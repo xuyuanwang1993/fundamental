@@ -27,22 +27,18 @@ list(APPEND lib_source ${impl_source})
 # Add to source group, TREE will enable cmake to config the folder layout automatically
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${lib_source})
 
-# Create the static library
-add_library(${lib_name} STATIC ${lib_source})
+add_library(${lib_name}_property INTERFACE)
 
-# Config common include and link
-target_include_directories(${lib_name}
-    PUBLIC
-    ${src_root_dir}
+target_include_directories(${lib_name}_property INTERFACE
+${src_root_dir}
 )
 
-set_target_properties(${lib_name} PROPERTIES
+set_target_properties(${lib_name}_property PROPERTIES
     FOLDER ${src_root_dir}
 )
 
 # Config link dependencies
-target_link_libraries(${lib_name}
-    PUBLIC
+target_link_libraries(${lib_name}_property INTERFACE
     ${RTTR_LIB}
     spdlog
     eventpp
@@ -50,4 +46,22 @@ target_link_libraries(${lib_name}
     BuildSettings
 )
 
+# Create the static library
+add_library(${lib_name}_s STATIC ${lib_source})
+
+# Config link dependencies
+target_link_libraries(${lib_name}_s
+    PUBLIC
+    ${lib_name}_property
+)
+
+# Create the static library
+add_library(${lib_name} SHARED ${lib_source})
+# Config link dependencies
+target_link_libraries(${lib_name}
+    PUBLIC
+    ${lib_name}_property
+)
+
 add_library(fh::${lib_name} ALIAS ${lib_name})
+add_library(fh::${lib_name}_s ALIAS ${lib_name}_s)

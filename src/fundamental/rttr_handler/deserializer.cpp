@@ -426,5 +426,11 @@ rttr::variant from_json(const std::string& json, const rttr::type& t, const Rttr
     return extract_value(json_obj, t, option);
 }
 
-} // end namespace io
+}
+
+void TestRttrInstance()
+{
+    std::cout<<"rttr instance :"<<&rttr::detail::get_registration_manager()<<std::endl;
+}
+// end namespace io
 } // namespace Fundamental

@@ -3,6 +3,7 @@
 #include <rttr/registration>
 #include <iostream>
 #include "fundamental/basic/log.h"
+#include "fundamental/rttr_handler/deserializer.h"
 struct MyPluginClass
 {
     MyPluginClass()
@@ -59,8 +60,23 @@ TestTypeRegister::TestTypeRegister()
 {
 }
 
+int * TestInstance::GetInstance1()
+{
+    static int i;
+    return &i;
+}
+static int instance2;
+int * TestInstance::GetInstance2()
+{
+    return &instance2;
+}
 DECALRE_PLUGIN_INIT_FUNCTION(PLUGIN_NAME)
 {
     FINFO("{} init", PLUGIN_NAME);
+    FWARN("plugin member->{}",(void*)&TestInstance::x);
+    FWARN("plugin func->{}",(void*)TestInstance::GetInstance1());
+    FWARN("plugin external->{}",(void*)TestInstance::GetInstance2());
+    Fundamental::Logger::TestLogInstance();
+    Fundamental::TestRttrInstance();
 }
 #endif

@@ -34,4 +34,5 @@ rttr::variant from_json_obj(const json& jsonObj, const rttr::type& t, const Rttr
      return true;
  }
  } // namespace io
+void TestRttrInstance();
 } // namespace RealiNative

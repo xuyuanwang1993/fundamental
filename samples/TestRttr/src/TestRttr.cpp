@@ -235,7 +235,9 @@ RTTR_REGISTRATION
 void TestPlugin();
 int main(int argc, char** argv)
 {
-    if (1)
+    Fundamental::Logger::TestLogInstance();
+    Fundamental::TestRttrInstance();
+    if (0)
     {
         FINFO("test rttr meta data");
         TestSerializeControl controlData;
@@ -535,4 +537,7 @@ void TestPlugin()
         abcd = Fundamental::io::to_json(v2);
         std::cout << "unload TestTypeRegister-test:" << abcd << std::endl;
     }
+    FWARN("exec member->{}",(void*)&TestInstance::x);
+    FWARN("exec func->{}",(void*)TestInstance::GetInstance1());
+    FWARN("exec external->{}",(void*)TestInstance::GetInstance2());
 }

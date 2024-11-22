@@ -36,7 +36,7 @@ static std::size_t s_logFileLimitSize                                = 10 * 1024
 static std::shared_ptr<NativeLogSink> s_nativeLogSink                = nullptr;
 static ErrorHandlerType s_errorHandler                               = nullptr;
 static LogMessageCatchFunc s_catchHandler                            = nullptr;
-static std::shared_ptr<spdlog::logger> s_loggerStorage               = spdlog::stdout_color_mt("console");
+static std::shared_ptr<spdlog::logger> s_loggerStorage               = spdlog::stdout_color_st("console");
 static std::shared_ptr<spdlog::pattern_formatter> s_formatterStorage = std::make_shared<spdlog::pattern_formatter>("%v", spdlog::pattern_time_type::local, "");
 struct LogGuard
 {
@@ -400,6 +400,8 @@ void Logger::Initialize(bool enableConsoleOutput)
 #if TARGET_PLATFORM_WINDOWS
             initList.emplace_back(std::make_shared<spdlog::sinks::wincolor_stdout_sink_mt>());
             initList.emplace_back(std::make_shared<spdlog::sinks::windebug_sink_mt>());
+#elif TARGET_PLATFORM_LINUX
+            initList.emplace_back(std::make_shared<spdlog::sinks::ansicolor_stdout_sink_st>());
 #endif
         }
         std::string fileName;
@@ -519,6 +521,12 @@ void Logger::PrintBackTrace()
 spdlog::pattern_formatter* Logger::GetStringFormatter()
 {
     return Logger::s_formatter;
+}
+
+void Logger::TestLogInstance()
+{
+    std::cout<<"internal log instance "<<details::s_loggerStorage.get()<<std::endl;
+    std::cout<<"spd log storage "<<&spdlog::details::registry::instance()<<std::endl;
 }
 
 void Logger::SetErrorHandler(const ErrorHandlerType& handler)

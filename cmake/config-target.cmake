@@ -4,7 +4,6 @@ add_library(BuildSettings INTERFACE)
 target_precompile_headers(BuildSettings INTERFACE "${CMAKE_CURRENT_LIST_DIR}/platform.h.in")
 target_compile_options(BuildSettings INTERFACE
     -std=c++17
-    -fPIC
     "$<$<CONFIG:Debug>:-DDEBUG_MODE -O0 -Wall -g2 -ggdb>"
     "$<$<CONFIG:Release>:-DNDEBUG -O3 -Wall>"
 )

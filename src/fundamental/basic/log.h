@@ -67,7 +67,7 @@ public:
      static bool IsDebuggerAttached();
      static void PrintBackTrace();
      static spdlog::pattern_formatter* GetStringFormatter();
-
+     static void TestLogInstance();
 private:
      static spdlog::pattern_formatter* s_formatter;
      static spdlog::logger* s_logger;

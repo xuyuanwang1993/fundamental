@@ -17,3 +17,10 @@ struct  TestTypeRegister
     std::string custom;
     TestEnumType enumType = TestEnum1;
 };
+
+struct TestInstance
+{
+    static int * GetInstance1();
+    static int * GetInstance2();
+    inline static int x;
+};
