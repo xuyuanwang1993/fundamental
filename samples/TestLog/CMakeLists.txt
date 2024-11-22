@@ -31,7 +31,7 @@ PRIVATE
 target_link_libraries(${app_target_name} 
 PRIVATE
     BuildSettings
-    fh::fundamental
+    fh::fundamental_s
 )
 
 

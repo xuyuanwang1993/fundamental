@@ -210,13 +210,15 @@ private:
                 m_writtenSize = 0;
             }
             auto newFileName = CalcFilename(m_baseFilename);
-            m_fileHelper.open(newFileName);
+
             if (newFileName != m_lastLogFileName)
             { // reset file status
                 m_fileIndex       = 1;
                 m_writtenSize     = 0;
                 m_lastLogFileName = newFileName;
             }
+            m_fileHelper.open(newFileName);
+            
         }
         catch (const std::exception& e)
         {

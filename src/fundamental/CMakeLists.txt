@@ -45,7 +45,7 @@ target_link_libraries(${lib_name}_property INTERFACE
     nlohmann::json
     BuildSettings
 )
-
+if(F_BUILD_STATIC)
 # Create the static library
 add_library(${lib_name}_s STATIC ${lib_source})
 
@@ -54,8 +54,11 @@ target_link_libraries(${lib_name}_s
     PUBLIC
     ${lib_name}_property
 )
+add_library(fh::${lib_name}_s ALIAS ${lib_name}_s)
+endif()
 
-# Create the static library
+if(F_BUILD_SHARED)
+# Create the shared library
 add_library(${lib_name} SHARED ${lib_source})
 # Config link dependencies
 target_link_libraries(${lib_name}
@@ -64,4 +67,4 @@ target_link_libraries(${lib_name}
 )
 
 add_library(fh::${lib_name} ALIAS ${lib_name})
-add_library(fh::${lib_name}_s ALIAS ${lib_name}_s)
+endif()

@@ -1,5 +1,10 @@
 set(RTTR_LIB RTTR::Core_Lib CACHE STRING "use rttr static lib")
 
+
+option(F_BUILD_STATIC "build static fundamental lib" ON)
+mark_as_advanced(F_BUILD_STATIC)
+option(F_BUILD_SHARED "build dynamic fundamental lib" OFF)
+
 add_library(BuildSettings INTERFACE)
 target_precompile_headers(BuildSettings INTERFACE "${CMAKE_CURRENT_LIST_DIR}/platform.h.in")
 target_compile_options(BuildSettings INTERFACE
