@@ -11,3 +11,6 @@ if(F_BUILD_SHARED)
 add_subdirectory(TestRttr)
 endif()
 
+if(ENABLE_DEBUG_MEMORY_TRACE)
+add_subdirectory(TestMemoryTracker)
+endif()

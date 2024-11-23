@@ -4,12 +4,12 @@
 
 namespace Fundamental
 {
-bool EventSystemWrapper::IsIdle() const
+bool EventSystem::IsIdle() const
 {
     return m_syncer.emptyQueue();
 }
 
-std::size_t EventSystemWrapper::EventsTick(std::size_t maxProcessEventNums, std::uint32_t maxProcessTimeMsec)
+std::size_t EventSystem::EventsTick(std::size_t maxProcessEventNums, std::uint32_t maxProcessTimeMsec)
 {
     auto startTimeMsec      = Fundamental::Timer::GetTimeNow();
     std::size_t proceedNums = 0;
@@ -28,25 +28,18 @@ std::size_t EventSystemWrapper::EventsTick(std::size_t maxProcessEventNums, std:
     return proceedNums;
 }
 
-/*
- * return false when the hash is existed
- */
-bool EventSystemWrapper::RegisterEvent(std::size_t eventHash)
+void EventSystem::RegisterEvent(std::size_t eventHash)
 {
-    return m_hashDic.insert(eventHash).second;
+    std::lock_guard<std::mutex> locker(m_mutex);
+    if(m_hashDic.insert(eventHash).second)
+    {
+        throw std::invalid_argument(StringFormat("{} is existed",eventHash));
+    }
 }
 
-EventHandleType EventSystemWrapper::AddEventListener(std::size_t eventHash, const EventCallbackType& listener)
+EventHandleType EventSystem::AddEventListener(std::size_t eventHash, const EventCallbackType& listener)
 {
     return m_syncer.appendListener(eventHash, listener);
 }
-void EventSystemWrapper::Release()
-{
-    m_hashDic.clear();
-    EQ clearEq;
-    std::swap(clearEq, m_syncer);
-}
-void EventSystemWrapper::Init()
-{ // do nothing
-}
+
 } // namespace Fundamental

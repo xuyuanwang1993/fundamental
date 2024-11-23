@@ -311,9 +311,9 @@ int main(int argc, char** argv)
             auto property = type::get<TestType>().get_property("data");
             assert(property.is_valid());
             TestType instance;
-            auto timeNow = Fundamental::GetTimeNow();
+            auto timeNow = Fundamental::Timer::GetTimeNow();
             property.set_value(instance, setData);
-            FWARN("cost {} ms", Fundamental::GetTimeNow()-timeNow);
+            FWARN("cost {} ms", Fundamental::Timer::GetTimeNow()-timeNow);
             assert(instance.data.size() == dataSize);
         }
         {
@@ -323,9 +323,9 @@ int main(int argc, char** argv)
             auto property = type::get<TestType>().get_property("data");
             assert(property.is_valid());
             TestType instance;
-            auto timeNow = Fundamental::GetTimeNow();
+            auto timeNow = Fundamental::Timer::GetTimeNow();
             property.set_value(instance, std::ref(setData));
-            FWARN("cost {} ms", Fundamental::GetTimeNow() - timeNow);
+            FWARN("cost {} ms", Fundamental::Timer::GetTimeNow() - timeNow);
             assert(instance.data.size() == dataSize);
         }
         return 0;

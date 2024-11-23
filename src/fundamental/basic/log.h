@@ -121,8 +121,7 @@ inline std::string StringFormat(const char* fmt, const Arg1& arg1, const Args&..
 #define FFAIL(...) FLOG(Fundamental::LogLevel::critical, ##__VA_ARGS__)
 #define FWARN(...) FLOG(Fundamental::LogLevel::warn, ##__VA_ARGS__)
 
-#define FASSERT(_check, ...)                                                                                                                          \
-    if (!(_check))                                                                                                                                          \
+#define FASSERT(_check, ...) if(!(_check))\
     {                                                                                                                                                       \
         Fundamental::Logger::LogOutput(Fundamental::LogLevel::critical, "[" __FILE__ ":"                                                        \
                                                                                     "(" STR_HELPER(__LINE__) ")] [check:" #_check "] " __VA_ARGS__); \
@@ -130,10 +129,7 @@ inline std::string StringFormat(const char* fmt, const Arg1& arg1, const Args&..
         assert((_check));                                                                                                                                   \
     }
 
-#define FASSERT_ACTION(_check, _action, ...)\
-    if (!(_check))                                                                                                                                          \
-    {                                                                                                                                                       \
-        Fundamental::Logger::LogOutput(Fundamental::LogLevel::critical, "[" __FILE__ ":"                                                        \
-                                                                                    "(" STR_HELPER(__LINE__) ")] [check:" #_check "] " __VA_ARGS__); \
-        _action;                                                                                                                                            \
-    }
+#define FASSERT_ACTION(_check, _action, ...) if (!(_check)){Fundamental::Logger::LogOutput(Fundamental::LogLevel::critical, "[" __FILE__ ":""(" STR_HELPER(__LINE__) ")] [check:" #_check "] " __VA_ARGS__);_action;}
+
+                                    
+/*end of file*/

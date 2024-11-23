@@ -5,24 +5,18 @@ file(GLOB lib_source
     *.h
     *.cpp
     *.hpp
-    basic/*.h
-    basic/*.cpp
-    basic/*.hpp
-    delay_queue/*.h
-    delay_queue/*.cpp
-    delay_queue/*.hpp
-    events/*.h
-    events/*.cpp
-    events/*.hpp
-    rttr_handler/*.h
-    rttr_handler/*.cpp
-    rttr_handler/*.hpp
-    thread_pool/*.h
-    thread_pool/*.cpp
-    thread_pool/*.hpp
-    tracker/*.h
-    tracker/*.cpp
-    tracker/*.hpp
+    core/*.h
+    core/*.cpp
+    core/*.hpp
+    imp/*.h
+    imp/*.cpp
+    imp/*.hpp
+    imp/base/*.h
+    imp/base/*.cpp
+    imp/base/*.hpp
+    imp/tcp/*.h
+    imp/tcp/*.cpp
+    imp/tcp/*.hpp
 )
 
 list(APPEND lib_source ${impl_source})
@@ -42,12 +36,9 @@ set_target_properties(${lib_name}_property PROPERTIES
 
 # Config link dependencies
 target_link_libraries(${lib_name}_property INTERFACE
-    ${RTTR_LIB}
-    spdlog
-    eventpp
-    nlohmann::json
     BuildSettings
 )
+
 if(F_BUILD_STATIC)
 # Create the static library
 add_library(${lib_name}${STATIC_LIB_SUFFIX} STATIC ${lib_source})
@@ -56,6 +47,7 @@ add_library(${lib_name}${STATIC_LIB_SUFFIX} STATIC ${lib_source})
 target_link_libraries(${lib_name}${STATIC_LIB_SUFFIX}
     PUBLIC
     ${lib_name}_property
+    ${GLOB_NAMESPACE}fundamental${STATIC_LIB_SUFFIX}
 )
 add_library(${GLOB_NAMESPACE}${lib_name}${STATIC_LIB_SUFFIX} ALIAS ${lib_name}${STATIC_LIB_SUFFIX})
 endif()
@@ -67,6 +59,7 @@ add_library(${lib_name} SHARED ${lib_source})
 target_link_libraries(${lib_name}
     PUBLIC
     ${lib_name}_property
+    ${GLOB_NAMESPACE}fundamental
 )
 
 add_library(${GLOB_NAMESPACE}${lib_name} ALIAS ${lib_name})

@@ -28,6 +28,6 @@ set_target_properties(${lib_name} PROPERTIES
 # Config link dependencies
 target_link_libraries(${lib_name}
     PUBLIC
-    fh::fundamental
+    ${GLOB_NAMESPACE}fundamental
     BuildSettings
 )

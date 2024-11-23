@@ -1,8 +1,9 @@
 
 #pragma once
-
 #include "event_system.h"
 #include <string>
+#include <mutex>
+#include <condition_variable>
 namespace Fundamental
 {
 
@@ -11,7 +12,7 @@ struct EngineProcessEvent : Fundamental::Event
 {
     using TaskType = std::function<void()>;
     // an event must contain 'kEventType' field;
-    constexpr inline static std::size_t kEventType = ComputeEventHash(0, "EngineProcessEvent", "EngineProcessEvent", "Interface");
+    constexpr inline static std::size_t kEventType = ComputeEventHash(0, "EngineProcessEvent", "EngineProcessEvent", "Interface")|1;
 
     EngineProcessEvent(const TaskType& task) :
     Event(kEventType),
@@ -22,33 +23,38 @@ struct EngineProcessEvent : Fundamental::Event
 };
 
 class DelayQueue;
-class EventSystemWrapper;
-
+class EventSystem;
 // EventsHandler will add a listener for Events::EngineProcessEvent by default
-struct EventsModel;
-struct  EventsHandler
+class EventsHandler
 {
-    friend struct EventsModel;
-    struct EventsModelData;
+public:
     EventsHandler();
     virtual ~EventsHandler();
-    virtual void Init();
-    void PostProcessEvent(const std::function<void()>& event);
-    void WakeUp();
+    //post call events to the events tick thread
+    virtual void PostProcessEvent(const std::function<void()>& event);
+    //update internal status
     virtual void Tick();
-    Fundamental::EventSystemWrapper* pEventSystem = nullptr;
-    Fundamental::DelayQueue* pDelayQueue          = nullptr;
-    EventsModelData* pEventsModelData                = nullptr;
+    void WakeUp();
+    Fundamental::EventSystem* EventSystem();
+    Fundamental::DelayQueue* DelayQueue();
+protected:
+    virtual void WakeUpImp()=0;
+    virtual void Wait(std::int64_t timeMsec)=0;
+protected:
+    Fundamental::EventSystem* pEventSystem = nullptr;
+    Fundamental::DelayQueue* pDelayQueue   = nullptr;
 };
 
-struct  EventsModel
+
+class EventsHandlerNormal : public EventsHandler
 {
-    EventsModel(EventsHandler* handleRef, const std::string& description);
-    virtual ~EventsModel();
-    virtual void Init();
-    virtual bool IsIdle();
-    virtual void Tick();
-    EventsHandler* const pHandleRef = nullptr;
+public:
+    void WakeUpImp() override;
+    void Wait(std::int64_t timeMsec) override;
+
+protected:
+    std::mutex notifyMutex;
+    std::condition_variable cv;
 };
 
 } // namespace Fundamental

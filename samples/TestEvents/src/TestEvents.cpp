@@ -6,8 +6,7 @@
 #include <fstream>
 #include <future>
 #include <memory>
-#if 1
-static Fundamental::EventSystemWrapper* g_nativeEventSystem = nullptr;
+static Fundamental::EventSystem* g_nativeEventSystem = nullptr;
 static std::unique_ptr<std::thread> s_nativeLoopThread;
 static bool g_exitFlag = false;
 
@@ -43,7 +42,7 @@ int main(int argc, char* argv[])
 {
     using EventType = Events::NativeNotifyEvents;
     // init native
-    g_nativeEventSystem = new Fundamental::EventSystemWrapper();
+    g_nativeEventSystem = new Fundamental::EventSystem();
     NativeBindEventListener();
     { // test disaptcher directly
         g_nativeEventSystem->DispatcherImmediateEvent<Events::NativeCallEvents>("test", 0);
@@ -64,12 +63,44 @@ int main(int argc, char* argv[])
     s_nativeLoopThread->join();
     delete g_nativeEventSystem;
     StressTesting(1000000);
+    Fundamental::Signal<void()> test;
+    test.Connect([](){
+
+        FINFO("simple signal");
+    });
+    test.Emit();
+    Fundamental::Signal<void(int)> testInt;
+    testInt.Connect([](int index){
+
+        FINFO("int singnal {}",index);
+    });
+    
+    testInt.Connect([](int index){
+
+        FINFO("test multi int singnal {}",index);
+    });
+    auto h=testInt.Connect([](int index){
+
+        FINFO("test remove int singnal {}",index);
+    });
+    std::thread([&](){
+        int cnt=10;
+        while(cnt>0)
+        {
+            --cnt;
+            if(cnt==5)
+            {
+                FWARN("remove handle");
+                testInt.DisConnect(h);
+            }
+            testInt.Emit(cnt);
+        }
+    }).join();
     return 0;
 }
 
 void NativeLoop()
 {
-    g_nativeEventSystem->Init();
 
     while (!g_exitFlag)
     {
@@ -77,8 +108,6 @@ void NativeLoop()
         // do some logic handler
         std::this_thread::yield();
     }
-
-    g_nativeEventSystem->Release();
 }
 
 void NativeBindEventListener()
@@ -106,7 +135,7 @@ void StressTesting(std::size_t eventNum)
 {
     using EventType = Events::NativeNotifyEvents;
     // init native
-    g_nativeEventSystem = new Fundamental::EventSystemWrapper();
+    g_nativeEventSystem = new Fundamental::EventSystem();
     std::size_t count   = 0;
     std::condition_variable exitCV;
     std::mutex syncMutex;
@@ -141,9 +170,4 @@ void StressTesting(std::size_t eventNum)
     s_nativeLoopThread->join();
     delete g_nativeEventSystem;
 }
-#else
-int main()
-{
-    return 0;
-}
-#endif
+

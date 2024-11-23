@@ -111,7 +111,7 @@ struct DelayQueue::Imp
         if (session->bWorking)
             return true;
         session->bWorking = true;
-        session->SetNextTimeout(GetTimeNow());
+        session->SetNextTimeout(Timer::GetTimeNow<std::chrono::milliseconds,std::chrono::steady_clock>());
         processingTasks.insert(std::make_pair(session->nextTimeout, handle));
         return true;
     }
@@ -141,7 +141,7 @@ struct DelayQueue::Imp
         auto* session = Cast(handle);
         processingTasks.erase(std::make_pair(session->nextTimeout, handle));
         session->bWorking = true;
-        session->SetNextTimeout(GetTimeNow());
+        session->SetNextTimeout(Timer::GetTimeNow<std::chrono::milliseconds,std::chrono::steady_clock>());
         processingTasks.insert(std::make_pair(session->nextTimeout, handle));
         return true;
     }
@@ -180,7 +180,7 @@ struct DelayQueue::Imp
         {
             return static_cast<std::int64_t>(~0);
         }
-        return processingTasks.begin()->first - GetTimeNow();
+        return processingTasks.begin()->first - Timer::GetTimeNow<std::chrono::milliseconds,std::chrono::steady_clock>();
     }
 
     inline bool UpdateTaskInterval(HandleType handle, std::int64_t intervalMs)
@@ -198,7 +198,7 @@ struct DelayQueue::Imp
 
         std::list<HandleType> expiredHandles;
         std::list<TaskType> expiredTasks;
-        auto now = GetTimeNow();
+        auto now = Timer::GetTimeNow<std::chrono::milliseconds,std::chrono::steady_clock>();
         {
             // take all  expired tasks
             std::lock_guard<std::mutex> locker(dataMutex);
@@ -228,7 +228,7 @@ struct DelayQueue::Imp
                     session->bWorking = false;
                 if (session->bWorking)
                 { // push back task for next cycle
-                    session->SetNextTimeout(GetTimeNow());
+                    session->SetNextTimeout(Timer::GetTimeNow<std::chrono::milliseconds,std::chrono::steady_clock>());
                     processingTasks.insert(std::make_pair(session->nextTimeout, handle));
                 }
                 else
