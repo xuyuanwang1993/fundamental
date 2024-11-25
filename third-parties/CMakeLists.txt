@@ -33,3 +33,7 @@ add_subdirectory(rttr-source)
 add_library(json_lib INTERFACE)
 target_include_directories(json_lib INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/nlohmann-source)
 add_library(nlohmann::json ALIAS json_lib)
+
+add_library(asio_lib INTERFACE)
+target_include_directories(asio_lib INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/asio-source)
+add_library(asio ALIAS asio_lib)
