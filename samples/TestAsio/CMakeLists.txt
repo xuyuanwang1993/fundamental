@@ -32,7 +32,7 @@ target_link_libraries(${app_target_name}
 PRIVATE
     BuildSettings
     ${GLOB_NAMESPACE}fundamental${STATIC_LIB_SUFFIX}
-    asio
+    ${GLOB_NAMESPACE}network${STATIC_LIB_SUFFIX}
 )
 
 

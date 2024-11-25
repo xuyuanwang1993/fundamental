@@ -37,7 +37,8 @@ public:
     }
 
     static std::string GetTimeStr(const char* format = "%F %T");
-
+    // t should be convert to seconds
+    static std::string ToTimeStr(std::time_t t,const char* format = "%F %T");
 private:
     std::chrono::high_resolution_clock::time_point m_previousTime;
     mutable std::mutex m_timePointMutex;

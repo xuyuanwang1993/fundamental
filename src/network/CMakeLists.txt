@@ -5,25 +5,18 @@ file(GLOB lib_source
     *.h
     *.cpp
     *.hpp
-    basic/*.h
-    basic/*.cpp
-    basic/*.hpp
-    delay_queue/*.h
-    delay_queue/*.cpp
-    delay_queue/*.hpp
-    events/*.h
-    events/*.cpp
-    events/*.hpp
-    rttr_handler/*.h
-    rttr_handler/*.cpp
-    rttr_handler/*.hpp
-    thread_pool/*.h
-    thread_pool/*.cpp
-    thread_pool/*.hpp
-    tracker/*.h
-    tracker/*.cpp
-    tracker/*.hpp
+    server/*.h
+    server/*.cpp
+    server/*.hpp
 )
+
+file(GLOB_RECURSE services_source
+    services/*.h
+    services/*.cpp
+    services/*.hpp
+)
+
+list(APPEND lib_source ${services_source})
 
 # Add to source group, TREE will enable cmake to config the folder layout automatically
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${lib_source})
@@ -40,11 +33,9 @@ set_target_properties(${lib_name}_property PROPERTIES
 
 # Config link dependencies
 target_link_libraries(${lib_name}_property INTERFACE
-    ${RTTR_LIB}
-    spdlog
-    eventpp
-    nlohmann::json
     BuildSettings
+    ${GLOB_NAMESPACE}fundamental${STATIC_LIB_SUFFIX}
+    asio
 )
 if(F_BUILD_STATIC)
 # Create the static library

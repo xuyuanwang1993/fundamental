@@ -50,6 +50,11 @@ template double Timer::GetDuration<Timer::TimeScale::Millisecond>() const;
 std::string Timer::GetTimeStr(const char* format)
 {
     auto t           = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    return ToTimeStr(t,format);
+}
+
+std::string Timer::ToTimeStr(std::time_t t, const char* format)
+{
     char timeStr[64] = { 0 };
     
 #if TARGET_PLATFORM_LINUX|| TARGET_PLATFORM_WINDOWS

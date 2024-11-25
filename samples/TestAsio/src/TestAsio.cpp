@@ -1,90 +1,13 @@
 
-#include "asio.hpp"
+
 #include "fundamental/basic/log.h"
+#include "network/services/echo/echo_connection.hpp"
+#include "network/services/echo/echo_client.hpp"
+#include "fundamental/delay_queue/delay_queue.h"
 #include <cstdlib>
 #include <iostream>
 #include <memory>
 #include <utility>
-using asio::ip::tcp;
-
-class session
-: public std::enable_shared_from_this<session>
-{
-public:
-    session(tcp::socket socket) :
-    socket_(std::move(socket))
-    {
-    }
-
-    void start()
-    {
-        do_read();
-    }
-
-private:
-    void do_read()
-    {
-        auto self(shared_from_this());
-        socket_.async_read_some(asio::buffer(data_, max_length),
-                                [this, self](std::error_code ec, std::size_t length) {
-                                    if (!ec)
-                                    {
-                                        do_write(length);
-                                    }
-                                });
-    }
-
-    void do_write(std::size_t length)
-    {
-        auto self(shared_from_this());
-        asio::async_write(socket_, asio::buffer(data_, length),
-                          [this, self](std::error_code ec, std::size_t /*length*/) {
-                              if (!ec)
-                              {
-                                  do_read();
-                              }
-                          });
-    }
-
-    tcp::socket socket_;
-    enum
-    {
-        max_length = 1024
-    };
-    char data_[max_length];
-};
-
-class server
-{
-public:
-    server(asio::io_context& io_context, short port) :
-    acceptor_(io_context, tcp::endpoint(tcp::v4(), port))
-    {
-        do_accept();
-    }
-
-private:
-    void do_accept()
-    {
-        acceptor_.async_accept(
-            [this](std::error_code ec, tcp::socket socket) {
-                if (!ec)
-                {
-                    std::make_shared<session>(std::move(socket))->start();
-                }
-
-                do_accept();
-            });
-    }
-
-    tcp::acceptor acceptor_;
-};
-
-enum
-{
-    max_length = 1024
-};
-
 
 int main(int argc, char* argv[])
 {
@@ -92,57 +15,82 @@ int main(int argc, char* argv[])
     if (!p)
     {
         FINFO("you can set env \"CLIENT\" to perform as a client role");
-        try
+         try
         {
-            if (argc != 2)
+            // Check command line arguments.
+            if (argc != 4)
             {
-                FERR("Usage: async_tcp_echo_server <port>");
+                std::cerr << "Usage: echo_server <address> <port> <threads>\n";
+                std::cerr << "  For IPv4, try:\n";
+                std::cerr << "    receiver 0.0.0.0 80 1 .\n";
+                std::cerr << "  For IPv6, try:\n";
+                std::cerr << "    receiver 0::0 80 1 .\n";
                 return 1;
             }
 
-            asio::io_context io_context;
+            // Initialise the server.
+            std::size_t num_threads = std::stoi(argv[3]);
+            network::echo::EchoServer s(argv[1], argv[2], num_threads);
 
-            server s(io_context, std::atoi(argv[1]));
-
-            io_context.run();
+            // Run the server until stopped.
+            s.Run();
         }
         catch (std::exception& e)
         {
-            FERR("Exception: {}",e.what());
+            FERR("exception: {}",e.what());
         }
 
         return 0;
     }
     else
     {
+        using asio::ip::tcp;
         try
         {
             if (argc != 3)
             {
-                FERR("Usage: blocking_tcp_echo_client <host> <port>");
+                std::cerr << "Usage: echo_client <host> <port>\n";
                 return 1;
             }
 
             asio::io_context io_context;
 
-            tcp::socket s(io_context);
             tcp::resolver resolver(io_context);
-            asio::connect(s, resolver.resolve(argv[1], argv[2]));
+            auto endpoints = resolver.resolve(argv[1], argv[2]);
+            network::echo::echo_client c(io_context, endpoints);
 
-            std::cout << "Enter message: ";
-            char request[max_length];
-            std::cin.getline(request, max_length);
-            size_t request_length = std::strlen(request);
-            asio::write(s, asio::buffer(request, request_length));
-
-            char reply[max_length];
-            size_t reply_length = asio::read(s,
-                                             asio::buffer(reply, request_length));
-            FINFO("Reply is: {}",std::string(reply,reply_length));
+            std::thread t([&io_context]() { io_context.run(); });
+            auto maxSize=64;
+            char line[maxSize- 1];
+            bool isRunning=true;
+            c.wait_connect();
+            while (c.connected()&&isRunning&&std::cin.getline(line, maxSize + 1))
+            {
+                network::echo::EchoMsg msg;
+                auto len=std::strlen(line);
+                if(0==len)
+                    continue;
+                FINFO("read size:{}",len);
+                if(strncmp(line,"#",1)==0)
+                {
+                    FWARN("disconnected request");
+                    len=0;
+                    isRunning=false;
+                }
+                auto bufLen=len+network::echo::EchoMsg::kTimeStampSize;
+                msg.msg.resize(bufLen);
+                msg.header.v=htobe32(bufLen);
+                ;
+                msg.TimeStamp()=htobe64((Fundamental::Timer::GetTimeNow<std::chrono::seconds,std::chrono::system_clock>()));
+                std::memcpy(msg.Data(),line,len);
+                c.write(msg);
+            }
+            t.join();
+            c.close();
         }
         catch (std::exception& e)
         {
-            FERR("Exception: {}",e.what());
+            FERR("exception: {}",e.what());
         }
 
         return 0;
