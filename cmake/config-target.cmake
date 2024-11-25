@@ -1,11 +1,30 @@
-set(RTTR_LIB RTTR::Core_Lib CACHE STRING "use rttr static lib")
-
-
 option(F_BUILD_STATIC "build static fundamental lib" ON)
-mark_as_advanced(F_BUILD_STATIC)
 option(F_BUILD_SHARED "build dynamic fundamental lib" OFF)
+option(ENABLE_DEBUG_MEMORY_TRACE "enable memory track" ON)
+
+set(RTTR_LIB RTTR::Core_Lib CACHE STRING "use rttr static lib")
+set(GLOB_NAMESPACE "fh::" CACHE STRING "generated lib namespace")
+if(F_BUILD_SHARED)
+set(STATIC_LIB_SUFFIX _s CACHE STRING "static lib suffix")
+endif()
+
+#make these values invisible
+mark_as_advanced(F_BUILD_STATIC)
+
 
 add_library(BuildSettings INTERFACE)
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+message(STATUS "build on linux")
+add_definitions(-DTARGET_PLATFORM_LINUX=1)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+add_definitions(-DTARGET_PLATFORM_WINDOWS=1)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+add_definitions(-DTARGET_PLATFORM_MAC=1)
+else()
+message(FATAL_ERROR "Unknown platform.")
+endif()
+
 target_precompile_headers(BuildSettings INTERFACE "${CMAKE_CURRENT_LIST_DIR}/platform.h.in")
 target_compile_options(BuildSettings INTERFACE
     -std=c++17
@@ -14,11 +33,16 @@ target_compile_options(BuildSettings INTERFACE
 )
 
 target_compile_definitions(BuildSettings INTERFACE
-    "$<$<CONFIG:Debug>:DEBUG_MODE>"
     "$<$<CONFIG:Debug>:VERBOSE_LOGGING>"
     "$<$<CONFIG:Release>:NDEBUG>"
     "$<$<CONFIG:Release>:OPTIMIZED>"
 )
+
+if(ENABLE_DEBUG_MEMORY_TRACE)
+target_compile_definitions(BuildSettings INTERFACE
+    "$<$<CONFIG:Debug>:WITH_MEMORY_TRACK>"
+)
+endif()
 
 set_target_properties(BuildSettings PROPERTIES POSITION_INDEPENDENT_CODE ON)
 

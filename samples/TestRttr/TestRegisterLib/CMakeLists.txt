@@ -7,8 +7,6 @@ file(GLOB lib_source
     *.hpp
 )
 
-list(APPEND lib_source ${impl_source})
-
 # Add to source group, TREE will enable cmake to config the folder layout automatically
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${lib_source})
 activate_precompiled_headers(pch.h lib_source)
@@ -28,6 +26,6 @@ set_target_properties(${lib_name} PROPERTIES
 # Config link dependencies
 target_link_libraries(${lib_name}
     PUBLIC
-    fh::fundamental
+    ${GLOB_NAMESPACE}fundamental
     BuildSettings
 )

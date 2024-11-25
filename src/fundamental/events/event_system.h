@@ -13,18 +13,19 @@ using EventHandleType = decltype(std::declval<EQ>().appendListener(std::declval<
 struct InternalNotifyQueuedEvent : Fundamental::Event
 {
     // an event must contain 'kEventType' field;
-    constexpr inline static std::size_t kEventType = ComputeEventHash(0, "InternalNotifyQueuedEvent", "InternalNotifyQueuedEvent", "internal");
+    constexpr inline static std::size_t kEventType = ComputeEventHash(0, "InternalNotifyQueuedEvent", "InternalNotifyQueuedEvent", "internal")|1;
 
     InternalNotifyQueuedEvent() :
     Event(kEventType)
     {
     }
 };
-class EventSystemWrapper
+
+class EventSystem
 {
 public:
-    EventSystemWrapper()          = default;
-    virtual ~EventSystemWrapper() = default;
+    EventSystem()          = default;
+    virtual ~EventSystem() = default;
 
     bool IsIdle() const;
     /*
@@ -36,9 +37,9 @@ public:
     std::size_t EventsTick(std::size_t maxProcessEventNums = static_cast<std::size_t>(~0), std::uint32_t maxProcessTimeMsec = 20);
 
     /*
-     * return false when the hash is existed
+     * throw std::invalid_argument when the eventHash is existed
      */
-    bool RegisterEvent(std::size_t eventHash);
+    void RegisterEvent(std::size_t eventHash);
 
     /*
      * append an event listener
@@ -59,12 +60,9 @@ public:
     template <typename EventDataType, typename... Args>
     decltype(auto) DispatcherImmediateEvent(Args&&... args);
 
-    void Release();
-
-    void Init();
-
 protected:
     EQ m_syncer;
+    std::mutex m_mutex;
     std::set<std::size_t> m_hashDic;
 };
 
@@ -76,7 +74,7 @@ protected:
  */
 
 template <typename EventDataType, typename... Args>
-inline decltype(auto) EventSystemWrapper::DispatcherImmediateEvent(Args&&... args)
+inline decltype(auto) EventSystem::DispatcherImmediateEvent(Args&&... args)
 {
     return m_syncer.dispatch(std::make_shared<EventDataType>(std::forward<Args>(args)...));
 }
@@ -87,10 +85,76 @@ inline decltype(auto) EventSystemWrapper::DispatcherImmediateEvent(Args&&... arg
  */
 
 template <typename EventDataType, typename... Args>
-inline decltype(auto) EventSystemWrapper::DispatcherEvent(Args&&... args)
+inline decltype(auto) EventSystem::DispatcherEvent(Args&&... args)
 {
-    EventSystemWrapper::template DispatcherImmediateEvent<InternalNotifyQueuedEvent>();
+    EventSystem::template DispatcherImmediateEvent<InternalNotifyQueuedEvent>();
     return m_syncer.enqueue(std::make_shared<EventDataType>(std::forward<Args>(args)...));
 }
+
+
+template <
+	typename Prototype,
+	typename PoliciesType
+>
+class SignalBase;
+
+// callbacklist wapper class
+template <
+	typename PoliciesType,
+	typename ReturnType, typename ...Args
+>
+class SignalBase<
+	ReturnType (Args...),
+	PoliciesType
+>
+{
+public:
+    using Callback_ = typename eventpp::internal_::SelectCallback<
+		PoliciesType,
+		eventpp::internal_::HasTypeCallback<PoliciesType>::value,
+		std::function<ReturnType (Args...)>
+	>::Type;
+    using HandleType=typename eventpp::CallbackList<ReturnType (Args...),PoliciesType>::Handle;
+public:
+    HandleType Connect(const Callback_& callback);
+    bool DisConnect(HandleType handle);
+    void Emit(Args ... args);
+    void operator() (Args ... args);
+private:
+    eventpp::CallbackList<ReturnType (Args...),PoliciesType> _connections;
+};
+
+template <typename PoliciesType, typename ReturnType, typename... Args>
+inline typename SignalBase<ReturnType(Args...), PoliciesType>::HandleType SignalBase<ReturnType(Args...), PoliciesType>::Connect(const Callback_& callback)
+{
+    return _connections.append(callback);
+}
+
+template <typename PoliciesType, typename ReturnType, typename... Args>
+inline bool SignalBase<ReturnType(Args...), PoliciesType>::DisConnect(HandleType handle)
+{
+    return _connections.remove(handle);
+}
+
+template <typename PoliciesType, typename ReturnType, typename... Args>
+inline void SignalBase<ReturnType(Args...), PoliciesType>::Emit(Args... args)
+{
+    _connections(std::forward<Args>(args)...);
+}
+
+template <typename PoliciesType, typename ReturnType, typename... Args>
+inline void SignalBase<ReturnType(Args...), PoliciesType>::operator()(Args... args)
+{
+    _connections(std::forward<Args>(args)...);
+}
+
+template <
+	typename Prototype_,
+	typename Policies_ = eventpp::DefaultPolicies
+>
+class Signal : public SignalBase<Prototype_, Policies_>
+{
+
+};
 
 } // namespace Fundamental

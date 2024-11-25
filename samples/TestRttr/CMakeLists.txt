@@ -34,7 +34,7 @@ target_link_libraries(${app_target_name}
 PRIVATE
     ${RTTR_LIB}
     BuildSettings
-    fh::fundamental
+    ${GLOB_NAMESPACE}fundamental
     TestRegisterLib
 )
 

@@ -6,14 +6,6 @@
 #include <mutex>
 namespace Fundamental
 {
-// GetTimestamp from 1970
-template <class ChronoTimeType = std::chrono::milliseconds, typename ClockType = std::chrono::steady_clock>
-inline std::int64_t GetTimeNow()
-{
-    auto timePoint = ClockType::now();
-    return std::chrono::duration_cast<ChronoTimeType>(timePoint.time_since_epoch()).count();
-}
-
 class Timer 
 {
 
@@ -45,7 +37,8 @@ public:
     }
 
     static std::string GetTimeStr(const char* format = "%F %T");
-
+    // t should be convert to seconds
+    static std::string ToTimeStr(std::time_t t,const char* format = "%F %T");
 private:
     std::chrono::high_resolution_clock::time_point m_previousTime;
     mutable std::mutex m_timePointMutex;

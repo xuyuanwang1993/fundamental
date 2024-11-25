@@ -20,9 +20,10 @@ file(GLOB lib_source
     thread_pool/*.h
     thread_pool/*.cpp
     thread_pool/*.hpp
+    tracker/*.h
+    tracker/*.cpp
+    tracker/*.hpp
 )
-
-list(APPEND lib_source ${impl_source})
 
 # Add to source group, TREE will enable cmake to config the folder layout automatically
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${lib_source})
@@ -47,14 +48,14 @@ target_link_libraries(${lib_name}_property INTERFACE
 )
 if(F_BUILD_STATIC)
 # Create the static library
-add_library(${lib_name}_s STATIC ${lib_source})
+add_library(${lib_name}${STATIC_LIB_SUFFIX} STATIC ${lib_source})
 
 # Config link dependencies
-target_link_libraries(${lib_name}_s
+target_link_libraries(${lib_name}${STATIC_LIB_SUFFIX}
     PUBLIC
     ${lib_name}_property
 )
-add_library(fh::${lib_name}_s ALIAS ${lib_name}_s)
+add_library(${GLOB_NAMESPACE}${lib_name}${STATIC_LIB_SUFFIX} ALIAS ${lib_name}${STATIC_LIB_SUFFIX})
 endif()
 
 if(F_BUILD_SHARED)
@@ -66,5 +67,5 @@ target_link_libraries(${lib_name}
     ${lib_name}_property
 )
 
-add_library(fh::${lib_name} ALIAS ${lib_name})
+add_library(${GLOB_NAMESPACE}${lib_name} ALIAS ${lib_name})
 endif()

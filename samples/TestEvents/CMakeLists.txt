@@ -30,7 +30,7 @@ PRIVATE
 # Config links
 target_link_libraries(${app_target_name}    
 PRIVATE
-    fh::fundamental_s
+    ${GLOB_NAMESPACE}fundamental${STATIC_LIB_SUFFIX}
 )
 
 # Add target name
