@@ -8,11 +8,23 @@ namespace network
 {
 struct RequestHandlerDummy
 {
-
 };
 
-//when data is coming we should parse the reuqest data first util a valid reuqest recv finished
-//then we need a handler to process the request
+// when data is coming we should parse the reuqest data first util a valid reuqest recv finished
+// then we need a handler to process the request
+
+template <typename RequestHandler>
+struct ConnectionInterface
+{
+    explicit ConnectionInterface(asio::ip::tcp::socket socket, RequestHandler& handler_ref);
+    /// @brief called when a new connection set up
+    virtual void Start() = 0;
+    /// Socket for the connection.
+    asio::ip::tcp::socket socket_;
+
+    /// The handler used to process the incoming msgContext.
+    RequestHandler& request_handler_;
+};
 
 // RequestHandler maybe provide hwo a request is handled
 template <typename Connection, typename RequestHandler>
@@ -109,7 +121,7 @@ inline void Server<Connection, RequestHandler>::DoAccept()
                                {
                                    std::make_shared<Connection>(
                                        std::move(socket), request_handler_)
-                                       ->start();
+                                       ->Start();
                                }
 
                                DoAccept();
@@ -121,8 +133,15 @@ inline void Server<Connection, RequestHandler>::DoAwaitStop()
 {
     signals_.async_wait(
         [this](std::error_code ec, int signo) {
-            FDEBUG("quit server because of  signal:{} ec:{}",signo,ec.message());
+            FDEBUG("quit server because of  signal:{} ec:{}", signo, ec.message());
             io_context_pool_.stop();
         });
+}
+template <typename RequestHandler>
+inline ConnectionInterface<RequestHandler>::ConnectionInterface(asio::ip::tcp::socket socket, RequestHandler& handler_ref):
+socket_(std::move(socket)),
+request_handler_(handler_ref)
+{
+
 }
 } // namespace network

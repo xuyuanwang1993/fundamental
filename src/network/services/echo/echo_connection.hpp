@@ -73,7 +73,7 @@ struct Builder
 
 /// Represents a single connection from a client.
 class connection
-: public std::enable_shared_from_this<connection>
+:public ConnectionInterface<EchoRequestHandler>,  public std::enable_shared_from_this<connection>
 {
 public:
     static constexpr std::size_t kPerReadMaxBytes = 16;
@@ -87,7 +87,7 @@ public:
                         EchoRequestHandler& handler);
 
     /// Start the first asynchronous operation for the connection.
-    void start();
+    void Start()override;
 
 private:
     void handle_close();
@@ -96,12 +96,6 @@ private:
 
     /// Perform an asynchronous write operation.
     void do_write();
-
-    /// Socket for the connection.
-    asio::ip::tcp::socket socket_;
-
-    /// The handler used to process the incoming msgContext.
-    EchoRequestHandler& request_handler_;
 
     MsgContext msgContext_;
     std::deque<EchoMsg> replys_;

@@ -10,12 +10,11 @@ namespace echo
 
 connection::connection(asio::ip::tcp::socket socket,
                        EchoRequestHandler& handler) :
-socket_(std::move(socket)),
-request_handler_(handler)
+ConnectionInterface<EchoRequestHandler>(std::move(socket),handler)
 {
 }
 
-void connection::start()
+void connection::Start()
 {
     do_read();
 }
