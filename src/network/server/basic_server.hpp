@@ -14,7 +14,7 @@ struct RequestHandlerDummy
 // then we need a handler to process the request
 
 template <typename RequestHandler>
-struct ConnectionInterface
+struct ConnectionInterface:public Fundamental::NonCopyable
 {
     explicit ConnectionInterface(asio::ip::tcp::socket socket, RequestHandler& handler_ref);
     /// @brief called when a new connection set up

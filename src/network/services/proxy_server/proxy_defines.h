@@ -8,8 +8,8 @@ namespace proxy
 
 enum ProxyOpCode : std::uint8_t
 {
-    InformationOp  = 0,
-    NetworkProxyOp = 1
+    AgentServiceOp = 0,
+    TrafficProxyOp = 1
 };
 
 using ProxySizeType                     = std::uint32_t;
@@ -20,11 +20,12 @@ struct ProxyFrame
     static constexpr std::uint16_t kFixed        = 0x6668;
     static constexpr std::uint8_t kVersion       = 0x01;
     static constexpr ProxySizeType kMaxFrameSize = 512 * 1024; // 512k
-    ProxyFrame():version(kVersion),op(0x00){
+    ProxyFrame() :
+    version(kVersion), op(0x00) {
 
     };
-    std::uint16_t fixed                          = kFixed;
-    std::uint8_t checkSum                        = 0;
+    std::uint16_t fixed   = kFixed;
+    std::uint8_t checkSum = 0;
     // version should be 0x01
     std::uint8_t version : 4;
     std::uint8_t op : 4;

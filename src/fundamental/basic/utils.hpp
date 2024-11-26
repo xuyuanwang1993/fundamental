@@ -2,29 +2,43 @@
 #define _HEAD_BASIC_UTILS_
 #include <chrono>
 #include <functional>
-namespace Fundamental {
+namespace Fundamental
+{
 
-struct NonCopyable {
-    NonCopyable() = default;
-    NonCopyable(const NonCopyable&) = delete;
+struct NonCopyable
+{
+    NonCopyable()                              = default;
+    NonCopyable(const NonCopyable&)            = delete;
     NonCopyable& operator=(const NonCopyable&) = delete;
 };
 
-using BasicTaskFunctionT=std::function<void()>;
+using BasicTaskFunctionT = std::function<void()>;
 struct ScopeGuard final : NonCopyable
 {
-    ScopeGuard(const BasicTaskFunctionT & _f,const BasicTaskFunctionT & initF=nullptr ):f(_f)
+    ScopeGuard(const BasicTaskFunctionT& _f, const BasicTaskFunctionT& initF = nullptr) :
+    f(_f)
     {
-        if(initF)
+        if (initF)
             initF();
     }
 
     ~ScopeGuard()
     {
-        if(f)
+        if (f)
             f();
     }
-    const BasicTaskFunctionT f=nullptr;
+    const BasicTaskFunctionT f = nullptr;
 };
-}
+
+template <typename T>
+struct Singleton : NonCopyable
+{
+    static T& Instance()
+    {
+        return instance;
+    };
+
+    inline static T instance;
+};
+} // namespace Fundamental
 #endif // _HEAD_BASIC_UTILS_

@@ -19,9 +19,6 @@ class Connection
     static constexpr std::size_t kMaxRecvRequestFrameTimeSec=30;
     friend struct ProxyRequestHandler;
 public:
-    Connection(const Connection&)            = delete;
-    Connection& operator=(const Connection&) = delete;
-
     /// Construct a Connection with the given socket.
     explicit Connection(asio::ip::tcp::socket socket,
                         ProxyRequestHandler& handler);

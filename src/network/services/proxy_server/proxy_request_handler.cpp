@@ -1,7 +1,9 @@
 #include "proxy_request_handler.hpp"
+#include "agent_service/agent_connection.hpp"
 #include "fundamental/basic/log.h"
 #include "fundamental/delay_queue/delay_queue.h"
 #include "proxy_connection.hpp"
+#include "traffic_proxy_service/traffic_proxy_connection.hpp"
 namespace network
 {
 namespace proxy
@@ -35,7 +37,7 @@ bool ProxyRequestHandler::DecodeHeader(const std::uint8_t* data, std::size_t len
         // decode payload size 4 bytes
         ProxySizeType payloadSize;
         std::memcpy(&payloadSize, data + offset, kProxySize);
-        static_assert(4 == kProxySize || 8 == kProxySize , "unsupported proxy size type");
+        static_assert(4 == kProxySize || 8 == kProxySize, "unsupported proxy size type");
         if constexpr (4 == kProxySize)
         {
             payloadSize = be32toh(payloadSize);
@@ -89,8 +91,8 @@ void ProxyRequestHandler::EncodeFrame(ProxyFrame& dstFrame)
         std::int32_t v;
     } opeationCheckSum;
     opeationCheckSum.v = 0;
-    auto bufferSize = dstFrame.payload.GetSize();
-    auto ptr        = dstFrame.payload.GetData();
+    auto bufferSize    = dstFrame.payload.GetSize();
+    auto ptr           = dstFrame.payload.GetData();
     // mask the origin data
     for (decltype(bufferSize) i = 0; i < bufferSize; i += 4)
     {
@@ -107,7 +109,43 @@ void ProxyRequestHandler::EncodeFrame(ProxyFrame& dstFrame)
 
 void ProxyRequestHandler::UpgradeProtocal(Connection&& connection)
 {
-    //
+    FDEBUG("proxy version {} op {} size:{}", connection.requestFrame.version,
+           connection.requestFrame.op,
+           connection.requestFrame.payload.GetSize());
+    auto op = connection.requestFrame.op;
+    switch (op)
+    {
+    case ProxyOpCode::AgentServiceOp:
+    {
+        std::make_shared<AgentConnection>(
+            std::move(connection.socket_), std::move(connection.requestFrame))
+            ->SetUp();
+    }
+    break;
+    case ProxyOpCode::TrafficProxyOp:
+    {
+        std::make_shared<TrafficProxyConnection>(
+            std::move(connection.socket_), std::move(connection.requestFrame))
+            ->SetUp();
+    }
+    break;
+    default:
+    {
+        FWARN("unsupported proxy op {} for version {}", ProxyFrame::kVersion,
+               connection.requestFrame.op);
+    }
+    break;
+    }
+}
+
+ProxeServiceBase::ProxeServiceBase(asio::ip::tcp::socket&& socket, ProxyFrame&& frame) :
+socket_(std::forward<asio::ip::tcp::socket>(socket)),
+frame(std::forward<ProxyFrame>(frame))
+{
+}
+
+ProxeServiceBase::~ProxeServiceBase()
+{
 }
 
 } // namespace proxy
