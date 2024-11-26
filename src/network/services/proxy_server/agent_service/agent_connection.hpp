@@ -10,6 +10,8 @@ class AgentConnection : public ProxeServiceBase, public std::enable_shared_from_
 public:
     explicit AgentConnection(asio::ip::tcp::socket&& socket, ProxyFrame&& frame);
     void SetUp() override;
+private:
+    void ProcessCmd();
 };
 } // namespace proxy
 } // namespace network

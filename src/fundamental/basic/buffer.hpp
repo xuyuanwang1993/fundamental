@@ -1,10 +1,11 @@
 #pragma once
 #include <cstdint>
 #include <cstdlib>
-#include <type_traits>
-#include <string>
-#include <stdexcept>
 #include <cstring>
+#include <stdexcept>
+#include <string>
+#include <type_traits>
+
 namespace Fundamental
 {
 
@@ -27,9 +28,9 @@ public:
 
     ~Buffer();
 
-    // Disable copy
-    Buffer(const Buffer&)            = delete;
-    Buffer& operator=(const Buffer&) = delete;
+    // overwrite copy
+    Buffer(const Buffer&);
+    Buffer& operator=(const Buffer&);
 
     // Enable move
     Buffer(Buffer&&) noexcept;
@@ -50,12 +51,12 @@ public:
         }
         if (freeOriginalData)
             FreeBuffer();
-        auto fixedSize=AlignSize_-(sizeInBytes%AlignSize_);
-        std::uint8_t* newPtr = reinterpret_cast<std::uint8_t*>(std::realloc(m_pRaw, sizeInBytes+fixedSize));
+        auto fixedSize       = AlignSize_ - (sizeInBytes % AlignSize_);
+        std::uint8_t* newPtr = reinterpret_cast<std::uint8_t*>(std::realloc(m_pRaw, sizeInBytes + fixedSize));
         if (!newPtr)
             throw std::runtime_error(std::string("bad alloc for ") + std::to_string(sizeInBytes) + " bytes");
-        if(fixedSize>0)
-            std::memset(newPtr+sizeInBytes,0,fixedSize);
+        if (fixedSize > 0)
+            std::memset(newPtr + sizeInBytes, 0, fixedSize);
         m_pRaw     = newPtr;
         m_byteSize = sizeInBytes;
     }
@@ -81,7 +82,7 @@ public:
     {
         return m_byteSize;
     }
-    
+
     std::uintptr_t GetAddress() const;
     std::uint8_t* GetData() const;
 
@@ -89,11 +90,18 @@ public:
 
     operator bool() const;
 
+    bool operator==(const std::string& str)
+    {
+        if (m_byteSize != str.size())
+            return false;
+        return 0 == std::memcmp(m_pRaw, str.data(), str.size());
+    }
+
 private:
     void Reset();
 
 private:
-    _SizeType m_byteSize  = 0;
+    _SizeType m_byteSize = 0;
     std::uint8_t* m_pRaw = nullptr;
 };
 
@@ -102,12 +110,16 @@ Buffer<_SizeType>::Buffer(Buffer&& other) noexcept :
 m_pRaw(other.m_pRaw),
 m_byteSize(other.m_byteSize)
 {
+    if (&other == this)
+        return;
     other.Reset();
 }
 
 template <typename _SizeType>
 inline Buffer<_SizeType>& Buffer<_SizeType>::operator=(Buffer<_SizeType>&& other) noexcept
 {
+    if (&other == this)
+        return *this;
     FreeBuffer();
 
     m_pRaw     = other.m_pRaw;
@@ -134,6 +146,23 @@ template <typename _SizeType>
 Buffer<_SizeType>::~Buffer()
 {
     FreeBuffer();
+}
+
+template <typename _SizeType>
+inline Buffer<_SizeType>::Buffer(const Buffer& other)
+{
+    if (&other == this)
+        return;
+    AssignBuffer(other.m_pRaw, other.m_byteSize);
+}
+
+template <typename _SizeType>
+inline Buffer<_SizeType>& Buffer<_SizeType>::operator=(const Buffer& other)
+{
+    if (&other == this)
+        return *this;
+    AssignBuffer(other.m_pRaw, other.m_byteSize);
+    return *this;
 }
 
 template <typename _SizeType>
@@ -165,7 +194,6 @@ void Buffer<_SizeType>::DetachRawMemory(std::uint8_t** ppOutRawData,
     outSizeInBytes = m_byteSize;
     Reset();
 }
-
 
 template <typename _SizeType>
 std::uintptr_t Buffer<_SizeType>::GetAddress() const
@@ -202,4 +230,19 @@ void Buffer<_SizeType>::Reset()
     m_byteSize = 0;
 }
 
+template <typename T>
+struct BufferHash
+{
+    std::size_t operator()(const Buffer<T>& buf) const noexcept
+    {
+        std::size_t seed = 0;
+        auto size        = buf.GetSize();
+        auto ptr         = buf.GetData();
+        for (typename Buffer<T>::SizeType i = 0; i < size; ++i)
+        {
+            seed ^= static_cast<std::size_t>(ptr[i]) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+        }
+        return seed;
+    }
+};
 } // namespace Fundamental

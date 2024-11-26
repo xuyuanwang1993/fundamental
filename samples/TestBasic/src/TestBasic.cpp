@@ -7,8 +7,8 @@ namespace
 {
 struct TestS : public Fundamental::Singleton<TestS>
 {
-    // we should not declare any other sigature for contruct Singleton instance
-    // except the default sigature version if you want to init some member values
+    // we should not declare any other signature for contruct Singleton instance
+    // except the default signature version if you want to init some member values
     ~TestS()
     {   
         //we should not access another static instance
