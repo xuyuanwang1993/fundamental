@@ -3,7 +3,6 @@
 #include <asio.hpp>
 #include <list>
 #include <memory>
-#include <thread>
 #include <vector>
 namespace network
 {

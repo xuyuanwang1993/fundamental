@@ -17,7 +17,7 @@ bool ProxyRequestHandler::DecodeHeader(const std::uint8_t* data, std::size_t len
         std::size_t offset = 0;
         // docode fixed 2bytes
         std::memcpy(&dstFrame.fixed, data, 2);
-        dstFrame.fixed = be16toh(dstFrame.fixed);
+        dstFrame.fixed = le16toh(dstFrame.fixed);
         if (dstFrame.fixed != ProxyFrame::kFixed)
             break;
         offset += 2;
@@ -40,11 +40,11 @@ bool ProxyRequestHandler::DecodeHeader(const std::uint8_t* data, std::size_t len
         static_assert(4 == kProxySize || 8 == kProxySize, "unsupported proxy size type");
         if constexpr (4 == kProxySize)
         {
-            payloadSize = be32toh(payloadSize);
+            payloadSize = le32toh(payloadSize);
         }
         else if constexpr (8 == kProxySize)
         {
-            payloadSize = be64toh(payloadSize);
+            payloadSize = le64toh(payloadSize);
         }
         if (payloadSize > ProxyFrame::kMaxFrameSize)
             break;
@@ -82,7 +82,7 @@ bool ProxyRequestHandler::DecodePayload(ProxyFrame& dstFrame)
 
 void ProxyRequestHandler::EncodeFrame(ProxyFrame& dstFrame)
 {
-    dstFrame.fixed   = htobe16(ProxyFrame::kFixed);
+    dstFrame.fixed   = htole16(ProxyFrame::kFixed);
     dstFrame.version = ProxyFrame::kVersion;
     dstFrame.mask.v  = static_cast<std::int32_t>(Fundamental::Timer::GetTimeNow() & 0xffffffff);
     union
@@ -132,10 +132,19 @@ void ProxyRequestHandler::UpgradeProtocal(Connection&& connection)
     default:
     {
         FWARN("unsupported proxy op {} for version {}", ProxyFrame::kVersion,
-               connection.requestFrame.op);
+              connection.requestFrame.op);
     }
     break;
     }
+}
+
+std::vector<asio::const_buffer> ProxyRequestHandler::FrameToBuffers(const ProxyFrame& frame)
+{
+    std::vector<asio::const_buffer> ret;
+    ret.push_back(asio::const_buffer(&frame.fixed, 8));
+    ret.push_back(asio::const_buffer(&frame.payload.GetSize(), sizeof(decltype(frame.payload.GetSize()))));
+    ret.push_back(asio::const_buffer(frame.payload.GetData(), frame.payload.GetSize()));
+    return ret;
 }
 
 ProxeServiceBase::ProxeServiceBase(asio::ip::tcp::socket&& socket, ProxyFrame&& frame) :

@@ -16,7 +16,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 #include "thread_pool.h"
-
+#include "fundamental/basic/utils.hpp"
 namespace Fundamental
 {
 
@@ -53,6 +53,7 @@ void ThreadPool::Join()
 
 void ThreadPool::Run()
 {
+    Fundamental::Utils::SetThreadName("thp");
     while (RunOne())
     {
     }

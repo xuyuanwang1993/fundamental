@@ -38,8 +38,6 @@ private:
     asio::steady_timer checkTimer;
 };
 
-typedef std::shared_ptr<Connection> connection_ptr;
-
-using EchoServer = network::Server<Connection, ProxyRequestHandler>;
+using ProxyServer = network::Server<Connection, ProxyRequestHandler>;
 } // namespace proxy
 } // namespace network

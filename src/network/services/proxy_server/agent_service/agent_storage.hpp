@@ -1,23 +1,12 @@
-#include "fundamental/basic/utils.hpp"
-#include "fundamental/basic/buffer.hpp"
+#pragma once
+#include "agent_defines.h"
 #include <mutex>
-#include <string>
-#include <unordered_map>
+
 namespace network
 {
 namespace proxy
 {
 
-using AgentSizeType=std::uint32_t;
-using AgentDataType=Fundamental::Buffer<AgentSizeType>;
-struct AgentEntryInfo
-{
-    std::int64_t timestamp;
-    AgentDataType data;
-};
-
-using AgentItemMap = std::unordered_map<AgentDataType /*section*/, AgentEntryInfo,Fundamental::BufferHash<AgentSizeType>>;
-using AgentMap     = std::unordered_map<AgentDataType /*id*/, AgentItemMap,Fundamental::BufferHash<AgentSizeType>>;
 class AgentStorage : public Fundamental::Singleton<AgentStorage>
 {
 public:

@@ -1,5 +1,5 @@
 #include "log.h"
-
+#include "utils.hpp"
 #include <condition_variable>
 #include <filesystem>
 #include <future>
@@ -138,6 +138,7 @@ protected:
 
     void Run()
     {
+        Fundamental::Utils::SetThreadName("logger_thread");
         std::unique_lock<std::mutex> locker(m_threadMutex);
         while (m_bFileWriterWorking)
         {

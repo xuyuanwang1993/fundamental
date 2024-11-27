@@ -41,7 +41,7 @@ void Connection::ReadHeader()
                              {
                                  FWARN("decode header failed");
                                  break;
-                             };
+                             }
                              ReadBody();
                              return;
                          } while (0);
@@ -64,7 +64,7 @@ void Connection::ReadBody()
                              {
                                  FWARN("decode payload failed");
                                  break;
-                             };
+                             }
                              StopTimeCheck();
                              request_handler_.UpgradeProtocal(std::forward<Connection>(*this));
                              return;

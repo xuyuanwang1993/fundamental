@@ -9,6 +9,7 @@ if(ENABLE_DEBUG_MEMORY_TRACE)
 add_subdirectory(TestMemoryTracker)
 endif()
 add_subdirectory(TestAsio)
+add_subdirectory(TestProxyServer)
 add_subdirectory(TestBasic)
 
 endif()

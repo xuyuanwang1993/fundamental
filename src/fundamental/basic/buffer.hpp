@@ -1,13 +1,40 @@
 #pragma once
+#include "endian.h"
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
-
+#include <vector>
 namespace Fundamental
 {
+enum class Endian : std::uint8_t
+{
+    None = 0,
+    LittleEndian,
+    BigEndian
+};
+static constexpr auto kHostEndian = []() constexpr -> Endian
+{
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+    return Endian::LittleEndian;
+#else
+    return Endian::BigEndian;
+#endif
+}
+();
+template <Endian targetEndian>
+inline constexpr bool NeedConvertEndian()
+{
+    return targetEndian == kHostEndian;
+}
+
+static constexpr auto kNeedConvertForTransfer = []() constexpr -> bool
+{
+    return kHostEndian == Endian::BigEndian;
+}
+();
 
 // NOTE: This buffer owns the life time of a block of raw memory.
 template <typename _SizeType = std::size_t>
@@ -64,7 +91,7 @@ public:
     // NOTE: this method is same as std::vector::assign,
     // so data will be copied.
     // if you do not wish a copy, consider to use MemoryOwner instead
-    void AssignBuffer(std::uint8_t* pData, _SizeType sizeInBytes);
+    void AssignBuffer(const std::uint8_t* pData, _SizeType sizeInBytes);
 
     // This method will free current buffer
     // and assign the raw pointer and size directly without copy
@@ -96,7 +123,27 @@ public:
             return false;
         return 0 == std::memcmp(m_pRaw, str.data(), str.size());
     }
+    Buffer(const std::string& str)
+    {
+        AssignBuffer(reinterpret_cast<const std::uint8_t*>(str.data()), str.size());
+    }
 
+    Buffer& operator=(const std::string& str)
+    {
+        AssignBuffer(reinterpret_cast<const std::uint8_t*>(str.data()), str.size());
+        return *this;
+    }
+
+    std::string ToString() const
+    {
+        const char* ptr = reinterpret_cast<char*>(m_pRaw);
+        return ptr ? std::string(ptr, ptr + m_byteSize) : std::string();
+    }
+
+    std::vector<std::uint8_t> ToVec() const
+    {
+        return m_pRaw ? std::vector<std::uint8_t>(m_pRaw, m_pRaw + m_byteSize) : std::vector<std::uint8_t>();
+    }
 private:
     void Reset();
 
@@ -166,7 +213,7 @@ inline Buffer<_SizeType>& Buffer<_SizeType>::operator=(const Buffer& other)
 }
 
 template <typename _SizeType>
-void Buffer<_SizeType>::AssignBuffer(std::uint8_t* pData,
+void Buffer<_SizeType>::AssignBuffer(const std::uint8_t* pData,
                                      _SizeType sizeInBytes)
 {
     Reallocate(sizeInBytes);
@@ -244,5 +291,256 @@ struct BufferHash
         }
         return seed;
     }
+};
+
+template <typename SizeType = std::size_t, Endian targetEndian = Endian::LittleEndian,
+          typename = std::enable_if_t<std::is_unsigned_v<SizeType>>>
+struct BufferReader
+{
+    using ConvertFlag=std::bool_constant<NeedConvertEndian<targetEndian>()>;
+public:
+    using SizeValueType = SizeType;
+    BufferReader()
+    {
+    }
+
+    // Disable copy
+    BufferReader(const BufferReader&)            = delete;
+    BufferReader& operator=(const BufferReader&) = delete;
+
+    // Enable move
+    BufferReader(BufferReader&& other) noexcept
+    {
+        this->operator=(std::move(other));
+    }
+    BufferReader& operator=(BufferReader&& other)
+    {
+        m_pRawBuffer       = other.m_pRawBuffer;
+        other.m_pRawBuffer = nullptr;
+
+        m_bufferSize      = other.m_bufferSize;
+        m_currentPosition = other.m_currentPosition;
+    }
+
+    void Reset()
+    {
+        m_pRawBuffer      = nullptr;
+        m_bufferSize      = static_cast<SizeType>(-1);
+        m_currentPosition = 0;
+    }
+
+    void SetBuffer(const std::uint8_t* buf, SizeType len)
+    {
+        m_pRawBuffer      = buf;
+        m_bufferSize      = len;
+        m_currentPosition = 0;
+    }
+
+    SizeType GetCurrentPosition() const
+    {
+        return m_currentPosition;
+    }
+    SizeType GetBufferSize() const
+    {
+        return m_bufferSize;
+    }
+    const std::uint8_t* GetBuffer() const
+    {
+        return m_pRawBuffer;
+    }
+    
+    // Read buffer to pDest and offset the current position.
+    template <typename ValueType>
+    void ReadValue(ValueType* pDest, SizeType valueSize = sizeof(ValueType))
+    {
+        PeekValue(pDest, m_currentPosition, valueSize);
+        m_currentPosition += valueSize;
+    }
+
+    void PeekOffset(SizeType offset)
+    {
+        m_currentPosition += offset;
+    }
+
+    // Read buffer to pDest and offset the current position.
+    template <typename ValueType>
+    void PeekValue(ValueType* pDest,
+                   SizeType srcBufferOffset = 0, SizeType valueSize = sizeof(ValueType))
+    {
+        if (srcBufferOffset + valueSize <= m_bufferSize)
+            throw std::invalid_argument(std::string("buffer overflow"));
+        constexpr static std::size_t kValueSize = sizeof(ValueType);
+        if constexpr ((kValueSize > 1) &&
+                      std::conjunction_v<std::is_integral<ValueType>, ConvertFlag>)
+        {
+            auto pData                = m_pRawBuffer + srcBufferOffset;
+            std::uint8_t* pDestBuffer = reinterpret_cast<std::uint8_t*>(pDest);
+            for (SizeType i = 0; i < valueSize; ++i)
+            {
+                pDestBuffer[i] = pData[valueSize - 1 - i];
+            }
+        }
+        else
+        {
+            std::memcpy(pDest, m_pRawBuffer + srcBufferOffset, valueSize);
+        }
+    }
+
+    template <typename VectorLikeType>
+    void ReadVectorLike(VectorLikeType& vectorLike)
+    {
+        SizeType size = 0;
+        ReadValue(&size);
+        vectorLike.resize(size / sizeof(typename VectorLikeType::value_type));
+
+        if (size > 0)
+        {
+            ReadValue(reinterpret_cast<std::uint8_t*>(vectorLike.data()), size);
+        }
+    }
+
+    template <typename EnumType,
+              typename = std::enable_if_t<std::is_enum_v<EnumType>>>
+    void ReadEnum(EnumType& destEnum)
+    {
+        std::underlying_type_t<EnumType> intValue;
+        ReadValue(&intValue);
+        destEnum = static_cast<EnumType>(intValue);
+    }
+
+    void ReadRawMemory(Buffer<SizeType>& destRawBuffer)
+    {
+        SizeType size = 0;
+        ReadValue(&size);
+        destRawBuffer.Reallocate(size);
+
+        if (size > 0)
+        {
+            ReadValue(destRawBuffer.GetData(), size);
+        }
+    }
+
+    template <typename VectorLikeType>
+    constexpr static SizeType GetVectorLikeSize(const VectorLikeType& vectorLike)
+    {
+        return sizeof(SizeType) + static_cast<SizeType>(vectorLike.size() * sizeof(typename VectorLikeType::value_type));
+    }
+
+private:
+    const std::uint8_t* m_pRawBuffer = nullptr;
+    SizeType m_bufferSize            = static_cast<SizeType>(-1);
+    SizeType m_currentPosition       = 0;
+};
+
+// Fixed buffer writer
+template <typename SizeType = std::size_t, Endian targetEndian = Endian::LittleEndian,
+          typename = std::enable_if_t<std::is_unsigned_v<SizeType>>>
+class BufferWriter
+{
+    using ConvertFlag=std::bool_constant<NeedConvertEndian<targetEndian>()>;
+public:
+    BufferWriter()
+    {
+    }
+
+    // Disable copy
+    BufferWriter(const BufferWriter&)            = delete;
+    BufferWriter& operator=(const BufferWriter&) = delete;
+
+    // Enable move
+    BufferWriter(BufferWriter&& other) noexcept
+    {
+        this->operator=(std::move(other));
+    }
+    BufferWriter& operator=(BufferWriter&& other)
+    {
+        m_pRawBuffer       = other.m_pRawBuffer;
+        other.m_pRawBuffer = nullptr;
+
+        m_bufferSize      = other.m_bufferSize;
+        m_currentPosition = other.m_currentPosition;
+    }
+
+    void Reset()
+    {
+        m_pRawBuffer      = nullptr;
+        m_bufferSize      = static_cast<SizeType>(-1);
+        m_currentPosition = 0;
+    }
+
+    void SetBuffer(std::uint8_t* buf, SizeType len)
+    {
+        m_pRawBuffer      = buf;
+        m_bufferSize      = len;
+        m_currentPosition = 0;
+    }
+
+    SizeType GetCurrentPosition() const
+    {
+        return m_currentPosition;
+    }
+    SizeType GetBufferSize() const
+    {
+        return m_bufferSize;
+    }
+    const std::uint8_t* GetBuffer() const
+    {
+        return m_pRawBuffer;
+    }
+
+    template <typename ValueType>
+    void WriteValue(ValueType* pValue, SizeType valueSize = sizeof(ValueType))
+    {
+        constexpr static std::size_t kValueSize = sizeof(ValueType);
+        if constexpr ((kValueSize > 1) &&
+                      std::conjunction_v<std::is_integral<ValueType>,ConvertFlag >)
+        {
+            auto pDest               = m_pRawBuffer + m_currentPosition;
+            const std::uint8_t* pSrc = reinterpret_cast<const std::uint8_t*>(pValue);
+            for (SizeType i = 0; i < valueSize; ++i)
+            {
+                pDest[i] = pSrc[valueSize - 1 - i];
+            }
+        }
+        else
+        {
+            std::memcpy(m_pRawBuffer + m_currentPosition, pValue, valueSize);
+        }
+        m_currentPosition += valueSize;
+    }
+
+    template <typename VectorLikeType>
+    void WriteVectorLike(const VectorLikeType& vectorLike)
+    {
+        auto size = static_cast<SizeType>(vectorLike.size() * sizeof(typename VectorLikeType::value_type));
+        WriteValue(&size);
+        if (size > 0)
+        {
+            WriteValue((std::uint8_t*)vectorLike.data(), size);
+        }
+    }
+
+    template <typename EnumType,
+              typename = std::enable_if_t<std::is_enum_v<EnumType>>>
+    void WriteEnum(EnumType eValue)
+    {
+        auto intValue = static_cast<std::underlying_type_t<EnumType>>(eValue);
+        WriteValue(&intValue);
+    }
+
+    void WriteRawMemory(const Buffer<SizeType>& srcRawBuffer)
+    {
+        auto size = srcRawBuffer.GetSize();
+        WriteValue(&size);
+        if (size > 0)
+        {
+            WriteValue(srcRawBuffer.GetData(), size);
+        }
+    }
+
+private:
+    std::uint8_t* m_pRawBuffer = nullptr;
+    SizeType m_bufferSize      = static_cast<SizeType>(-1);
+    SizeType m_currentPosition = 0;
 };
 } // namespace Fundamental
