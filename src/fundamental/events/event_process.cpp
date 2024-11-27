@@ -3,6 +3,7 @@
 #include "event_system.h"
 #include "fundamental/basic/log.h"
 #include "fundamental/delay_queue/delay_queue.h"
+#include <iostream>
 #include <unordered_map>
 namespace Fundamental
 {
@@ -20,7 +21,7 @@ pDelayQueue(new Fundamental::DelayQueue)
         };
         pEventSystem->AddEventListener(RegisterEventType::kEventType, func);
     }
-    //wakeup when new process  event is enqueued
+    // wakeup when new process  event is enqueued
     {
         using RegisterEventType = Fundamental::InternalNotifyQueuedEvent;
         auto func               = [=](const Fundamental::EventPointerType& event) {
@@ -28,7 +29,7 @@ pDelayQueue(new Fundamental::DelayQueue)
         };
         pEventSystem->AddEventListener(RegisterEventType::kEventType, func);
     }
-    //wakeup when timeout status changed
+    // wakeup when timeout status changed
     pDelayQueue->SetStateChangedCallback([=]() {
         WakeUp();
     });
@@ -41,7 +42,6 @@ EventsHandler::~EventsHandler()
     if (pEventSystem)
         delete pEventSystem;
 }
-
 
 void EventsHandler::Tick()
 {
@@ -58,7 +58,6 @@ void EventsHandler::Tick()
         Wait(waitTimeMsec);
     }
 }
-
 
 void EventsHandler::WakeUp()
 {

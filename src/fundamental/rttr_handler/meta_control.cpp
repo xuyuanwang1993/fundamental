@@ -5,13 +5,13 @@ namespace Fundamental
 {
 std::string RttrMetaControlOption::ExcludeMetaDataKey()
 {
-    static constexpr char* kExcludeMetaDataKey = "exclude_set_data";
+    static constexpr const char* kExcludeMetaDataKey = "exclude_set_data";
     return kExcludeMetaDataKey;
 }
 
 std::string RttrMetaControlOption::IncludeMetaDataKey()
 {
-    static constexpr char* kIncludeMetaDataKey = "include_set_data";
+    static constexpr const char* kIncludeMetaDataKey = "include_set_data";
     return kIncludeMetaDataKey;
 }
 

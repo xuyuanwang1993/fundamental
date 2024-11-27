@@ -79,8 +79,6 @@ public:
     static constexpr std::size_t kPerReadMaxBytes = 16;
 
 public:
-    connection(const connection&)            = delete;
-    connection& operator=(const connection&) = delete;
 
     /// Construct a connection with the given socket.
     explicit connection(asio::ip::tcp::socket socket,

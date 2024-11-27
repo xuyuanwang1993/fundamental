@@ -4,11 +4,12 @@
 #include "network/services/echo/echo_connection.hpp"
 #include "network/services/echo/echo_client.hpp"
 #include "fundamental/delay_queue/delay_queue.h"
+#include "network/server/io_context_pool.hpp"
 #include <cstdlib>
 #include <iostream>
 #include <memory>
 #include <utility>
-
+#include "fundamental/application/application.hpp"
 int main(int argc, char* argv[])
 {
     auto p = ::getenv("CLIENT");
@@ -27,13 +28,12 @@ int main(int argc, char* argv[])
                 std::cerr << "    receiver 0::0 80 1 .\n";
                 return 1;
             }
-
+            network::io_context_pool::s_excutorNums=std::stoi(argv[3]);
+            network::io_context_pool::Instance().start();
             // Initialise the server.
-            std::size_t num_threads = std::stoi(argv[3]);
-            network::echo::EchoServer s(argv[1], argv[2], num_threads);
-
-            // Run the server until stopped.
-            s.Run();
+            network::echo::EchoServer s(argv[1], argv[2]);
+            s.Start();
+            Fundamental::Application::Instance().Loop();
         }
         catch (std::exception& e)
         {

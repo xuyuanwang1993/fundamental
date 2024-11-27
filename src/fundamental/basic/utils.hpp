@@ -2,6 +2,7 @@
 #define _HEAD_BASIC_UTILS_
 #include <chrono>
 #include <functional>
+#include <string>
 namespace Fundamental
 {
 
@@ -40,5 +41,11 @@ struct Singleton : NonCopyable
 
     inline static T instance;
 };
+
+namespace Utils
+{
+     void SetThreadName(const std::string& name);
+}
+
 } // namespace Fundamental
 #endif // _HEAD_BASIC_UTILS_
