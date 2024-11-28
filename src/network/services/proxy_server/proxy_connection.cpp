@@ -75,9 +75,12 @@ void Connection::ReadBody()
 
 void Connection::StartTimerCheck()
 {
-    checkTimer.async_wait([this, self = shared_from_this()](const std::error_code& /*error*/) {
-        FWARN("recv request frame timeout,disconnected");
-        HandleClose();
+    checkTimer.async_wait([this, self = shared_from_this()](const std::error_code& e) {
+        if (!e)
+        {
+            FWARN("recv request frame timeout,disconnected");
+            HandleClose();
+        }
     });
 }
 

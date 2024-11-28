@@ -23,9 +23,9 @@ int main(int argc, char* argv[])
             {
                 std::cerr << "Usage: echo_server <address> <port> <threads>\n";
                 std::cerr << "  For IPv4, try:\n";
-                std::cerr << "    receiver 0.0.0.0 80 1 .\n";
+                std::cerr << "    receiver 0.0.0.0 4885 1 \n";
                 std::cerr << "  For IPv6, try:\n";
-                std::cerr << "    receiver 0::0 80 1 .\n";
+                std::cerr << "    receiver 0::0 4885 1 \n";
                 return 1;
             }
             network::io_context_pool::s_excutorNums = std::stoi(argv[3]);
@@ -52,7 +52,6 @@ int main(int argc, char* argv[])
                 std::cerr << "Usage: echo_client <host> <port> <mode> <section>\n";
                 return 1;
             }
-
             network::io_context_pool::s_excutorNums = 2;
             network::io_context_pool::Instance().start();
             network::proxy::rpc::AgentClient client;
@@ -77,6 +76,12 @@ int main(int argc, char* argv[])
                 context.request.id      = "test";
                 context.request.section = section;
                 context.request.data    = msg;
+                FDEBUG("id:{} section:{} msg:{}", context.request.id.Dump(),
+                       context.request.section.Dump(),
+                       context.request.data.Dump());
+                FDEBUG("str id:{} section:{} msg:{}", context.request.id.DumpAscii(),
+                       context.request.section.DumpAscii(),
+                       context.request.data.DumpAscii());
                 using namespace network::proxy::rpc;
                 context.cb = [](bool bSuccess, AgentClientToken token, AgentResponse&& res) {
                     FINFO("update success:{} token:{}", bSuccess, token);
@@ -100,7 +105,7 @@ int main(int argc, char* argv[])
                           std::string(res.data.data(), res.data.data() + res.data.size()));
                     Fundamental::Application::Instance().Exit();
                 };
-                token=client.Query(context);
+                auto token = client.Query(context);
                 FINFO("create task token:{}", token);
             }
             Fundamental::Application::Instance().Loop();

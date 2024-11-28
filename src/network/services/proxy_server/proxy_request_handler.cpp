@@ -57,6 +57,7 @@ bool ProxyRequestHandler::DecodeHeader(const std::uint8_t* data, std::size_t len
 
 bool ProxyRequestHandler::DecodePayload(ProxyFrame& dstFrame)
 {
+
     auto bufferSize = dstFrame.payload.GetSize();
     auto ptr        = dstFrame.payload.GetData();
     union
@@ -64,19 +65,28 @@ bool ProxyRequestHandler::DecodePayload(ProxyFrame& dstFrame)
         std::uint8_t data[4];
         std::int32_t v;
     } opeationCheckSum;
-    opeationCheckSum.v = 0;
+    opeationCheckSum.v                   = 0;
+    std::size_t leftSize                 = bufferSize % 4;
+    decltype(bufferSize) alignBufferSize = bufferSize - leftSize;
     // restore to origin data
-    for (decltype(bufferSize) i = 0; i < bufferSize; i += 4)
+    for (decltype(bufferSize) i = 0; i < alignBufferSize; i += 4)
     {
-        std::int32_t& operationNum = *((std::int32_t*)ptr + i);
+        std::int32_t& operationNum = *((std::int32_t*)(ptr + i));
         operationNum ^= dstFrame.mask.v;
         opeationCheckSum.v ^= operationNum;
     }
+
     // update mask
     dstFrame.checkSum ^= opeationCheckSum.data[0];
     dstFrame.checkSum ^= opeationCheckSum.data[1];
     dstFrame.checkSum ^= opeationCheckSum.data[2];
     dstFrame.checkSum ^= opeationCheckSum.data[3];
+    // fix left bytes
+    for (size_t i = 0; i < leftSize; ++i)
+    {
+        ptr[i + alignBufferSize] ^= dstFrame.mask.data[i % 4];
+        dstFrame.checkSum ^= ptr[i + alignBufferSize];
+    }
     return dstFrame.checkSum == 0;
 }
 
@@ -90,21 +100,29 @@ void ProxyRequestHandler::EncodeFrame(ProxyFrame& dstFrame)
         std::uint8_t data[4];
         std::int32_t v;
     } opeationCheckSum;
-    opeationCheckSum.v = 0;
-    auto bufferSize    = dstFrame.payload.GetSize();
-    auto ptr           = dstFrame.payload.GetData();
+    opeationCheckSum.v                   = 0;
+    auto bufferSize                      = dstFrame.payload.GetSize();
+    auto ptr                             = dstFrame.payload.GetData();
+    std::size_t leftSize                 = bufferSize % 4;
+    decltype(bufferSize) alignBufferSize = bufferSize - leftSize;
     // mask the origin data
-    for (decltype(bufferSize) i = 0; i < bufferSize; i += 4)
+    for (decltype(bufferSize) i = 0; i < alignBufferSize; i += 4)
     {
-        std::int32_t& operationNum = *((std::int32_t*)ptr + i);
-        operationNum ^= dstFrame.mask.v;
+        std::int32_t& operationNum = *((std::int32_t*)(ptr + i));
         opeationCheckSum.v ^= operationNum;
+        operationNum ^= dstFrame.mask.v;
     }
     // update mask
     dstFrame.checkSum ^= opeationCheckSum.data[0];
     dstFrame.checkSum ^= opeationCheckSum.data[1];
     dstFrame.checkSum ^= opeationCheckSum.data[2];
     dstFrame.checkSum ^= opeationCheckSum.data[3];
+    // fix left bytes
+    for (size_t i = 0; i < leftSize; ++i)
+    {
+        dstFrame.checkSum ^= ptr[i + alignBufferSize];
+        ptr[i + alignBufferSize] ^= dstFrame.mask.data[i % 4];
+    }
 }
 
 void ProxyRequestHandler::UpgradeProtocal(Connection&& connection)

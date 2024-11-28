@@ -3,6 +3,7 @@
 #include <chrono>
 #include <functional>
 #include <string>
+
 namespace Fundamental
 {
 
@@ -45,6 +46,8 @@ struct Singleton : NonCopyable
 namespace Utils
 {
      void SetThreadName(const std::string& name);
+     std::string BufferToHex(const void * buffer,std::size_t size);
+     std::string BufferDumpAscii(const void * buffer,std::size_t size);
 }
 
 } // namespace Fundamental

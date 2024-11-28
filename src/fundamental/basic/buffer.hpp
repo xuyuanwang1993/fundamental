@@ -1,12 +1,15 @@
 #pragma once
 #include "endian.h"
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <vector>
+#include "utils.hpp"
+#include <sstream>
 namespace Fundamental
 {
 enum class Endian : std::uint8_t
@@ -83,7 +86,10 @@ public:
         if (!newPtr)
             throw std::runtime_error(std::string("bad alloc for ") + std::to_string(sizeInBytes) + " bytes");
         if (fixedSize > 0)
+        {
             std::memset(newPtr + sizeInBytes, 0, fixedSize);
+        }
+            
         m_pRaw     = newPtr;
         m_byteSize = sizeInBytes;
     }
@@ -144,6 +150,21 @@ public:
     {
         return m_pRaw ? std::vector<std::uint8_t>(m_pRaw, m_pRaw + m_byteSize) : std::vector<std::uint8_t>();
     }
+
+    std::string ToHexString() const;
+
+    std::string Dump() const
+    {
+        std::stringstream ss;
+        ss << "Buffer(" << m_byteSize << "):" << ToHexString();
+        return ss.str();
+    }
+
+    std::string DumpAscii() const
+    {
+        return Utils::BufferDumpAscii(m_pRaw,m_byteSize);
+    }
+
 private:
     void Reset();
 
@@ -271,6 +292,12 @@ Fundamental::Buffer<_SizeType>::operator bool() const
 }
 
 template <typename _SizeType>
+inline std::string Buffer<_SizeType>::ToHexString() const
+{
+    return Utils::BufferToHex(m_pRaw,m_byteSize);
+}
+
+template <typename _SizeType>
 void Buffer<_SizeType>::Reset()
 {
     m_pRaw     = nullptr;
@@ -297,7 +324,8 @@ template <typename SizeType = std::size_t, Endian targetEndian = Endian::LittleE
           typename = std::enable_if_t<std::is_unsigned_v<SizeType>>>
 struct BufferReader
 {
-    using ConvertFlag=std::bool_constant<NeedConvertEndian<targetEndian>()>;
+    using ConvertFlag = std::bool_constant<NeedConvertEndian<targetEndian>()>;
+
 public:
     using SizeValueType = SizeType;
     BufferReader()
@@ -348,7 +376,7 @@ public:
     {
         return m_pRawBuffer;
     }
-    
+
     // Read buffer to pDest and offset the current position.
     template <typename ValueType>
     void ReadValue(ValueType* pDest, SizeType valueSize = sizeof(ValueType))
@@ -437,7 +465,8 @@ template <typename SizeType = std::size_t, Endian targetEndian = Endian::LittleE
           typename = std::enable_if_t<std::is_unsigned_v<SizeType>>>
 class BufferWriter
 {
-    using ConvertFlag=std::bool_constant<NeedConvertEndian<targetEndian>()>;
+    using ConvertFlag = std::bool_constant<NeedConvertEndian<targetEndian>()>;
+
 public:
     BufferWriter()
     {
@@ -493,7 +522,7 @@ public:
     {
         constexpr static std::size_t kValueSize = sizeof(ValueType);
         if constexpr ((kValueSize > 1) &&
-                      std::conjunction_v<std::is_integral<ValueType>,ConvertFlag >)
+                      std::conjunction_v<std::is_integral<ValueType>, ConvertFlag>)
         {
             auto pDest               = m_pRawBuffer + m_currentPosition;
             const std::uint8_t* pSrc = reinterpret_cast<const std::uint8_t*>(pValue);

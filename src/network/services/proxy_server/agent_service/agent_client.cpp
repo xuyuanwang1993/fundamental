@@ -5,6 +5,7 @@
 #include <array>
 #include <atomic>
 #include <memory>
+#include <iostream>
 namespace network
 {
 namespace proxy
@@ -52,10 +53,10 @@ struct AgentClient::AgentSession : public std::enable_shared_from_this<AgentSess
 struct AgentClient::AgentHandler
 {
     template <typename ContextType>
-    static void PackageProxyFrame(AgentRequestFrame& frame, ContextType& context);
+    static void PackageProxyFrame(AgentRequestFrame& frame,const ContextType& context);
 
     template <typename ContextType>
-    static AgentClientToken HandleAgentRequest(AgentClient* client, ContextType& context);
+    static AgentClientToken HandleAgentRequest(AgentClient* client,const ContextType& context);
 };
 
 AgentClient::AgentClient()
@@ -97,7 +98,7 @@ AgentClientToken AgentClient::Query(const AgentQueryContext& context)
 }
 
 template <>
-void AgentClient::AgentHandler::PackageProxyFrame<AgentUpdateContext>(AgentRequestFrame& frame, AgentUpdateContext& context)
+void AgentClient::AgentHandler::PackageProxyFrame<AgentUpdateContext>(AgentRequestFrame& frame,const AgentUpdateContext& context)
 {
     using SizeType       = decltype(frame.payload)::SizeType;
     SizeType payloadSize = sizeof(SizeType) * 3 +
@@ -112,7 +113,7 @@ void AgentClient::AgentHandler::PackageProxyFrame<AgentUpdateContext>(AgentReque
 }
 
 template <>
-void AgentClient::AgentHandler::PackageProxyFrame<AgentQueryContext>(AgentRequestFrame& frame, AgentQueryContext& context)
+void AgentClient::AgentHandler::PackageProxyFrame<AgentQueryContext>(AgentRequestFrame& frame,const AgentQueryContext& context)
 {
     using SizeType       = decltype(frame.payload)::SizeType;
     SizeType payloadSize = sizeof(SizeType) * 2 +
@@ -126,17 +127,18 @@ void AgentClient::AgentHandler::PackageProxyFrame<AgentQueryContext>(AgentReques
 }
 
 template <typename ContextType>
-void AgentClient::AgentHandler::PackageProxyFrame(AgentRequestFrame& frame, ContextType& context)
+void AgentClient::AgentHandler::PackageProxyFrame(AgentRequestFrame& frame, const ContextType& context)
 {
-    //just do noting
+    // just do noting
 }
 
 template <typename ContextType>
-AgentClientToken AgentClient::AgentHandler::HandleAgentRequest(AgentClient* client, ContextType& context)
+AgentClientToken AgentClient::AgentHandler::HandleAgentRequest(AgentClient* client,const ContextType& context)
 {
     ProxyFrame frame;
     frame.op = ProxyOpCode::AgentServiceOp;
     AgentRequestFrame requestFrame;
+    requestFrame.cmd = context.request.kCmd;
     PackageProxyFrame(requestFrame, context);
     {
         using SizeType       = typename decltype(frame.payload)::SizeType;
@@ -289,6 +291,7 @@ void AgentClient::AgentSession::RecvHeader()
                              if (!ProxyRequestHandler::DecodeHeader(headerBuffer.data(),
                                                                     headerBuffer.size(), responseFrame))
                              {
+                                FERR("decode frame header failed");
                                  break;
                              }
                              RecvBody();
@@ -310,6 +313,7 @@ void AgentClient::AgentSession::RecvBody()
                              }
                              if (!ProxyRequestHandler::DecodePayload(responseFrame))
                              {
+                                FERR("decode frame payload failed");
                                  break;
                              }
                              HandleResponse();
@@ -348,7 +352,7 @@ void AgentClient::AgentSession::HandleResponse()
 
 void AgentClient::AgentSession::HandleFailed(asio::error_code ec)
 {
-    FDEBUG("request failed for {} {} final status{}", host, service, static_cast<std::int32_t>(status_.load()));
+    FDEBUG("request failed for {} {} final status {}", host, service, static_cast<std::int32_t>(status_.load()));
     if (status_ != AgentCancelled)
         status_.exchange(AgentFinishedFailed);
     if (finishCb)
