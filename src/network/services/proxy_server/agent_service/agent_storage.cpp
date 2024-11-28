@@ -1,9 +1,24 @@
 #include "agent_storage.hpp"
+#include "fundamental/application/application.hpp"
 #include "fundamental/delay_queue/delay_queue.h"
 namespace network
 {
 namespace proxy
 {
+AgentStorage::AgentStorage()
+{
+    Fundamental::Application::Instance().loopStarted.Connect([this]() {
+        auto task=Fundamental::Application::Instance().DelayQueue()->AddDelayTask(AgentStorage::s_expiredSec * 1000, [this]() {
+            RemoveExpiredData(s_expiredSec);
+        });
+        Fundamental::Application::Instance().DelayQueue()->StartDelayTask(task);
+    });
+}
+
+AgentStorage::~AgentStorage()
+{
+}
+
 void AgentStorage::UpdateAgentInfo(const AgentDataType& id, const AgentDataType& section, AgentDataType&& data)
 {
     std::scoped_lock<std::mutex> locker(dataMutex);
@@ -24,6 +39,7 @@ bool AgentStorage::QueryAgentInfo(const AgentDataType& id, const AgentDataType& 
             break;
         entry.timestamp = iter2->second.timestamp;
         entry.data      = iter2->second.data;
+        return true;
     } while (0);
     return false;
 }

@@ -1,15 +1,15 @@
 #pragma once
 #include "endian.h"
+#include "utils.hpp"
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <vector>
-#include "utils.hpp"
-#include <sstream>
 namespace Fundamental
 {
 enum class Endian : std::uint8_t
@@ -89,7 +89,7 @@ public:
         {
             std::memset(newPtr + sizeInBytes, 0, fixedSize);
         }
-            
+
         m_pRaw     = newPtr;
         m_byteSize = sizeInBytes;
     }
@@ -111,7 +111,7 @@ public:
     void DetachRawMemory(std::uint8_t** ppOutRawData,
                          _SizeType& outSizeInBytes);
 
-    const SizeType& GetSize() const
+    SizeType GetSize() const
     {
         return m_byteSize;
     }
@@ -162,7 +162,7 @@ public:
 
     std::string DumpAscii() const
     {
-        return Utils::BufferDumpAscii(m_pRaw,m_byteSize);
+        return Utils::BufferDumpAscii(m_pRaw, m_byteSize);
     }
 
 private:
@@ -294,7 +294,7 @@ Fundamental::Buffer<_SizeType>::operator bool() const
 template <typename _SizeType>
 inline std::string Buffer<_SizeType>::ToHexString() const
 {
-    return Utils::BufferToHex(m_pRaw,m_byteSize);
+    return Utils::BufferToHex(m_pRaw, m_byteSize);
 }
 
 template <typename _SizeType>
@@ -395,8 +395,14 @@ public:
     void PeekValue(ValueType* pDest,
                    SizeType srcBufferOffset = 0, SizeType valueSize = sizeof(ValueType))
     {
-        if (srcBufferOffset + valueSize <= m_bufferSize)
-            throw std::invalid_argument(std::string("buffer overflow"));
+        if (srcBufferOffset + valueSize > m_bufferSize)
+        {
+            std::string ex = std::string("buffer overflow");
+            ex += " pos:" + std::to_string(srcBufferOffset) + " need:" +
+                  std::to_string(valueSize) + " max:" + std::to_string(m_bufferSize);
+            throw std::invalid_argument(ex);
+        }
+
         constexpr static std::size_t kValueSize = sizeof(ValueType);
         if constexpr ((kValueSize > 1) &&
                       std::conjunction_v<std::is_integral<ValueType>, ConvertFlag>)
@@ -440,6 +446,13 @@ public:
     {
         SizeType size = 0;
         ReadValue(&size);
+        if (size + m_currentPosition > m_bufferSize)
+        {
+            std::string ex = std::string("raw buffer overflow");
+            ex += " pos:" + std::to_string(m_currentPosition) + " need:" +
+                  std::to_string(size) + " max:" + std::to_string(m_bufferSize);
+            throw std::invalid_argument(ex);
+        }
         destRawBuffer.Reallocate(size);
 
         if (size > 0)

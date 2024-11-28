@@ -45,6 +45,7 @@ static bool ProcessQuery(AgentRequestFrame& request, AgentResponseFrame& respons
         response.cmd = request.cmd;
         if (!AgentStorage::Instance().QueryAgentInfo(requestData.id, requestData.section, responseData))
         {
+            response.msg="not existed";
             response.code = AgentFailed;
         }
     }
@@ -53,11 +54,11 @@ static bool ProcessQuery(AgentRequestFrame& request, AgentResponseFrame& respons
         return false;
     }
     SizeType payloadSize = sizeof(responseData.timestamp) +
-                           requestData.section.GetSize() +
-                           sizeof(requestData.section.GetSize());
+                           responseData.data.GetSize() +
+                           sizeof(responseData.data.GetSize());
     response.payload.Reallocate(payloadSize);
     Fundamental::BufferWriter<SizeType> writer;
-    writer.SetBuffer(response.payload.GetData(),response.payload.GetSize());
+    writer.SetBuffer(response.payload.GetData(), response.payload.GetSize());
     writer.WriteValue(&responseData.timestamp);
     writer.WriteRawMemory(responseData.data);
     return true;
@@ -90,7 +91,11 @@ void AgentConnection::ProcessCmd()
     {
         AgentRequestFrame request;
         if (!PaserRequestFrame(request))
+        {
+            FERR("invalid agent request");
             break;
+        }
+
         auto iter = cmd_handlers.find(request.cmd);
         if (iter == cmd_handlers.end() || !iter->second)
         {
@@ -117,8 +122,9 @@ bool AgentConnection::PaserRequestFrame(AgentRequestFrame& request)
         reader.ReadRawMemory(request.payload);
         frame.payload.FreeBuffer();
     }
-    catch (const std::exception&)
+    catch (const std::exception& e)
     {
+        FDEBUG("e:{}", e.what());
         return false;
     }
     return true;
@@ -143,11 +149,8 @@ void AgentConnection::HandleResponse(AgentResponseFrame& response)
     ProxyRequestHandler::EncodeFrame(responseFrame);
     auto buffers = ProxyRequestHandler::FrameToBuffers(responseFrame);
     asio::async_write(socket_, std::move(buffers),
-                      [this, self = shared_from_this(), refFrame = std::move(responseFrame)](std::error_code ec, std::size_t) {
-                          if (!ec)
-                          {
-                              FWARN("disconnected for  write :{}", ec.message());
-                          }
+                      [this, self = shared_from_this(), refFrame = std::move(responseFrame)](std::error_code ec, std::size_t transfer_bytes) {
+                          FDEBUG("agent reponse transfer bytes:{} ec:{}", transfer_bytes, ec.message());
                       });
 }
 

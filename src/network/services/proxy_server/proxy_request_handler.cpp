@@ -24,32 +24,32 @@ bool ProxyRequestHandler::DecodeHeader(const std::uint8_t* data, std::size_t len
         // decode checkSum 1bytes
         dstFrame.checkSum = data[offset];
         ++offset;
-        // decode version low 4bit
-        dstFrame.version = data[offset] & 0xf;
+        // decode version
+        dstFrame.version = data[offset];
         if (dstFrame.version > ProxyFrame::kVersion)
             break;
-        // decode op high 4bit
-        dstFrame.op = data[offset] >> 4;
+        ++offset;
+        // decode op
+        dstFrame.op = data[offset];
         ++offset;
         // decode mask 4bytes
         std::memcpy(dstFrame.mask.data, data + offset, 4);
         offset += 4;
         // decode payload size 4 bytes
-        ProxySizeType payloadSize;
-        std::memcpy(&payloadSize, data + offset, kProxySize);
+        std::memcpy(&dstFrame.sizeStorage, data + offset, kProxySize);
         static_assert(4 == kProxySize || 8 == kProxySize, "unsupported proxy size type");
         if constexpr (4 == kProxySize)
         {
-            payloadSize = le32toh(payloadSize);
+            dstFrame.sizeStorage = le32toh(dstFrame.sizeStorage);
         }
         else if constexpr (8 == kProxySize)
         {
-            payloadSize = le64toh(payloadSize);
+            dstFrame.sizeStorage = le64toh(dstFrame.sizeStorage);
         }
-        if (payloadSize > ProxyFrame::kMaxFrameSize)
+        if (dstFrame.sizeStorage > ProxyFrame::kMaxFrameSize)
             break;
         // allocate memory 4bytes align
-        dstFrame.payload.Reallocate<sizeof(ProxySizeType)>(payloadSize);
+        dstFrame.payload.Reallocate<sizeof(ProxySizeType)>(dstFrame.sizeStorage);
         return true;
     } while (0);
     return false;
@@ -57,7 +57,6 @@ bool ProxyRequestHandler::DecodeHeader(const std::uint8_t* data, std::size_t len
 
 bool ProxyRequestHandler::DecodePayload(ProxyFrame& dstFrame)
 {
-
     auto bufferSize = dstFrame.payload.GetSize();
     auto ptr        = dstFrame.payload.GetData();
     union
@@ -100,9 +99,17 @@ void ProxyRequestHandler::EncodeFrame(ProxyFrame& dstFrame)
         std::uint8_t data[4];
         std::int32_t v;
     } opeationCheckSum;
-    opeationCheckSum.v                   = 0;
-    auto bufferSize                      = dstFrame.payload.GetSize();
-    auto ptr                             = dstFrame.payload.GetData();
+    opeationCheckSum.v = 0;
+    auto bufferSize    = dstFrame.payload.GetSize();
+    auto ptr           = dstFrame.payload.GetData();
+    if constexpr (4 == kProxySize)
+    {
+        dstFrame.sizeStorage = le32toh(bufferSize);
+    }
+    else if constexpr (8 == kProxySize)
+    {
+        dstFrame.sizeStorage = le64toh(bufferSize);
+    }
     std::size_t leftSize                 = bufferSize % 4;
     decltype(bufferSize) alignBufferSize = bufferSize - leftSize;
     // mask the origin data
@@ -159,8 +166,12 @@ void ProxyRequestHandler::UpgradeProtocal(Connection&& connection)
 std::vector<asio::const_buffer> ProxyRequestHandler::FrameToBuffers(const ProxyFrame& frame)
 {
     std::vector<asio::const_buffer> ret;
-    ret.push_back(asio::const_buffer(&frame.fixed, 8));
-    ret.push_back(asio::const_buffer(&frame.payload.GetSize(), sizeof(decltype(frame.payload.GetSize()))));
+    ret.push_back(asio::const_buffer(&frame.fixed, 2));
+    ret.push_back(asio::const_buffer(&frame.checkSum, 1));
+    ret.push_back(asio::const_buffer(&frame.version, 1));
+    ret.push_back(asio::const_buffer(&frame.op, 1));
+    ret.push_back(asio::const_buffer(frame.mask.data, 4));
+    ret.push_back(asio::const_buffer(&frame.sizeStorage, sizeof(frame.sizeStorage)));
     ret.push_back(asio::const_buffer(frame.payload.GetData(), frame.payload.GetSize()));
     return ret;
 }

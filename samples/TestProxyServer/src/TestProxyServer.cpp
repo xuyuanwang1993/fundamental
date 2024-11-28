@@ -10,6 +10,7 @@
 #include <iostream>
 #include <memory>
 #include <utility>
+#include <random>
 int main(int argc, char* argv[])
 {
     auto p = ::getenv("CLIENT");
@@ -59,17 +60,9 @@ int main(int argc, char* argv[])
             std::string section = argv[4];
             if (mode == "update")
             {
-                auto maxSize = 1024;
-                char line[maxSize - 1];
-                std::string msg;
-                while (std::cin.getline(line, maxSize + 1))
-                {
-                    auto len = std::strlen(line);
-                    if (0 == len)
-                        continue;
-                    msg = std::string(line, len);
-                    break;
-                }
+                std::random_device rd;
+                std::int32_t len=(rd()%2000)+100;
+                std::string msg(len,'c');
                 network::proxy::rpc::AgentUpdateContext context;
                 context.host            = argv[1];
                 context.service         = argv[2];
@@ -102,7 +95,22 @@ int main(int argc, char* argv[])
                 context.cb = [](bool bSuccess, AgentClientToken token, AgentResponse&& res) {
                     FINFO("update success:{} token:{}", bSuccess, token);
                     FINFO("code:{} msg:{} size:{} result:{}", res.code, res.msg, res.data.size(),
-                          std::string(res.data.data(), res.data.data() + res.data.size()));
+                          Fundamental::Utils::BufferDumpAscii(res.data.data(), res.data.size()));
+                    // decode data
+                    network::proxy::AgentQueryResponse response;
+                    Fundamental::BufferReader<network::proxy::ProxySizeType> reader;
+                    reader.SetBuffer(res.data.data(), res.data.size());
+                    try
+                    {
+                        reader.ReadValue(&response.timestamp);
+                        reader.ReadRawMemory(response.data);
+                        FINFO("time:{}  data:{}", Fundamental::Timer::ToTimeStr(response.timestamp),
+                              response.data.ToString());
+                    }
+                    catch (const std::exception&)
+                    {
+                    }
+
                     Fundamental::Application::Instance().Exit();
                 };
                 auto token = client.Query(context);
