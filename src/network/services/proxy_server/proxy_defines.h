@@ -1,6 +1,8 @@
 #pragma once
 #include "fundamental/basic/buffer.hpp"
+#include <asio.hpp>
 #include <cstdint>
+#include <vector>
 namespace network
 {
 namespace proxy
@@ -20,11 +22,11 @@ struct ProxyFrame
     static constexpr std::uint16_t kFixed        = 0x6668;
     static constexpr std::uint8_t kVersion       = 0x01;
     static constexpr ProxySizeType kMaxFrameSize = 512 * 1024; // 512k
-    std::uint16_t fixed   = kFixed;
-    std::uint8_t checkSum = 0;
+    std::uint16_t fixed                          = kFixed;
+    std::uint8_t checkSum                        = 0;
     // version should be 0x01
-    std::uint8_t version=kVersion;
-    std::uint8_t op=0x00;
+    std::uint8_t version = kVersion;
+    std::uint8_t op      = 0x00;
     union
     {
         std::uint8_t data[4];
@@ -32,6 +34,19 @@ struct ProxyFrame
     } mask;
     ProxySizeType sizeStorage = 0;
     Fundamental::Buffer<ProxySizeType> payload;
+    //functions
+    std::vector<asio::const_buffer> ToAsioBuffers()
+    {
+        std::vector<asio::const_buffer> ret;
+        ret.push_back(asio::const_buffer(&fixed, 2));
+        ret.push_back(asio::const_buffer(&checkSum, 1));
+        ret.push_back(asio::const_buffer(&version, 1));
+        ret.push_back(asio::const_buffer(&op, 1));
+        ret.push_back(asio::const_buffer(mask.data, 4));
+        ret.push_back(asio::const_buffer(&sizeStorage, sizeof(sizeStorage)));
+        ret.push_back(asio::const_buffer(payload.GetData(), payload.GetSize()));
+        return ret;
+    }
 };
 } // namespace proxy
 } // namespace network

@@ -89,7 +89,7 @@ void connection::do_read()
 
 void connection::do_write()
 {
-    asio::async_write(socket_, Builder::ToBuffers(replys_.front()),
+    asio::async_write(socket_, Builder::ToAsioBuffers(replys_.front()),
                       [this, self = shared_from_this()](std::error_code ec, std::size_t) {
                           if (!ec)
                           {
@@ -168,7 +168,7 @@ decltype(MsgContext::status) Paser::PaserRequest(MsgContext& msgContext, std::si
     }
 }
 
-std::vector<asio::const_buffer> Builder::ToBuffers(EchoMsg& reply)
+std::vector<asio::const_buffer> Builder::ToAsioBuffers(EchoMsg& reply)
 {
     std::vector<asio::const_buffer> ret;
     ret.push_back(asio::const_buffer(reply.header.data, EchoMsg::kHeaderSize));

@@ -163,19 +163,6 @@ void ProxyRequestHandler::UpgradeProtocal(Connection&& connection)
     }
 }
 
-std::vector<asio::const_buffer> ProxyRequestHandler::FrameToBuffers(const ProxyFrame& frame)
-{
-    std::vector<asio::const_buffer> ret;
-    ret.push_back(asio::const_buffer(&frame.fixed, 2));
-    ret.push_back(asio::const_buffer(&frame.checkSum, 1));
-    ret.push_back(asio::const_buffer(&frame.version, 1));
-    ret.push_back(asio::const_buffer(&frame.op, 1));
-    ret.push_back(asio::const_buffer(frame.mask.data, 4));
-    ret.push_back(asio::const_buffer(&frame.sizeStorage, sizeof(frame.sizeStorage)));
-    ret.push_back(asio::const_buffer(frame.payload.GetData(), frame.payload.GetSize()));
-    return ret;
-}
-
 ProxeServiceBase::ProxeServiceBase(asio::ip::tcp::socket&& socket, ProxyFrame&& frame) :
 socket_(std::forward<asio::ip::tcp::socket>(socket)),
 frame(std::forward<ProxyFrame>(frame))

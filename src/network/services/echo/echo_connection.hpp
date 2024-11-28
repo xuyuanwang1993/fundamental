@@ -68,7 +68,7 @@ struct Paser
 
 struct Builder
 {
-    static std::vector<asio::const_buffer> ToBuffers(EchoMsg& reply);
+    static std::vector<asio::const_buffer> ToAsioBuffers(EchoMsg& reply);
 };
 
 /// Represents a single connection from a client.

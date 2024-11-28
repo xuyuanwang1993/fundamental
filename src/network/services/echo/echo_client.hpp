@@ -155,7 +155,7 @@ private:
     {
         if(buf_slices_.empty())
         {
-            auto buffers=Builder::ToBuffers(write_msgs_.front());
+            auto buffers=Builder::ToAsioBuffers(write_msgs_.front());
             for(auto& item:buffers)
             {
                 std::size_t offset=0;

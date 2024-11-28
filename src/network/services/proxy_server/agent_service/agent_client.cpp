@@ -266,8 +266,7 @@ void AgentClient::AgentSession::StartConnect(asio::ip::tcp::resolver::results_ty
 void AgentClient::AgentSession::SendRequest()
 {
     status_.exchange(SessionStatus::AgentSending);
-    auto buffers = ProxyRequestHandler::FrameToBuffers(frame);
-    asio::async_write(socket_, std::move(buffers),
+    asio::async_write(socket_, frame.ToAsioBuffers(),
                       [this, self = shared_from_this()](std::error_code ec, std::size_t) {
                           if (ec || status_ == AgentCancelled)
                           {

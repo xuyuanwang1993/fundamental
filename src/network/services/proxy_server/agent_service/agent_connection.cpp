@@ -147,8 +147,7 @@ void AgentConnection::HandleResponse(AgentResponseFrame& response)
     writer.WriteRawMemory(response.msg);
     writer.WriteRawMemory(response.payload);
     ProxyRequestHandler::EncodeFrame(responseFrame);
-    auto buffers = ProxyRequestHandler::FrameToBuffers(responseFrame);
-    asio::async_write(socket_, std::move(buffers),
+    asio::async_write(socket_, responseFrame.ToAsioBuffers(),
                       [this, self = shared_from_this(), refFrame = std::move(responseFrame)](std::error_code ec, std::size_t transfer_bytes) {
                           FDEBUG("agent reponse transfer bytes:{} ec:{}", transfer_bytes, ec.message());
                       });

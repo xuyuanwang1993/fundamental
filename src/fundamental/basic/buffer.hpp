@@ -129,6 +129,24 @@ public:
             return false;
         return 0 == std::memcmp(m_pRaw, str.data(), str.size());
     }
+
+    bool operator!=(const std::string& str)
+    {
+        return !(this->operator==(str));
+    }
+
+    bool operator==(const Buffer& buffer)
+    {
+        if (m_byteSize != buffer.GetSize())
+            return false;
+        return 0 == std::memcmp(m_pRaw, buffer.GetData(), buffer.GetSize());
+    }
+
+    bool operator!=(const Buffer& buffer)
+    {
+        return !(this->operator==(buffer));
+    }
+
     Buffer(const std::string& str)
     {
         AssignBuffer(reinterpret_cast<const std::uint8_t*>(str.data()), str.size());
