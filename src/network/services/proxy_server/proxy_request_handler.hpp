@@ -13,7 +13,6 @@ struct ProxyRequestHandler
     static bool DecodePayload(ProxyFrame& dstFrame);
     static void EncodeFrame(ProxyFrame& dstFrame);
     static void UpgradeProtocal(Connection&& connection);
-    static std::vector<asio::const_buffer> FrameToBuffers(const ProxyFrame& frame);
 };
 
 struct ProxeServiceBase:public Fundamental::NonCopyable

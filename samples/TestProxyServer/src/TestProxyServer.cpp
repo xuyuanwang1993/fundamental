@@ -6,11 +6,13 @@
 #include "network/server/io_context_pool.hpp"
 #include "network/services/proxy_server/agent_service/agent_client.hpp"
 #include "network/services/proxy_server/proxy_connection.hpp"
+#include "network/services/proxy_server/traffic_proxy_service/traffic_proxy_manager.hpp"
 #include <cstdlib>
 #include <iostream>
 #include <memory>
-#include <utility>
 #include <random>
+#include <utility>
+void InitTrafficProxyManager();
 int main(int argc, char* argv[])
 {
     auto p = ::getenv("CLIENT");
@@ -31,6 +33,7 @@ int main(int argc, char* argv[])
             }
             network::io_context_pool::s_excutorNums = std::stoi(argv[3]);
             network::io_context_pool::Instance().start();
+            InitTrafficProxyManager();
             // Initialise the server.
             network::proxy::ProxyServer s(argv[1], argv[2]);
             s.Start();
@@ -61,8 +64,8 @@ int main(int argc, char* argv[])
             if (mode == "update")
             {
                 std::random_device rd;
-                std::int32_t len=(rd()%2000)+100;
-                std::string msg(len,'c');
+                std::int32_t len = (rd() % 2000) + 100;
+                std::string msg(len, 'c');
                 network::proxy::rpc::AgentUpdateContext context;
                 context.host            = argv[1];
                 context.service         = argv[2];
@@ -124,5 +127,45 @@ int main(int argc, char* argv[])
         }
 
         return 0;
+    }
+}
+
+void InitTrafficProxyManager()
+{
+    using namespace network::proxy;
+    auto& manager = TrafficProxyManager::Instance();
+    { // add http proxy
+        TrafficProxyHostInfo host;
+        host.token = "test_http_token";
+        {
+            TrafficProxyHost hostRecord;
+            hostRecord.host    = "www.baidu.com";
+            hostRecord.service = "http";
+            host.hosts.emplace(TrafficProxyDataType("www.baidu.com"), std::move(hostRecord));
+        }
+        {
+            TrafficProxyHost hostRecord;
+            hostRecord.host    = "github.com";
+            hostRecord.service = "http";
+            host.hosts.emplace(TrafficProxyDataType("github.com"), std::move(hostRecord));
+        }
+        manager.UpdateTrafficProxyHostInfo(TrafficProxyDataType("test_http"), std::move(host));
+    }
+    { // add normal tcp
+        TrafficProxyHostInfo host;
+        host.token = "test_tcp_token";
+        {
+            TrafficProxyHost hostRecord;
+            hostRecord.host    = "127.0.0.1";
+            hostRecord.service = "54885";
+            host.hosts.emplace(TrafficProxyDataType("internal"), std::move(hostRecord));
+        }
+        {
+            TrafficProxyHost hostRecord;
+            hostRecord.host    = "127.0.0.1";
+            hostRecord.service = "54886";
+            host.hosts.emplace(TrafficProxyDataType(TrafficProxyManager::kDefaultFieldName ), std::move(hostRecord));
+        }
+        manager.UpdateTrafficProxyHostInfo(TrafficProxyDataType("test_tcp"), std::move(host));
     }
 }

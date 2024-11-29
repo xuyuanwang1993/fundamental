@@ -29,9 +29,9 @@ class TrafficProxyConnection : public ProxeServiceBase, public std::enable_share
         std::size_t writeBytesNum = 0;
         std::size_t readBytesNum  = 0;
         //
-        std::int64_t lastCheckSecTimePoint          = 0;
-        std::size_t lastReadBytesNum                = 0;
-        std::size_t lastWriteBytesNum               = 0;
+        std::int64_t lastCheckSecTimePoint = 0;
+        std::size_t lastReadBytesNum       = 0;
+        std::size_t lastWriteBytesNum      = 0;
         void PrepareWriteCache();
         void PrepareReadCache();
         asio::mutable_buffer GetReadBuffer();
@@ -40,7 +40,17 @@ class TrafficProxyConnection : public ProxeServiceBase, public std::enable_share
         void UpdateWriteBuffer(std::size_t writeBytes);
         //
         void InitStatistics();
-        void UpdateStatistics(const std::string &tag);
+        void UpdateStatistics(const std::string& tag);
+    };
+    enum TrafficProxyStatusMask : std::int32_t
+    {
+        TrafficClientConnected = (1 << 0),
+        CheckTimerStarted      = (1 << 2),
+        ProxyDnsResolving      = (1 << 3),
+        ProxyConnecting        = (1 << 4),
+        ProxyConnected         = (1 << 5),
+        TrafficClientClosed    = (1 << 6),
+        ProxyClosed            = (1 << 7)
     };
 
 public:
@@ -52,6 +62,9 @@ protected:
     void Process();
     void ProcessTrafficProxy();
     void HandleDisconnect(asio::error_code ec, const std::string& callTag = "");
+    void HandleTrafficDataFinished(asio::error_code ec, const std::string& callTag = "");
+    void HandleProxyFinished(asio::error_code ec, const std::string& callTag = "");
+    void AbortCheck();
 
 protected:
     void StartDnsResolve(const std::string& host, const std::string& service);
@@ -61,12 +74,13 @@ protected:
     void StartProxyWrite();
     void StartProxyRead();
     void StartStatistics();
-
+    void StopStatistics();
 protected:
     asio::ip::tcp::socket proxy_socket_;
     asio::ip::tcp::resolver resolver;
     asio::steady_timer checkTimer;
 
+    std::int32_t status = TrafficClientConnected;
     EndponitCacheStatus request_client_;
     EndponitCacheStatus passive_server_;
 };

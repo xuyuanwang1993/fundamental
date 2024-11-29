@@ -53,9 +53,10 @@ public:
 
     // NOTE: this method is same as std::vector::assign,
     // so data will be copied.
-    explicit Buffer(std::uint8_t* pData,
+    explicit Buffer(const void* pData,
                     _SizeType sizeInBytes);
-
+    explicit Buffer(const char* cStr);
+    
     ~Buffer();
 
     // overwrite copy
@@ -97,7 +98,7 @@ public:
     // NOTE: this method is same as std::vector::assign,
     // so data will be copied.
     // if you do not wish a copy, consider to use MemoryOwner instead
-    void AssignBuffer(const std::uint8_t* pData, _SizeType sizeInBytes);
+    void AssignBuffer(const void* pData, _SizeType sizeInBytes);
 
     // This method will free current buffer
     // and assign the raw pointer and size directly without copy
@@ -155,6 +156,12 @@ public:
     Buffer& operator=(const std::string& str)
     {
         AssignBuffer(reinterpret_cast<const std::uint8_t*>(str.data()), str.size());
+        return *this;
+    }
+
+    Buffer& operator=(const char* cStr)
+    {
+        AssignBuffer(cStr, strlen(cStr));
         return *this;
     }
 
@@ -222,10 +229,16 @@ Buffer<_SizeType>::Buffer(_SizeType sizeInBytes)
 }
 
 template <typename _SizeType>
-Buffer<_SizeType>::Buffer(std::uint8_t* pData,
+Buffer<_SizeType>::Buffer(const void* pData,
                           _SizeType sizeInBytes)
 {
     AssignBuffer(pData, sizeInBytes);
+}
+
+template <typename _SizeType>
+inline Buffer<_SizeType>::Buffer(const char* cStr)
+{
+    AssignBuffer(cStr, strlen(cStr));
 }
 
 template <typename _SizeType>
@@ -252,7 +265,7 @@ inline Buffer<_SizeType>& Buffer<_SizeType>::operator=(const Buffer& other)
 }
 
 template <typename _SizeType>
-void Buffer<_SizeType>::AssignBuffer(const std::uint8_t* pData,
+void Buffer<_SizeType>::AssignBuffer(const void* pData,
                                      _SizeType sizeInBytes)
 {
     Reallocate(sizeInBytes);
