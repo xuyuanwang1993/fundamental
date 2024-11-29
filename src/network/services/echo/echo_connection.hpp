@@ -62,7 +62,7 @@ struct EchoRequestHandler
 
 struct Paser
 {
-    static constexpr std::size_t kMaxMsgSize = 32;
+    static constexpr std::size_t kMaxMsgSize = 2048;
     static decltype(MsgContext::status) PaserRequest(MsgContext& msgContext, std::size_t dataLen);
 };
 

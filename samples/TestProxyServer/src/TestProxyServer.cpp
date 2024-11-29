@@ -24,7 +24,7 @@ int main(int argc, char* argv[])
             // Check command line arguments.
             if (argc != 4)
             {
-                std::cerr << "Usage: echo_server <address> <port> <threads>\n";
+                std::cerr << "Usage: server <address> <port> <threads>\n";
                 std::cerr << "  For IPv4, try:\n";
                 std::cerr << "    receiver 0.0.0.0 4885 1 \n";
                 std::cerr << "  For IPv6, try:\n";
@@ -53,7 +53,7 @@ int main(int argc, char* argv[])
         {
             if (argc != 5)
             {
-                std::cerr << "Usage: echo_client <host> <port> <mode> <section>\n";
+                std::cerr << "Usage: client <host> <port> <mode> <section>\n";
                 return 1;
             }
             network::io_context_pool::s_excutorNums = 2;

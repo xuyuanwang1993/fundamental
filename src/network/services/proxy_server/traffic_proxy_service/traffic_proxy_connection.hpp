@@ -73,7 +73,7 @@ protected:
     void StartTrafficClientRead();
     void StartProxyWrite();
     void StartProxyRead();
-    void StartStatistics();
+    void DoStatistics();
     void StopStatistics();
 protected:
     asio::ip::tcp::socket proxy_socket_;

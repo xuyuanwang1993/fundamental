@@ -3,6 +3,7 @@
 #include "fundamental/delay_queue/delay_queue.h"
 #include "traffic_proxy_codec.hpp"
 #include "traffic_proxy_manager.hpp"
+#include <iostream>
 namespace network
 {
 namespace proxy
@@ -23,7 +24,6 @@ void TrafficProxyConnection::SetUp()
 TrafficProxyConnection::~TrafficProxyConnection()
 {
     HandleDisconnect({}, "");
-    FDEBUG("release TrafficProxyConnection");
 }
 
 void TrafficProxyConnection::Process()
@@ -91,6 +91,8 @@ void TrafficProxyConnection::HandleDisconnect(asio::error_code ec, const std::st
 
 void TrafficProxyConnection::HandleTrafficDataFinished(asio::error_code ec, const std::string& callTag)
 {
+    if (status & TrafficClientConnected)
+        status ^= TrafficClientConnected;
     if (status ^ TrafficClientClosed)
     {
         status |= TrafficClientClosed;
@@ -102,6 +104,8 @@ void TrafficProxyConnection::HandleTrafficDataFinished(asio::error_code ec, cons
 
 void TrafficProxyConnection::HandleProxyFinished(asio::error_code ec, const std::string& callTag)
 {
+    if (status & ProxyConnected)
+        status ^= ProxyConnected;
     if (status ^ ProxyClosed)
     {
         status |= ProxyClosed;
@@ -169,7 +173,10 @@ void TrafficProxyConnection::StartConnect(asio::ip::tcp::resolver::results_type&
                             request_client_.InitStatistics();
                             passive_server_.InitStatistics();
                             if (s_trafficStatisticsIntervalSec > 0)
-                                StartStatistics();
+                            {
+                                status |= CheckTimerStarted;
+                                DoStatistics();
+                            }
                         });
 }
 
@@ -245,7 +252,7 @@ void TrafficProxyConnection::StartProxyWrite()
     {
         if (status & TrafficClientClosed)
         {
-            FDEBUG(" proxy finished");
+            FDEBUG("proxy finished");
             HandleProxyFinished({}, "");
             StopStatistics();
         }
@@ -272,9 +279,10 @@ void TrafficProxyConnection::StartProxyRead()
                                   });
 }
 
-void TrafficProxyConnection::StartStatistics()
+void TrafficProxyConnection::DoStatistics()
 {
-    status |= CheckTimerStarted;
+    if (!(status & CheckTimerStarted))
+        return;
     checkTimer.async_wait([this, self = shared_from_this()](const std::error_code& e) {
         if (e)
         {
@@ -283,7 +291,7 @@ void TrafficProxyConnection::StartStatistics()
         }
         request_client_.UpdateStatistics("client");
         passive_server_.UpdateStatistics("proxy");
-        StartStatistics();
+        DoStatistics();
     });
 }
 
@@ -363,18 +371,17 @@ void TrafficProxyConnection::EndponitCacheStatus::UpdateStatistics(const std::st
     auto timePoint = Fundamental::Timer::GetTimeNow<std::chrono::seconds>();
     if (timePoint == lastCheckSecTimePoint)
         return;
-    static constexpr std::size_t kMBScale = 1024 * 1024;
-    auto timeDiff                         = timePoint - lastCheckSecTimePoint;
-    auto readBytesDiff                    = (readBytesNum - lastReadBytesNum) / 1024.0;
-    auto writeBytesDiff                   = writeBytesNum - lastWriteBytesNum / 1024.0;
-    auto readSpeedKBPerSec                = readBytesDiff / timeDiff;
-    auto writeSpeedKBPerSec               = writeBytesDiff / timeDiff;
+    auto timeDiff           = timePoint - lastCheckSecTimePoint;
+    auto readBytesDiff      = (readBytesNum - lastReadBytesNum) / 1024.0;
+    auto writeBytesDiff     = (writeBytesNum - lastWriteBytesNum) / 1024.0;
+    auto readSpeedKBPerSec  = readBytesDiff / timeDiff;
+    auto writeSpeedKBPerSec = writeBytesDiff / timeDiff;
     // update
     lastCheckSecTimePoint = timePoint;
     lastReadBytesNum      = readBytesNum;
     lastWriteBytesNum     = writeBytesNum;
-    FDEBUG("{} read {}kB/s->{}MB write:{}kB/s->{}MB", tag, readSpeedKBPerSec,
-           lastReadBytesNum / kMBScale, writeSpeedKBPerSec, lastWriteBytesNum / kMBScale);
+    FDEBUG("{} read {}kB/s->{}bytes write:{}kB/s->{}bytes", tag, readSpeedKBPerSec,
+           lastReadBytesNum, writeSpeedKBPerSec, lastWriteBytesNum);
 }
 } // namespace proxy
 } // namespace network
