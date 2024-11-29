@@ -62,32 +62,30 @@ struct EchoRequestHandler
 
 struct Paser
 {
-    static constexpr std::size_t kMaxMsgSize = 32;
+    static constexpr std::size_t kMaxMsgSize = 2048;
     static decltype(MsgContext::status) PaserRequest(MsgContext& msgContext, std::size_t dataLen);
 };
 
 struct Builder
 {
-    static std::vector<asio::const_buffer> ToBuffers(EchoMsg& reply);
+    static std::vector<asio::const_buffer> ToAsioBuffers(EchoMsg& reply);
 };
 
 /// Represents a single connection from a client.
 class connection
-: public std::enable_shared_from_this<connection>
+:public ConnectionInterface<EchoRequestHandler>,  public std::enable_shared_from_this<connection>
 {
 public:
     static constexpr std::size_t kPerReadMaxBytes = 16;
 
 public:
-    connection(const connection&)            = delete;
-    connection& operator=(const connection&) = delete;
 
     /// Construct a connection with the given socket.
     explicit connection(asio::ip::tcp::socket socket,
                         EchoRequestHandler& handler);
 
     /// Start the first asynchronous operation for the connection.
-    void start();
+    void Start()override;
 
 private:
     void handle_close();
@@ -96,12 +94,6 @@ private:
 
     /// Perform an asynchronous write operation.
     void do_write();
-
-    /// Socket for the connection.
-    asio::ip::tcp::socket socket_;
-
-    /// The handler used to process the incoming msgContext.
-    EchoRequestHandler& request_handler_;
 
     MsgContext msgContext_;
     std::deque<EchoMsg> replys_;

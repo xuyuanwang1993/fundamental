@@ -108,7 +108,9 @@ public:
      */
     void HandleEvent();
 
-
+    /*
+    * this callback will be called when delay queue has been modified
+    */
     void SetStateChangedCallback(const std::function<void()>& cb);
 
 public:

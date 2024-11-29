@@ -23,6 +23,9 @@ file(GLOB lib_source
     tracker/*.h
     tracker/*.cpp
     tracker/*.hpp
+    application/*.h
+    application/*.cpp
+    application/*.hpp
 )
 
 # Add to source group, TREE will enable cmake to config the folder layout automatically
