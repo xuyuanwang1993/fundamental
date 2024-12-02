@@ -1,3 +1,8 @@
+if(__FUNDAMENTAL__)
+  return()
+endif()
+set(__FUNDAMENTAL__ TRUE)
+
 option(F_BUILD_STATIC "build static fundamental lib" ON)
 option(F_BUILD_SHARED "build dynamic fundamental lib" OFF)
 option(ENABLE_DEBUG_MEMORY_TRACE "enable memory track" ON)
