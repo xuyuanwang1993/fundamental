@@ -19,3 +19,6 @@ if(F_BUILD_SHARED)
 add_subdirectory(TestRttr)
 endif()
 
+if(IMPORT_GTEST)
+add_subdirectory(GtestSample)
+endif()

@@ -21,6 +21,7 @@ set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 # find_package() uses <PackageName>_ROOT variables
 cmake_policy(SET CMP0074 NEW)
 include(cmake/config-target.cmake)
+include(cmake/import_gtest_config.cmake)
 add_subdirectory(third-parties)
 add_subdirectory(src)
 add_subdirectory(samples)
