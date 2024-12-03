@@ -10,6 +10,12 @@ void TrafficProxyManager::UpdateTrafficProxyHostInfo(const TrafficProxyDataType&
     storage[serviceName] = std::move(hostInfo);
 }
 
+void TrafficProxyManager::RemoveTrafficProxyHostInfo(const TrafficProxyDataType& serviceName)
+{
+    std::scoped_lock<std::mutex> locker(dataMutex);
+    storage.erase(serviceName);
+}
+
 bool TrafficProxyManager::GetTrafficProxyHostInfo(const TrafficProxyDataType& serviceName,
                                                   const TrafficProxyDataType& token,
                                                   const TrafficProxyDataType& field,

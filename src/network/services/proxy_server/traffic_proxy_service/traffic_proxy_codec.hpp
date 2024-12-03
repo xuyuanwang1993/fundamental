@@ -1,3 +1,4 @@
+#pragma once
 #include "network/services/proxy_server/proxy_defines.h"
 #include "network/services/proxy_server/proxy_request_handler.hpp"
 #include "traffic_proxy_defines.h"
@@ -8,23 +9,24 @@ namespace proxy
 
 struct TrafficEncoder
 {
-    static void EncodeProxyRequest(TrafficProxyDataType& dstBuffer, const TrafficProxyRequest& request);
-    template <typename Request>
-    static void EncodeProxyFrame(ProxyFrame& dstFrame, const Request& request);
+    template <typename CommandFrame>
+    static void EncodeCommandFrame(TrafficProxyDataType& dstBuffer, const CommandFrame& command_frame);
+    template <typename CommandFrame>
+    static void EncodeProxyFrame(ProxyFrame& dstFrame, const CommandFrame& command_frame);
 };
 
 struct TrafficDecoder
 {
-    static bool DecodeProxyRequest(const TrafficProxyDataType& srcBuffer, TrafficProxyRequest& dstRequest);
+    template <typename CommandFrame>
+    static bool DecodeCommandFrame(const TrafficProxyDataType& srcBuffer, CommandFrame& dst_command_frame);
 };
 
-template <typename Request>
-inline void TrafficEncoder::EncodeProxyFrame(ProxyFrame& dstFrame, const Request& request)
+template <typename CommandFrame>
+inline void TrafficEncoder::EncodeProxyFrame(ProxyFrame& dstFrame, const CommandFrame& command_frame)
 {
     dstFrame.op = ProxyOpCode::TrafficProxyOp;
-    EncodeProxyRequest(dstFrame.payload, request);
+    EncodeCommandFrame(dstFrame.payload, command_frame);
     ProxyRequestHandler::EncodeFrame(dstFrame);
 }
-
 } // namespace proxy
 } // namespace network

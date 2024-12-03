@@ -9,16 +9,28 @@ using TrafficProxySizeType = std::uint32_t;
 using TrafficProxyDataType = Fundamental::Buffer<TrafficProxySizeType>;
 enum TrafficProxyOperation : std::int32_t
 {
-    TrafficProxyDataOp = 0,
+    TrafficProxyDataOp           = 0,
+    UpdateTrafficProxyHostInfoOp = 1,
+    RemoveTrafficProxyHostInfoOp = 2
 };
 
 struct TrafficProxyRequestBase
 {
-    TrafficProxyOperation op = TrafficProxyDataOp;
+    const TrafficProxyOperation op = TrafficProxyDataOp;
+};
+
+struct TrafficProxyResponseBase
+{
+    const TrafficProxyOperation op = TrafficProxyDataOp;
+    std::int32_t req;
 };
 
 struct TrafficProxyRequest : TrafficProxyRequestBase
 {
+    TrafficProxyRequest() :
+    TrafficProxyRequestBase { TrafficProxyDataOp }
+    {
+    }
     TrafficProxyDataType proxyServiceName;
     TrafficProxyDataType field;
     TrafficProxyDataType token;
@@ -41,5 +53,42 @@ struct TrafficProxyHostInfo
 using TrafficProxyHostMap = std::unordered_map<TrafficProxyDataType /*proxyServiceName*/,
                                                TrafficProxyHostInfo,
                                                Fundamental::BufferHash<TrafficProxySizeType>>;
+
+struct UpdateTrafficProxyRequest : TrafficProxyRequestBase
+{
+    UpdateTrafficProxyRequest() :
+    TrafficProxyRequestBase { UpdateTrafficProxyHostInfoOp }
+    {
+    }
+    std::int32_t req = 0;
+    TrafficProxyDataType proxyServiceName;
+    TrafficProxyHostInfo hostInfo;
+};
+
+struct UpdateTrafficProxyResponse : TrafficProxyResponseBase
+{
+    UpdateTrafficProxyResponse() :
+    TrafficProxyResponseBase { UpdateTrafficProxyHostInfoOp }
+    {
+    }
+};
+
+struct RemoveTrafficProxyRequest : TrafficProxyRequestBase
+{
+    RemoveTrafficProxyRequest() :
+    TrafficProxyRequestBase { RemoveTrafficProxyHostInfoOp }
+    {
+    }
+    std::int32_t req = 0;
+    TrafficProxyDataType proxyServiceName;
+};
+
+struct RemoveTrafficProxyResponse : TrafficProxyResponseBase
+{
+    RemoveTrafficProxyResponse() :
+    TrafficProxyResponseBase { RemoveTrafficProxyHostInfoOp }
+    {
+    }
+};
 } // namespace proxy
 } // namespace network

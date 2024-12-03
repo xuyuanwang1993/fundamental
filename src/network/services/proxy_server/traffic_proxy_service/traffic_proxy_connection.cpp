@@ -3,6 +3,7 @@
 #include "fundamental/delay_queue/delay_queue.h"
 #include "traffic_proxy_codec.hpp"
 #include "traffic_proxy_manager.hpp"
+#include "traffic_proxy_codec.hpp"
 #include <iostream>
 namespace network
 {
@@ -47,7 +48,12 @@ void TrafficProxyConnection::Process()
     case TrafficProxyDataOp:
         ProcessTrafficProxy();
         break;
-
+    case UpdateTrafficProxyHostInfoOp:
+        ProcessTrafficProxy();
+        break;
+    case RemoveTrafficProxyHostInfoOp:
+        ProcessTrafficProxy();
+        break;
     default:
         FWARN("unsupported traffic proxy op {}", op);
         break;
@@ -56,20 +62,9 @@ void TrafficProxyConnection::Process()
 
 void TrafficProxyConnection::ProcessTrafficProxy()
 {
-    using SizeType = decltype(frame.payload.GetSize());
-    Fundamental::BufferReader<SizeType> reader;
-    reader.SetBuffer(frame.payload.GetData() + sizeof(TrafficProxyOperation),
-                     frame.payload.GetSize() - sizeof(TrafficProxyOperation));
     TrafficProxyRequest request;
-    try
+    if(!TrafficDecoder::DecodeCommandFrame(frame.payload,request))
     {
-        reader.ReadRawMemory(request.proxyServiceName);
-        reader.ReadRawMemory(request.field);
-        reader.ReadRawMemory(request.token);
-    }
-    catch (const std::exception& e)
-    {
-        FERR("process TrafficProxyConnection TrafficProxyRequest failed {}", e.what());
         return;
     }
     TrafficProxyHost hostInfo;

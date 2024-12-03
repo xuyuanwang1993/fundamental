@@ -14,7 +14,7 @@ public:
 
 public:
     void UpdateTrafficProxyHostInfo(const TrafficProxyDataType& serviceName, TrafficProxyHostInfo&& hostInfo);
-
+    void RemoveTrafficProxyHostInfo(const TrafficProxyDataType& serviceName);
     bool GetTrafficProxyHostInfo(const TrafficProxyDataType& serviceName,
                                  const TrafficProxyDataType& token,
                                  const TrafficProxyDataType& field,
