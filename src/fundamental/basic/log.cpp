@@ -219,7 +219,6 @@ private:
                 m_lastLogFileName = newFileName;
             }
             m_fileHelper.open(newFileName);
-            
         }
         catch (const std::exception& e)
         {
@@ -421,7 +420,7 @@ void Logger::Initialize(bool enableConsoleOutput)
         }
 
         details::s_loggerStorage = spdlog::create(details::s_customLoggerName, initList.begin(), initList.end());
-        Logger::s_logger   = details::s_loggerStorage.get();
+        Logger::s_logger         = details::s_loggerStorage.get();
         spdlog::set_level(static_cast<spdlog::level::level_enum>(details::s_minimumLevel));
         spdlog::set_pattern(details::s_logFormat);
         if (details::s_errorHandler)
@@ -528,8 +527,8 @@ spdlog::pattern_formatter* Logger::GetStringFormatter()
 
 void Logger::TestLogInstance()
 {
-    std::cout<<"internal log instance "<<details::s_loggerStorage.get()<<std::endl;
-    std::cout<<"spd log storage "<<&spdlog::details::registry::instance()<<std::endl;
+    std::cout << "internal log instance " << details::s_loggerStorage.get() << std::endl;
+    std::cout << "spd log storage " << &spdlog::details::registry::instance() << std::endl;
 }
 
 void Logger::SetErrorHandler(const ErrorHandlerType& handler)
@@ -542,5 +541,15 @@ void Logger::SetCatchHandler(const LogMessageCatchFunc& handler)
     details::s_catchHandler = handler;
     if (details::s_nativeLogSink)
         details::s_nativeLogSink->SetMsgCatcher(details::s_catchHandler);
+}
+LoggerStream::LoggerStream(LogLevel level) :
+level_(level)
+{
+}
+LoggerStream::~LoggerStream()
+{
+#ifndef DISABLE_FLOG
+    Logger::LogOutput(level_, ss_.str());
+#endif
 }
 } // namespace Fundamental

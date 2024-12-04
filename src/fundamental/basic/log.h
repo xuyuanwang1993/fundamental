@@ -31,8 +31,8 @@ using LogMessageCatchFunc = std::function<void(LogLevel level, const char* /*str
 class Logger
 {
 public:
-     Logger();
-     ~Logger();
+    Logger();
+    ~Logger();
 
     template <typename T>
     static inline void LogOutput(LogLevel level, const T& data)
@@ -57,20 +57,21 @@ public:
      * logFileLimitSize[size_t] single log file's limit size
      *
      */
-     static void ConfigLogger(const std::string_view& itemName, const std::string_view& value);
+    static void ConfigLogger(const std::string_view& itemName, const std::string_view& value);
 
-     static void Initialize(bool enableConsoleOutput = true);
-     static void Release();
-     static void SetErrorHandler(const ErrorHandlerType& handler);
-     static void SetCatchHandler(const LogMessageCatchFunc& handler);
-     static ErrorHandlerType GetErrorHandler();
-     static bool IsDebuggerAttached();
-     static void PrintBackTrace();
-     static spdlog::pattern_formatter* GetStringFormatter();
-     static void TestLogInstance();
+    static void Initialize(bool enableConsoleOutput = true);
+    static void Release();
+    static void SetErrorHandler(const ErrorHandlerType& handler);
+    static void SetCatchHandler(const LogMessageCatchFunc& handler);
+    static ErrorHandlerType GetErrorHandler();
+    static bool IsDebuggerAttached();
+    static void PrintBackTrace();
+    static spdlog::pattern_formatter* GetStringFormatter();
+    static void TestLogInstance();
+
 private:
-     static spdlog::pattern_formatter* s_formatter;
-     static spdlog::logger* s_logger;
+    static spdlog::pattern_formatter* s_formatter;
+    static spdlog::logger* s_logger;
 };
 
 template <typename T>
@@ -91,6 +92,25 @@ inline std::string StringFormat(const char* fmt, const Arg1& arg1, const Args&..
     return std::string(msg.formatted.data(), msg.formatted.size());
 }
 
+class LoggerStream final
+{
+public:
+    LoggerStream(LogLevel level);
+    ~LoggerStream();
+    template <typename Value>
+    decltype(auto) operator<<(const Value& t)
+    {
+
+#ifndef DISABLE_FLOG
+        ss_ << t;
+#endif
+        return *this;
+    }
+
+private:
+    const LogLevel level_;
+    std::stringstream ss_;
+};
 } // namespace Fundamental
 
 #ifndef DISABLE_TRACE
@@ -121,20 +141,31 @@ inline std::string StringFormat(const char* fmt, const Arg1& arg1, const Args&..
 #define FFAIL(...) FLOG(Fundamental::LogLevel::critical, ##__VA_ARGS__)
 #define FWARN(...) FLOG(Fundamental::LogLevel::warn, ##__VA_ARGS__)
 
+#define FINFOS Fundamental::LoggerStream(Fundamental::LogLevel::info)
+#define FERRS Fundamental::LoggerStream(Fundamental::LogLevel::err)
+#define FFAILS Fundamental::LoggerStream(Fundamental::LogLevel::critical)
+#define FWARNS Fundamental::LoggerStream(Fundamental::LogLevel::warn)
 
 #ifndef DISABLE_ASSERT
-#define FASSERT(_check, ...) if(!(_check))\
-    {                                                                                                                                                       \
-        Fundamental::Logger::LogOutput(Fundamental::LogLevel::critical, "[" __FILE__ ":"                                                        \
-                                                                                    "(" STR_HELPER(__LINE__) ")] [check:" #_check "] " __VA_ARGS__); \
-        Fundamental::Logger::PrintBackTrace();                                                                                                     \
-        assert((_check));                                                                                                                                   \
-    }
+    #define FASSERT(_check, ...)                                                                                                             \
+        if (!(_check))                                                                                                                       \
+        {                                                                                                                                    \
+            Fundamental::Logger::LogOutput(Fundamental::LogLevel::critical, "[" __FILE__ ":"                                                 \
+                                                                            "(" STR_HELPER(__LINE__) ")] [check:" #_check "] " __VA_ARGS__); \
+            Fundamental::Logger::PrintBackTrace();                                                                                           \
+            assert((_check));                                                                                                                \
+        }
 
-#define FASSERT_ACTION(_check, _action, ...) if (!(_check)){Fundamental::Logger::LogOutput(Fundamental::LogLevel::critical, "[" __FILE__ ":""(" STR_HELPER(__LINE__) ")] [check:" #_check "] " __VA_ARGS__);_action;}
+    #define FASSERT_ACTION(_check, _action, ...)                                                                                             \
+        if (!(_check))                                                                                                                       \
+        {                                                                                                                                    \
+            Fundamental::Logger::LogOutput(Fundamental::LogLevel::critical, "[" __FILE__ ":"                                                 \
+                                                                            "(" STR_HELPER(__LINE__) ")] [check:" #_check "] " __VA_ARGS__); \
+            _action;                                                                                                                         \
+        }
 #else
-#define FASSERT(_check, ...) (void)0
-#define FASSERT_ACTION(_check, _action, ...) (void)0
+    #define FASSERT(_check, ...)                 (void)0
+    #define FASSERT_ACTION(_check, _action, ...) (void)0
 #endif
-                                    
+
 /*end of file*/
