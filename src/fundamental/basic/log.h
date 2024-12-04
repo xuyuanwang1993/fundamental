@@ -141,6 +141,7 @@ private:
 #define FFAIL(...) FLOG(Fundamental::LogLevel::critical, ##__VA_ARGS__)
 #define FWARN(...) FLOG(Fundamental::LogLevel::warn, ##__VA_ARGS__)
 
+#define FDEBUGS Fundamental::LoggerStream(Fundamental::LogLevel::debug)
 #define FINFOS Fundamental::LoggerStream(Fundamental::LogLevel::info)
 #define FERRS Fundamental::LoggerStream(Fundamental::LogLevel::err)
 #define FFAILS Fundamental::LoggerStream(Fundamental::LogLevel::critical)

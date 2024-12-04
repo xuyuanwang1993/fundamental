@@ -37,14 +37,3 @@ add_library(nlohmann::json ALIAS json_lib)
 add_library(asio_lib INTERFACE)
 target_include_directories(asio_lib INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/asio-source)
 add_library(asio ALIAS asio_lib)
-
-
-
-if(IMPORT_GTEST)
-FetchContent_Declare(
-  googletest
-  GIT_REPOSITORY http://192.168.50.101:8787/rdd/googletest.git
-  GIT_TAG        703bd9caab50b139428cea1aaff9974ebee5742e # release-1.10.0
-)
-FetchContent_MakeAvailable(googletest)
-endif()
