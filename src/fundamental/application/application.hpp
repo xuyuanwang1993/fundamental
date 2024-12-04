@@ -13,10 +13,10 @@ namespace Fundamental
 struct ApplicationInterface
 {
     virtual ~ApplicationInterface();
-    bool Load(int argc, char** argv);
-    bool Init();
-    void Tick();
-    void Exit();
+    virtual bool Load(int argc, char** argv);
+    virtual bool Init();
+    virtual void Tick();
+    virtual void Exit();
 };
 
 class Application : public EventsHandlerNormal, public Singleton<Application>
