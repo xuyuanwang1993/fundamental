@@ -1,6 +1,8 @@
 #pragma once
-#include <cstdint>
 #include <endian.h>
+
+#ifdef __cplusplus
+#include <cstdint>
 namespace Fundamental
 {
 // All currently supported platform types
@@ -26,6 +28,7 @@ static constexpr auto kTargetPlatform = []() constexpr -> TargetPlatformType
 }
 ();
 }
+#endif  // end __cplusplus
 
 
 #ifdef _WIN32
