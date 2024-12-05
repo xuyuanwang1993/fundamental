@@ -118,12 +118,14 @@ void AgentClient::AgentHandler::PackageProxyFrame<AgentQueryContext>(AgentReques
     using SizeType       = decltype(frame.payload)::SizeType;
     SizeType payloadSize = sizeof(SizeType) * 2 +
                            context.request.id.GetSize() +
-                           context.request.section.GetSize();
+                           context.request.section.GetSize() +
+                           sizeof(context.request.max_query_wait_time_sec);
     frame.payload.Reallocate(payloadSize);
     Fundamental::BufferWriter<SizeType> writer;
     writer.SetBuffer(frame.payload.GetData(), frame.payload.GetSize());
     writer.WriteRawMemory(context.request.id);
     writer.WriteRawMemory(context.request.section);
+    writer.WriteValue(&context.request.max_query_wait_time_sec);
 }
 
 template <typename ContextType>
@@ -160,6 +162,7 @@ AgentClientToken AgentClient::AgentHandler::HandleAgentRequest(AgentClient* clie
         client->sessions_.emplace(token, newSession);
     }
     newSession->finish.Connect([client, token]() {
+        FDEBUG("agent {} finished", token);
         std::scoped_lock<std::mutex> locker(client->mutex_);
         client->sessions_.erase(token);
     });

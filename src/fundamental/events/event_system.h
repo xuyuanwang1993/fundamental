@@ -13,7 +13,7 @@ using EventHandleType = decltype(std::declval<EQ>().appendListener(std::declval<
 struct InternalNotifyQueuedEvent : Fundamental::Event
 {
     // an event must contain 'kEventType' field;
-    constexpr inline static std::size_t kEventType = ComputeEventHash(0, "InternalNotifyQueuedEvent", "InternalNotifyQueuedEvent", "internal")|1;
+    constexpr inline static std::size_t kEventType = ComputeEventHash(0, "InternalNotifyQueuedEvent", "InternalNotifyQueuedEvent", "internal") | 1;
 
     InternalNotifyQueuedEvent() :
     Event(kEventType)
@@ -66,7 +66,6 @@ protected:
     std::set<std::size_t> m_hashDic;
 };
 
-
 /*
  *
  * dispatch an event immediatelly
@@ -91,43 +90,52 @@ inline decltype(auto) EventSystem::DispatcherEvent(Args&&... args)
     return m_syncer.enqueue(std::make_shared<EventDataType>(std::forward<Args>(args)...));
 }
 
-
 template <
-	typename Prototype,
-	typename PoliciesType
->
+    typename Prototype,
+    typename PoliciesType>
 class SignalBase;
 
 // callbacklist wapper class
 template <
-	typename PoliciesType,
-	typename ReturnType, typename ...Args
->
+    typename PoliciesType,
+    typename ReturnType, typename... Args>
 class SignalBase<
-	ReturnType (Args...),
-	PoliciesType
->
+    ReturnType(Args...),
+    PoliciesType>
 {
 public:
     using Callback_ = typename eventpp::internal_::SelectCallback<
-		PoliciesType,
-		eventpp::internal_::HasTypeCallback<PoliciesType>::value,
-		std::function<ReturnType (Args...)>
-	>::Type;
-    using HandleType=typename eventpp::CallbackList<ReturnType (Args...),PoliciesType>::Handle;
+        PoliciesType,
+        eventpp::internal_::HasTypeCallback<PoliciesType>::value,
+        std::function<ReturnType(Args...)>>::Type;
+    using HandleType = typename eventpp::CallbackList<ReturnType(Args...), PoliciesType>::Handle;
+
 public:
-    HandleType Connect(const Callback_& callback);
+    /// @brief bind excutors for this signal
+    /// @param callback  the excutor function
+    /// @param append_mode true means the excutor will be append to the process deque tail,false means the excutor 
+    /// will be add to the process deque top
+    /// @return the handle which can be used to cancel the excutor binding
+    HandleType Connect(const Callback_& callback, bool append_mode = true);
     bool DisConnect(HandleType handle);
-    void Emit(Args ... args);
-    void operator() (Args ... args);
+    void Emit(Args... args);
+    void operator()(Args... args);
+
 private:
-    eventpp::CallbackList<ReturnType (Args...),PoliciesType> _connections;
+    eventpp::CallbackList<ReturnType(Args...), PoliciesType> _connections;
 };
 
 template <typename PoliciesType, typename ReturnType, typename... Args>
-inline typename SignalBase<ReturnType(Args...), PoliciesType>::HandleType SignalBase<ReturnType(Args...), PoliciesType>::Connect(const Callback_& callback)
+inline typename SignalBase<ReturnType(Args...), PoliciesType>::HandleType SignalBase<ReturnType(Args...), PoliciesType>::Connect(const Callback_& callback, bool append_mode)
 {
-    return _connections.append(callback);
+    if (append_mode)
+    {
+        return _connections.append(callback);
+    }
+    else
+    {
+        return _connections.prepend(callback);
+    }
 }
 
 template <typename PoliciesType, typename ReturnType, typename... Args>
@@ -149,12 +157,10 @@ inline void SignalBase<ReturnType(Args...), PoliciesType>::operator()(Args... ar
 }
 
 template <
-	typename Prototype_,
-	typename Policies_ = eventpp::DefaultPolicies
->
+    typename Prototype_,
+    typename Policies_ = eventpp::DefaultPolicies>
 class Signal : public SignalBase<Prototype_, Policies_>
 {
-
 };
 
 } // namespace Fundamental

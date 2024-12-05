@@ -50,7 +50,7 @@ struct AgentDummyResponse
 
 struct AgentUpdateRequest
 {
-    static constexpr const char * kCmd="update";
+    static constexpr const char* kCmd = "update";
     AgentDataType id;
     AgentDataType section;
     AgentDataType data;
@@ -60,9 +60,10 @@ using AgentUpdateResponse = AgentDummyResponse;
 
 struct AgentQueryRequest
 {
-    static constexpr const char * kCmd="query";
+    static constexpr const char* kCmd = "query";
     AgentDataType id;
     AgentDataType section;
+    std::int32_t max_query_wait_time_sec = 0;
 };
 
 struct AgentQueryResponse : AgentEntryInfo

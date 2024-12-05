@@ -14,6 +14,13 @@ struct NonCopyable
     NonCopyable& operator=(const NonCopyable&) = delete;
 };
 
+struct NonMovable
+{
+    NonMovable()                         = default;
+    NonMovable(NonMovable&&)             = delete;
+    NonMovable& operator=(NonCopyable&&) = delete;
+};
+
 using BasicTaskFunctionT = std::function<void()>;
 struct ScopeGuard final : NonCopyable
 {
@@ -33,22 +40,26 @@ struct ScopeGuard final : NonCopyable
 };
 
 template <typename T>
-struct Singleton : NonCopyable
+struct Singleton : NonCopyable,NonMovable
 {
     static T& Instance()
     {
+        static T instance;
         return instance;
     };
 
-    inline static T instance;
+protected:
+    Singleton()
+    {
+    }
 };
 
 namespace Utils
 {
-     void SetThreadName(const std::string& name);
-     std::string BufferToHex(const void * buffer,std::size_t size);
-     std::string BufferDumpAscii(const void * buffer,std::size_t size);
-}
+void SetThreadName(const std::string& name);
+std::string BufferToHex(const void* buffer, std::size_t size);
+std::string BufferDumpAscii(const void* buffer, std::size_t size);
+} // namespace Utils
 
 } // namespace Fundamental
 #endif // _HEAD_BASIC_UTILS_

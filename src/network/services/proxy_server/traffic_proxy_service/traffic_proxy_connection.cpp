@@ -3,7 +3,6 @@
 #include "fundamental/delay_queue/delay_queue.h"
 #include "traffic_proxy_codec.hpp"
 #include "traffic_proxy_manager.hpp"
-#include "traffic_proxy_codec.hpp"
 #include <iostream>
 namespace network
 {
@@ -63,7 +62,7 @@ void TrafficProxyConnection::Process()
 void TrafficProxyConnection::ProcessTrafficProxy()
 {
     TrafficProxyRequest request;
-    if(!TrafficDecoder::DecodeCommandFrame(frame.payload,request))
+    if (!TrafficDecoder::DecodeCommandFrame(frame.payload, request))
     {
         return;
     }
@@ -278,6 +277,7 @@ void TrafficProxyConnection::DoStatistics()
 {
     if (!(status & CheckTimerStarted))
         return;
+    checkTimer.expires_after(asio::chrono::seconds(s_trafficStatisticsIntervalSec));
     checkTimer.async_wait([this, self = shared_from_this()](const std::error_code& e) {
         if (e)
         {

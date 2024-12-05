@@ -15,6 +15,16 @@ next_io_context_(0),
 signals_(*io_contexts_[0])
 {
     work_.push_back(asio::make_work_guard(*io_contexts_[0]));
+    //WARRNING: this context pool works as a singleton,so we
+    // should release all resource reference before our application is exited
+    // when the static resource will be recycled, this action avoids error access
+    // to no-static objects
+    Fundamental::Application::Instance().exitStarted.Connect([this]() {
+        FINFO("asio context pool stop for application exit");
+        stop();
+        work_.clear();
+        io_contexts_.clear();
+    });
 }
 
 io_context_pool::~io_context_pool()
@@ -45,14 +55,11 @@ void io_context_pool::start()
             }
             catch (const std::exception& e)
             {
-                FERR("asio context err:{}",e.what());
+                FERR("asio context err:{}", e.what());
             }
         });
     }
-    Fundamental::Application::Instance().exitStarted.Connect([this]() {
-        FINFO("asio context pool stop for application exit");
-        stop();
-    });
+
     // Register to handle the signals that indicate when the server should exit.
     // It is safe to register for the same signal multiple times in a program,
     // provided all registration for the specified signal is made through Asio.
@@ -65,6 +72,7 @@ void io_context_pool::start()
         [this](std::error_code ec, int signo) {
             FINFO("quit  because of  signal:{} ec:{}", signo, ec.message());
             Fundamental::Application::Instance().Exit();
+            FINFO("quit finished");
         });
 }
 

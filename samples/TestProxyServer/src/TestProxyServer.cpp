@@ -90,13 +90,14 @@ int main(int argc, char* argv[])
             else
             {
                 network::proxy::rpc::AgentQueryContext context;
-                context.host            = argv[1];
-                context.service         = argv[2];
-                context.request.id      = "test";
-                context.request.section = section;
+                context.host                            = argv[1];
+                context.service                         = argv[2];
+                context.request.id                      = "test";
+                context.request.section                 = section;
+                context.request.max_query_wait_time_sec = 60;
                 using namespace network::proxy::rpc;
                 context.cb = [](bool bSuccess, AgentClientToken token, AgentResponse&& res) {
-                    FINFO("update success:{} token:{}", bSuccess, token);
+                    FINFO("query success:{} token:{}", bSuccess, token);
                     FINFO("code:{} msg:{} size:{} result:{}", res.code, res.msg, res.data.size(),
                           Fundamental::Utils::BufferDumpAscii(res.data.data(), res.data.size()));
                     // decode data
@@ -164,7 +165,7 @@ void InitTrafficProxyManager()
             TrafficProxyHost hostRecord;
             hostRecord.host    = "127.0.0.1";
             hostRecord.service = "54886";
-            host.hosts.emplace(TrafficProxyDataType(TrafficProxyManager::kDefaultFieldName ), std::move(hostRecord));
+            host.hosts.emplace(TrafficProxyDataType(TrafficProxyManager::kDefaultFieldName), std::move(hostRecord));
         }
         manager.UpdateTrafficProxyHostInfo(TrafficProxyDataType("test_tcp"), std::move(host));
     }

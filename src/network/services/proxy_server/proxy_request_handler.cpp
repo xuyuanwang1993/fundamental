@@ -74,7 +74,6 @@ bool ProxyRequestHandler::DecodePayload(ProxyFrame& dstFrame)
         operationNum ^= dstFrame.mask.v;
         opeationCheckSum.v ^= operationNum;
     }
-
     // update mask
     dstFrame.checkSum ^= opeationCheckSum.data[0];
     dstFrame.checkSum ^= opeationCheckSum.data[1];

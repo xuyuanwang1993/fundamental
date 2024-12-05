@@ -48,6 +48,7 @@ public:
     }
     void Loop()
     {
+        Fundamental::Utils::SetThreadName("main_loop");
         loopStarted.Emit();
         bRunning.exchange(true);
         while (bRunning)

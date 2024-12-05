@@ -12,7 +12,7 @@ add_subdirectory(TestAsio)
 add_subdirectory(TestProxyServer)
 add_subdirectory(TestTrafficProxy)
 add_subdirectory(TestBasic)
-
+add_subdirectory(TestApplication)
 endif()
 
 if(F_BUILD_SHARED)
