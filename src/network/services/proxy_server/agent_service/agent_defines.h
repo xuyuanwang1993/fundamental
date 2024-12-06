@@ -69,5 +69,17 @@ struct AgentQueryRequest
 struct AgentQueryResponse : AgentEntryInfo
 {
 };
+
+struct AgentSniffRequest
+{
+    static constexpr const char* kCmd        = "sniff";
+    static constexpr const char* kLoopbackIp = "127.0.0.1";
+    static constexpr const char* kPreferEth  = "eth0";
+};
+
+struct AgentSniffResponse
+{
+    AgentDataType host;
+};
 } // namespace proxy
 } // namespace network

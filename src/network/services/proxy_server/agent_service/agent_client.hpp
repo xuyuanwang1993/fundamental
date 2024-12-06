@@ -36,6 +36,14 @@ struct AgentQueryContext
     AgentFinishedCallback cb;
 };
 
+struct AgentSniffContext
+{
+    std::string host;
+    std::string service;
+    AgentSniffRequest request;
+    AgentFinishedCallback cb;
+};
+
 class AgentClient
 {
 public:
@@ -49,6 +57,7 @@ public:
     bool CancelRequest(AgentClientToken token);
     AgentClientToken Update(const AgentUpdateContext& context);
     AgentClientToken Query(const AgentQueryContext& context);
+    AgentClientToken Sniff(const AgentSniffContext& context);
 protected:
     std::mutex mutex_;
     std::map<AgentClientToken, std::weak_ptr<AgentSession>> sessions_;

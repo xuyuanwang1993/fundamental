@@ -3,7 +3,7 @@
 #include <chrono>
 #include <functional>
 #include <string>
-
+#include <unordered_map>
 namespace Fundamental
 {
 
@@ -40,7 +40,7 @@ struct ScopeGuard final : NonCopyable
 };
 
 template <typename T>
-struct Singleton : NonCopyable,NonMovable
+struct Singleton : NonCopyable, NonMovable
 {
     static T& Instance()
     {
@@ -59,6 +59,14 @@ namespace Utils
 void SetThreadName(const std::string& name);
 std::string BufferToHex(const void* buffer, std::size_t size);
 std::string BufferDumpAscii(const void* buffer, std::size_t size);
+struct NetworkInfo
+{
+    std::string ifName;
+    std::string ipv4;
+    std::string mac;
+    bool isLoopback = false;
+};
+std::unordered_map<std::string,NetworkInfo> GetLocalNetInformation();
 } // namespace Utils
 
 } // namespace Fundamental

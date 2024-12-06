@@ -31,7 +31,43 @@ struct AgentConnection::details
         }
         connection->HandleResponse(response);
     }
+    static void ProcessSniff(AgentRequestFrame& request, std::shared_ptr<AgentConnection> connection)
+    {
+        AgentResponseFrame response;
+        using SizeType = decltype(request.payload)::SizeType;
+        Fundamental::BufferReader<SizeType> reader;
+        reader.SetBuffer(request.payload.GetData(), request.payload.GetSize());
+        AgentSniffRequest requestData;
+        response.cmd = request.cmd;
 
+        auto ipInfo = connection->socket_.remote_endpoint().address().to_string();
+        if (ipInfo == AgentSniffRequest::kLoopbackIp)
+        {
+            auto networkInfo = Fundamental::Utils::GetLocalNetInformation();
+            auto iter        = networkInfo.find(AgentSniffRequest::kPreferEth);
+            if (iter != networkInfo.end())
+            {
+                ipInfo = iter->second.ipv4;
+            }
+            else
+            {
+                for (auto& item : networkInfo)
+                {
+                    if (!item.second.isLoopback)
+                        ipInfo = item.second.ipv4;
+                }
+            }
+        }
+        AgentSniffResponse responseData;
+        responseData.host    = ipInfo;
+        SizeType payloadSize = responseData.host.GetSize() +
+                               sizeof(responseData.host.GetSize());
+        response.payload.Reallocate(payloadSize);
+        Fundamental::BufferWriter<SizeType> writer;
+        writer.SetBuffer(response.payload.GetData(), response.payload.GetSize());
+        writer.WriteRawMemory(responseData.host);
+        connection->HandleResponse(response);
+    }
     static void ProcessQuery(AgentRequestFrame& request, std::shared_ptr<AgentConnection> connection)
     {
         using SizeType = decltype(request.payload)::SizeType;
@@ -80,6 +116,7 @@ struct AgentConnection::details
     }
 }; //  details
 static Fundamental::ScopeGuard s_register(nullptr, []() {
+    AgentConnection::cmd_handlers.emplace(std::string(AgentSniffRequest::kCmd), AgentConnection::details::ProcessSniff);
     AgentConnection::cmd_handlers.emplace(std::string(AgentUpdateRequest::kCmd), AgentConnection::details::ProcessUpdate);
     AgentConnection::cmd_handlers.emplace(std::string(AgentQueryRequest::kCmd), AgentConnection::details::ProcessQuery);
 });
@@ -97,7 +134,7 @@ void AgentConnection::SetUp()
 AgentConnection::~AgentConnection()
 {
     FDEBUG("release AgentConnection");
-    if(delay_timer)
+    if (delay_timer)
         delay_timer->cancel();
 }
 

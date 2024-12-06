@@ -87,6 +87,31 @@ int main(int argc, char* argv[])
                 auto token = client.Update(context);
                 FINFO("create task token:{}", token);
             }
+            if (mode == "sniff")
+            {
+                network::proxy::rpc::AgentSniffContext context;
+                context.host    = argv[1];
+                context.service = argv[2];
+                using namespace network::proxy::rpc;
+                context.cb = [](bool bSuccess, AgentClientToken token, AgentResponse&& res) {
+                    FINFO("sniff success:{} token:{}", bSuccess, token);
+                    FINFO("code:{}", res.code);
+                    network::proxy::AgentSniffResponse response;
+                    Fundamental::BufferReader<network::proxy::ProxySizeType> reader;
+                    reader.SetBuffer(res.data.data(), res.data.size());
+                    try
+                    {
+                        reader.ReadRawMemory(response.host);
+                        FINFO("host:{}", response.host.ToString());
+                    }
+                    catch (const std::exception&)
+                    {
+                    }
+                    Fundamental::Application::Instance().Exit();
+                };
+                auto token = client.Sniff(context);
+                FINFO("create task token:{}", token);
+            }
             else
             {
                 network::proxy::rpc::AgentQueryContext context;

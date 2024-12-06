@@ -97,6 +97,11 @@ AgentClientToken AgentClient::Query(const AgentQueryContext& context)
     return AgentHandler::HandleAgentRequest(this, context);
 }
 
+AgentClientToken AgentClient::Sniff(const AgentSniffContext& context)
+{
+    return AgentHandler::HandleAgentRequest(this, context);
+}
+
 template <>
 void AgentClient::AgentHandler::PackageProxyFrame<AgentUpdateContext>(AgentRequestFrame& frame, const AgentUpdateContext& context)
 {
@@ -111,6 +116,13 @@ void AgentClient::AgentHandler::PackageProxyFrame<AgentUpdateContext>(AgentReque
     writer.WriteRawMemory(context.request.section);
     writer.WriteRawMemory(context.request.data);
 }
+
+template <>
+void AgentClient::AgentHandler::PackageProxyFrame<AgentSniffContext>(AgentRequestFrame& frame, const AgentSniffContext& context)
+{
+
+}
+
 
 template <>
 void AgentClient::AgentHandler::PackageProxyFrame<AgentQueryContext>(AgentRequestFrame& frame, const AgentQueryContext& context)
