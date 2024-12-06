@@ -8,7 +8,7 @@ namespace proxy
 AgentStorage::AgentStorage()
 {
     Fundamental::Application::Instance().loopStarted.Connect([this]() {
-        auto task=Fundamental::Application::Instance().DelayQueue()->AddDelayTask(AgentStorage::s_expiredSec * 1000, [this]() {
+        auto task = Fundamental::Application::Instance().DelayQueue()->AddDelayTask(AgentStorage::s_expiredSec * 1000, [this]() {
             RemoveExpiredData(s_expiredSec);
         });
         Fundamental::Application::Instance().DelayQueue()->StartDelayTask(task);
@@ -19,12 +19,29 @@ AgentStorage::~AgentStorage()
 {
 }
 
-void AgentStorage::UpdateAgentInfo(const AgentDataType& id, const AgentDataType& section, AgentDataType&& data)
+void AgentStorage::UpdateAgentInfo(const AgentDataType& id,
+                                   const AgentDataType& section,
+                                   AgentDataType&& data,
+                                   AgentUpdateOperation op)
 {
     std::scoped_lock<std::mutex> locker(dataMutex);
-    auto& entry     = storage[id][section];
-    entry.data      = std::move(data);
-    entry.timestamp = Fundamental::Timer::GetTimeNow<std::chrono::seconds, std::chrono::system_clock>();
+    switch (op)
+    {
+    case AgentUpdateOperation::AgentUpdateSetValueOp:
+    {
+        auto& entry     = storage[id][section];
+        entry.data      = std::move(data);
+        entry.timestamp = Fundamental::Timer::GetTimeNow<std::chrono::seconds, std::chrono::system_clock>();
+    }
+    break;
+    case AgentUpdateOperation::AgentUpdateRemoveValueOp:
+    {
+        storage[id].erase(section);
+    }
+    break;
+    default:
+        break;
+    }
 }
 bool AgentStorage::QueryAgentInfo(const AgentDataType& id, const AgentDataType& section, AgentEntryInfo& entry)
 {

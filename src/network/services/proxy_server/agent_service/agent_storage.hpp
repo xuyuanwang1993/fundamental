@@ -15,7 +15,9 @@ public:
 public:
     AgentStorage();
     ~AgentStorage();
-    void UpdateAgentInfo(const AgentDataType& id, const AgentDataType& section, AgentDataType&& data);
+    void UpdateAgentInfo(const AgentDataType& id, 
+    const AgentDataType& section,
+     AgentDataType&& data,AgentUpdateOperation op);
     bool QueryAgentInfo(const AgentDataType& id, const AgentDataType& section, AgentEntryInfo& entry);
     void RemoveExpiredData(std::int64_t expiredSec = 60);
 

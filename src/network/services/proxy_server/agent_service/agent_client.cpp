@@ -108,21 +108,21 @@ void AgentClient::AgentHandler::PackageProxyFrame<AgentUpdateContext>(AgentReque
     using SizeType       = decltype(frame.payload)::SizeType;
     SizeType payloadSize = sizeof(SizeType) * 3 +
                            context.request.data.GetSize() + context.request.id.GetSize() +
-                           context.request.section.GetSize();
+                           context.request.section.GetSize() +
+                           sizeof(context.request.op);
     frame.payload.Reallocate(payloadSize);
     Fundamental::BufferWriter<SizeType> writer;
     writer.SetBuffer(frame.payload.GetData(), frame.payload.GetSize());
     writer.WriteRawMemory(context.request.id);
     writer.WriteRawMemory(context.request.section);
     writer.WriteRawMemory(context.request.data);
+    writer.WriteValue(&context.request.op);
 }
 
 template <>
 void AgentClient::AgentHandler::PackageProxyFrame<AgentSniffContext>(AgentRequestFrame& frame, const AgentSniffContext& context)
 {
-
 }
-
 
 template <>
 void AgentClient::AgentHandler::PackageProxyFrame<AgentQueryContext>(AgentRequestFrame& frame, const AgentQueryContext& context)

@@ -23,7 +23,8 @@ struct AgentConnection::details
             reader.ReadRawMemory(requestData.id);
             reader.ReadRawMemory(requestData.section);
             reader.ReadRawMemory(requestData.data);
-            AgentStorage::Instance().UpdateAgentInfo(requestData.id, requestData.section, std::move(requestData.data));
+            reader.ReadValue(&requestData.op);
+            AgentStorage::Instance().UpdateAgentInfo(requestData.id, requestData.section, std::move(requestData.data),requestData.op);
         }
         catch (const std::exception&)
         { // close connection

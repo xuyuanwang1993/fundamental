@@ -48,12 +48,19 @@ struct AgentDummyResponse
 {
 };
 
+enum AgentUpdateOperation : std::uint32_t
+{
+    AgentUpdateSetValueOp,
+    AgentUpdateRemoveValueOp
+};
+
 struct AgentUpdateRequest
 {
     static constexpr const char* kCmd = "update";
     AgentDataType id;
     AgentDataType section;
     AgentDataType data;
+    AgentUpdateOperation op = AgentUpdateSetValueOp;
 };
 
 using AgentUpdateResponse = AgentDummyResponse;
