@@ -37,6 +37,7 @@ public:
                     const std::string& port);
 
     /// start accept.
+    /// exception on failure
     void Start();
     ///  stop accept
     void Stop();
