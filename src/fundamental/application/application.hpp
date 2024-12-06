@@ -1,10 +1,10 @@
 #pragma once
 #include "fundamental/basic/log.h"
 #include "fundamental/basic/utils.hpp"
+#include "fundamental/delay_queue/delay_queue.h"
 #include "fundamental/events/event_process.h"
 #include "fundamental/events/event_system.h"
 #include "fundamental/thread_pool/thread_pool.h"
-#include "fundamental/delay_queue/delay_queue.h"
 #include <atomic>
 #include <type_traits>
 namespace Fundamental
@@ -12,6 +12,7 @@ namespace Fundamental
 
 struct ApplicationInterface
 {
+    constexpr ApplicationInterface() = default;
     virtual ~ApplicationInterface();
     virtual bool Load(int argc, char** argv);
     virtual bool Init();
@@ -30,19 +31,20 @@ public:
     Signal<void()> loopFinished;
     Signal<void()> exitStarted;
     Signal<void()> exitFinished;
+
 public:
     void OverlayApplication(std::shared_ptr<ApplicationInterface>&& newImp);
     bool Load(int argc, char** argv)
     {
         loadStarted.Emit(argc, argv);
-        bool ret=imp ? imp->Load(argc, argv) : true;
+        bool ret = imp ? imp->Load(argc, argv) : true;
         loadFinished.Emit(ret);
         return ret;
     }
     bool Init()
     {
         initStarted.Emit();
-        bool ret=imp ? imp->Init() : true;
+        bool ret = imp ? imp->Init() : true;
         initFinished.Emit(ret);
         return ret;
     }
