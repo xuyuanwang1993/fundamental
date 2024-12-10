@@ -4,10 +4,17 @@
 #include "fundamental/delay_queue/delay_queue.h"
 #include "proxy_connection.hpp"
 #include "traffic_proxy_service/traffic_proxy_connection.hpp"
+#include <map>
 namespace network
 {
 namespace proxy
 {
+
+namespace internal
+{
+static std::map<std::uint8_t, ProxyRequestHandler::ProtocalHandler> s_handlers;
+}
+
 bool ProxyRequestHandler::DecodeHeader(const std::uint8_t* data, std::size_t len, ProxyFrame& dstFrame)
 {
     do
@@ -155,8 +162,35 @@ void ProxyRequestHandler::UpgradeProtocal(Connection&& connection)
     break;
     default:
     {
-        FWARN("unsupported proxy op {} for version {}", ProxyFrame::kVersion,
-              connection.requestFrame.op);
+        auto iter = internal::s_handlers.find(op);
+        if (iter != internal::s_handlers.end())
+        {
+            auto newConnection = iter->second(std::move(connection.socket_), std::move(connection.requestFrame));
+            if (newConnection)
+                newConnection->SetUp();
+        }
+        else
+        {
+            FWARN("unsupported proxy op {} for version {}", ProxyFrame::kVersion,
+                  connection.requestFrame.op);
+        }
+    }
+    break;
+    }
+}
+
+void ProxyRequestHandler::RegisterProtocal(std::uint8_t opCode, ProtocalHandler handler)
+{
+    switch (opCode)
+    {
+    case ProxyOpCode::AgentServiceOp:
+    case ProxyOpCode::TrafficProxyOp:
+        throw std::runtime_error(Fundamental::StringFormat("conflict proxy op:{}", opCode));
+        break;
+    default:
+    {
+        if (handler)
+            internal::s_handlers[opCode] = handler;
     }
     break;
     }
