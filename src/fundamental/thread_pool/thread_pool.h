@@ -36,9 +36,10 @@ using clock_t         = std::chrono::steady_clock;
 
 enum ThreadPoolType : std::int32_t
 {
-    ShortTimeThreadPool = -1,
-    LongTimeThreadPool  = 0,
-    BlockTimeThreadPool = 1,
+    ShortTimeThreadPool = 0,
+    LongTimeThreadPool  = 1,
+    BlockTimeThreadPool = 2,
+    PrallelThreadPool   = 3
 };
 
 enum ThreadPoolTaskStatus : std::uint32_t
@@ -59,9 +60,9 @@ struct ThreadPoolTaskToken
 {
     bool CancelTask()
     {
-        if (status && status->status.load() == ThreadTaskWaitting)
+        ThreadPoolTaskStatus old = status->status.load();
+        if (status->status.compare_exchange_strong(old, ThreadTaskCancelled))
         {
-            status->status.exchange(ThreadTaskCancelled);
             return true;
         }
         return false;
@@ -92,7 +93,7 @@ public:
     static ThreadPool& Instance()
     {
         // Init handles joining on cleanup
-        static ThreadPool* instance = new ThreadPool;
+        static ThreadPool* instance = new ThreadPool(Index);
         return *instance;
     }
 
@@ -101,11 +102,11 @@ public:
     ThreadPool(ThreadPool&&)                 = delete;
     ThreadPool& operator=(ThreadPool&&)      = delete;
 
-     int Count() const;
-     void Spawn(int count = 1);
-     void Join();
-     void Run();
-     bool RunOne();
+    std::size_t Count() const;
+    void Spawn(int count = 1);
+    void Join();
+
+    bool RunOne();
 
     template <typename _Callable, typename... _Args>
     auto Enqueue(_Callable&& f, _Args&&... args) -> ThreadPoolTaskToken<_Callable, _Args...>
@@ -122,35 +123,50 @@ public:
     template <typename _Callable, typename... _Args>
     auto Schedule(clock_t::time_point time, _Callable&& f, _Args&&... args) -> ThreadPoolTaskToken<_Callable, _Args...>
     {
-        std::unique_lock<std::mutex> lock(m_tasksMutex);
-        using R    = std::invoke_result_t<_Callable, _Args...>;
-        auto bound = std::bind(std::forward<_Callable>(f), std::forward<_Args>(args)...);
-        auto task  = std::make_shared<std::packaged_task<R()>>([bound]() {
+
+        using R      = std::invoke_result_t<_Callable, _Args...>;
+        auto promise = std::make_shared<std::promise<R>>();
+        auto bound   = std::bind(std::forward<_Callable>(f), std::forward<_Args>(args)...);
+        auto task    = [bound, promise]() {
             try
             {
-
-                return bound();
+                if constexpr (std::is_same_v<R, void>)
+                {
+                    bound();
+                    promise->set_value();
+                }
+                else
+                {
+                    promise->set_value(bound());
+                }
             }
             catch (const std::exception& e)
             {
-                std::cerr << "ThreadPool Run ERROR " << e.what() << std::endl;
-                throw;
+                promise->set_exception(std::make_exception_ptr(e));
             }
-        });
+        };
         ThreadPoolTaskToken<_Callable, _Args...> result;
-        result.resultFuture = task->get_future();
-        m_tasks.push({ time, [task]() { return (*task)(); }, result.status });
+        result.resultFuture = std::move(promise->get_future());
+        std::unique_lock<std::mutex> lock(m_tasksMutex);
+        m_tasks.push({ time, task, result.status });
         m_condition.notify_one();
         return result;
     }
-    
-protected:
-     ThreadPool() = default;
-     ~ThreadPool();
 
-     Task Dequeue(); // returns null function if joining
+    bool InThreadPool();
+
+protected:
+    ThreadPool(std::int32_t type = ThreadPoolType::ShortTimeThreadPool) :
+    type(type)
+    {
+    }
+    ~ThreadPool();
+
+    Task Dequeue(); // returns null function if joining
+    void Run(std::size_t index);
 
 private:
+    const std::int32_t type;
     std::vector<std::thread> m_workers;
     std::atomic<bool> m_joining { false };
 

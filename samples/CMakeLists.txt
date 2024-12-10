@@ -21,4 +21,5 @@ endif()
 
 if(IMPORT_GTEST)
 add_subdirectory(GtestSample)
+add_subdirectory(TestParallel)
 endif()

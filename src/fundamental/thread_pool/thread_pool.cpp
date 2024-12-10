@@ -19,16 +19,23 @@
 #include "fundamental/basic/utils.hpp"
 namespace Fundamental
 {
+bool ThreadPool::InThreadPool()
+{
+    std::unique_lock<std::mutex> lock(m_workersMutex);
+    return std::any_of(m_workers.begin(), m_workers.end(), [](const std::thread& t) -> bool {
+        return t.get_id() == std::this_thread::get_id();
+    });
+}
 
 ThreadPool::~ThreadPool()
 {
     Join();
 }
 
-int ThreadPool::Count() const
+std::size_t ThreadPool::Count() const
 {
     std::unique_lock<std::mutex> lock(m_workersMutex);
-    return int(m_workers.size());
+    return m_workers.size();
 }
 
 void ThreadPool::Spawn(int count)
@@ -36,7 +43,7 @@ void ThreadPool::Spawn(int count)
     std::unique_lock<std::mutex> lock(m_workersMutex);
     m_joining = false;
     while (count-- > 0)
-        m_workers.emplace_back(std::bind(&ThreadPool::Run, this));
+        m_workers.emplace_back(std::bind(&ThreadPool::Run, this, m_workers.size()));
 }
 
 void ThreadPool::Join()
@@ -51,9 +58,9 @@ void ThreadPool::Join()
     m_workers.clear();
 }
 
-void ThreadPool::Run()
+void ThreadPool::Run(std::size_t index)
 {
-    Fundamental::Utils::SetThreadName("thp");
+    Fundamental::Utils::SetThreadName("thp_" + std::to_string(type) + "_" + std::to_string(index));
     while (RunOne())
     {
     }
@@ -103,4 +110,4 @@ ThreadPool::Task ThreadPool::Dequeue()
     }
     return ThreadPool::Task();
 }
-} // namespace RealiNative
+} // namespace Fundamental
