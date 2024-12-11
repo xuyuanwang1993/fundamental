@@ -14,7 +14,7 @@ enum ProxyOpCode : std::uint8_t
     TrafficProxyOp = 1
 };
 
-using ProxySizeType                     = std::uint32_t;
+using ProxySizeType                     = std::uint64_t;
 static constexpr std::size_t kProxySize = sizeof(ProxySizeType);
 struct ProxyFrame
 {
@@ -34,7 +34,7 @@ struct ProxyFrame
     } mask;
     ProxySizeType sizeStorage = 0;
     Fundamental::Buffer<ProxySizeType> payload;
-    //functions
+    // functions
     std::vector<asio::const_buffer> ToAsioBuffers()
     {
         std::vector<asio::const_buffer> ret;
@@ -47,6 +47,90 @@ struct ProxyFrame
         ret.push_back(asio::const_buffer(payload.GetData(), payload.GetSize()));
         return ret;
     }
+};
+
+// a sample for payload
+
+struct PayloadFrame
+{
+    using SizeType                             = std::uint64_t;
+    static constexpr std::size_t kMaxFrameSize = 1024LLU * 1024 * 1024 * 4; // 8G
+    static constexpr std::size_t kSizeCount    = sizeof(SizeType);
+    std::string cmd;
+    std::string description;
+    std::vector<std::uint8_t> binaryData;
+    std::size_t size() const
+    {
+        return kSizeCount +
+               sizeof(SizeType) +
+               sizeof(SizeType) +
+               sizeof(SizeType) +
+               cmd.size() +
+               description.size() +
+               binaryData.size();
+    }
+    static bool ReadFrameSize(SizeType& size, std::uint8_t* data, std::size_t dataLen)
+    {
+        Fundamental::BufferReader<SizeType> reader;
+        reader.SetBuffer(data, dataLen);
+        try
+        {
+            reader.ReadValue(&size);
+            return true;
+        }
+        catch (const std::exception& e)
+        {
+            return false;
+        }
+    }
+
+    static bool DecodeFrame(PayloadFrame& frame, std::uint8_t* data, std::size_t dataLen)
+    {
+        Fundamental::BufferReader<SizeType> reader;
+        reader.SetBuffer(data, dataLen);
+        try
+        {
+            reader.ReadVectorLike(frame.cmd);
+            reader.ReadVectorLike(frame.description);
+            reader.ReadVectorLike(frame.binaryData);
+            return true;
+        }
+        catch (const std::exception& e)
+        {
+            return false;
+        }
+    }
+};
+
+struct PayloadFrameView
+{
+    explicit PayloadFrameView(PayloadFrame& frame) :
+    frame(frame),
+    totalSize(htole64(frame.size())),
+    cmdSize(htole64(static_cast<PayloadFrame::SizeType>(frame.cmd.size()))),
+    descriptionSize(htole64(static_cast<PayloadFrame::SizeType>(frame.description.size()))),
+    binarySize(htole64(static_cast<PayloadFrame::SizeType>(frame.binaryData.size())))
+    {
+    }
+
+    std::vector<asio::const_buffer> ToAsioBuffers()
+    {
+        std::vector<asio::const_buffer> ret;
+        ret.push_back(asio::const_buffer(&totalSize, PayloadFrame::kSizeCount));
+        ret.push_back(asio::const_buffer(&cmdSize, PayloadFrame::kSizeCount));
+        ret.push_back(asio::const_buffer(frame.cmd.data(), frame.cmd.size()));
+        ret.push_back(asio::const_buffer(&descriptionSize, PayloadFrame::kSizeCount));
+        ret.push_back(asio::const_buffer(frame.description.data(), frame.description.size()));
+        ret.push_back(asio::const_buffer(&binarySize, PayloadFrame::kSizeCount));
+        ret.push_back(asio::const_buffer(frame.binaryData.data(), frame.binaryData.size()));
+        return ret;
+    }
+
+    const PayloadFrame& frame;
+    const PayloadFrame::SizeType totalSize;
+    const PayloadFrame::SizeType cmdSize;
+    const PayloadFrame::SizeType descriptionSize;
+    const PayloadFrame::SizeType binarySize;
 };
 } // namespace proxy
 } // namespace network

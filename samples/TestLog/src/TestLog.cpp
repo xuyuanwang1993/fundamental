@@ -11,7 +11,6 @@ int main(int argc, char** argv)
         std::this_thread::sleep_for(std::chrono::seconds(1));
         kTargetCount--;
     }
-    
 
     Fundamental::Logger::ConfigLogger("programName", "test");
     Fundamental::Logger::ConfigLogger("outputPath", "output/logs");
@@ -24,7 +23,7 @@ int main(int argc, char** argv)
     Fundamental::Logger::ConfigLogger("logFormat", "%^[%L]%H:%M:%S.%e%$[%t] %v ");
     int cnt1 = 1000;
     std::string teststr(100, 'c');
-    
+
     auto errorHandler = [](const std::string& msg) {
         std::cerr << "------------bad bad-------"
                   << "-------------" << msg << std::endl;
@@ -36,18 +35,16 @@ int main(int argc, char** argv)
     Fundamental::Logger::SetCatchHandler(msgCatcher);
 
     Fundamental::Logger::Initialize();
-    //while (true)
+    // while (true)
     //{
-    //    FINFO("{}", teststr);
-    //    std::this_thread::sleep_for(std::chrono::seconds(10));
-    //}
+    //     FINFO("{}", teststr);
+    //     std::this_thread::sleep_for(std::chrono::seconds(10));
+    // }
     std::cout << "APP_NAME:" << APP_NAME << std::endl;
-    FINFOS<<"stream output info";
-    FERRS<<"stream output error";
-    FFAILS<<"stream output failed";
-    FWARNS<<"stream output warn";
-    if(1)
-        return 0;
+    FINFOS << "stream output info";
+    FERRS << "stream output error";
+    FFAILS << "stream output failed";
+    FWARNS << "stream output warn";
     FTRACE("test trace");
     FTRACE("{}", 123);
     FDEBUG("{}", "TEST");
@@ -71,7 +68,15 @@ int main(int argc, char** argv)
         FASSERT_ACTION(false, break, "{}", "test assert return ");
         FERR("should not output");
     } while (0);
-    FASSERT(false, "{}", "test assert");
-    FERR("should not reach");
+    try
+    {
+        FASSERT(false, "{}", "test assert");
+        FERR("should not reach");
+    }
+    catch (const std::exception& e)
+    {
+        std::cerr << e.what() << '\n';
+    }
+
     return 0;
 }

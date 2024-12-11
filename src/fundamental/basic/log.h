@@ -74,12 +74,16 @@ private:
     static spdlog::logger* s_logger;
 };
 
+inline std::string StringFormat()
+{
+    return "";
+}
+
 template <typename T>
 inline std::string StringFormat(const T& data)
 {
     spdlog::details::log_msg msg;
     msg.raw << data;
-    Logger::GetStringFormatter()->format(msg);
     return std::string(msg.formatted.data(), msg.formatted.size());
 }
 
@@ -87,15 +91,26 @@ template <typename Arg1, typename... Args>
 inline std::string StringFormat(const char* fmt, const Arg1& arg1, const Args&... args)
 {
     spdlog::details::log_msg msg;
-    msg.raw.write(fmt, arg1, args...);
-    Logger::GetStringFormatter()->format(msg);
-    return std::string(msg.formatted.data(), msg.formatted.size());
+    try
+    {
+        msg.raw.write(fmt, arg1, args...);
+        Logger::GetStringFormatter()->format(msg);
+        return std::string(msg.formatted.data(), msg.formatted.size());
+    }
+    catch (const std::exception& e)
+    {
+        auto errorHandler = Logger::GetErrorHandler();
+        if (errorHandler)
+            errorHandler(e.what());
+        return "";
+    }
 }
 
 class LoggerStream final
 {
 public:
     LoggerStream(LogLevel level);
+    LoggerStream(LogLevel level, const char* fileName, const char* funcName, std::int32_t line);
     ~LoggerStream();
     template <typename Value>
     decltype(auto) operator<<(const Value& t)
@@ -112,10 +127,11 @@ private:
     std::stringstream ss_;
 };
 } // namespace Fundamental
+#define STR_H(x)      #x
+#define STR_HELPER(x) STR_H(x)
 
 #ifndef DISABLE_TRACE
-    #define STR_H(x)      #x
-    #define STR_HELPER(x) STR_H(x)
+
     #ifdef _MSC_VER
         #define FTRACE(...) Fundamental::Logger::LogOutput(Fundamental::LogLevel::trace, "[ " __FILE__ "(" STR_HELPER(__LINE__) ") ] " __VA_ARGS__)
     #else
@@ -126,42 +142,53 @@ private:
 #endif
 
 #ifndef DISABLE_FLOG
-    #define FLOG(logLevel, ...) Fundamental::Logger::LogOutput(logLevel, ##__VA_ARGS__)
+    #define FLOG(logLevel, ...) Fundamental::Logger::LogOutput(logLevel, __VA_ARGS__)
+    #define FLOG_DEBUGINFO(logLevel, ...)                                                                     \
+        do                                                                                                    \
+        {                                                                                                     \
+            auto __debugInfo__ = Fundamental::StringFormat("[" __FILE__ ":{}"                                 \
+                                                           "(" STR_HELPER(__LINE__) ")] ",                    \
+                                                           __func__);                                         \
+            Fundamental::Logger::LogOutput(logLevel, __debugInfo__ + Fundamental::StringFormat(__VA_ARGS__)); \
+        } while (0)
 #else
-    #define FLOG(logLevel, ...) (void)0
+    #define FLOG(logLevel, ...)           (void)0
+    #define FLOG_DEBUGINFO(logLevel, ...) (void)0
 #endif // !DISABLE_FLOG
 
 #ifndef NDEBUG
-    #define FDEBUG(...) FLOG(Fundamental::LogLevel::debug, ##__VA_ARGS__)
+    #define FDEBUG(...) FLOG(Fundamental::LogLevel::debug, __VA_ARGS__)
+    #define FASSERT_THROWN(_check, ...)                                                                        \
+        if (!(_check))                                                                                         \
+        {                                                                                                      \
+            auto __debugInfo__ = Fundamental::StringFormat("[" __FILE__ ":{}"                                  \
+                                                           "(" STR_HELPER(__LINE__) ")] [####check####:" #_check "] ", \
+                                                           __func__);                                          \
+            throw std::runtime_error(__debugInfo__ + Fundamental::StringFormat(__VA_ARGS__));                  \
+        }
 #else
-    #define FDEBUG(...) (void)0
+    #define FDEBUG(...)                 (void)0
+    #define FASSERT_THROWN(_check, ...) (void)0
 #endif
 #define FINFO(...) FLOG(Fundamental::LogLevel::info, ##__VA_ARGS__)
-#define FERR(...)  FLOG(Fundamental::LogLevel::err, ##__VA_ARGS__)
-#define FFAIL(...) FLOG(Fundamental::LogLevel::critical, ##__VA_ARGS__)
-#define FWARN(...) FLOG(Fundamental::LogLevel::warn, ##__VA_ARGS__)
+#define FERR(...)  FLOG_DEBUGINFO(Fundamental::LogLevel::err, ##__VA_ARGS__)
+#define FFAIL(...) FLOG_DEBUGINFO(Fundamental::LogLevel::critical, ##__VA_ARGS__)
+#define FWARN(...) FLOG_DEBUGINFO(Fundamental::LogLevel::warn, ##__VA_ARGS__)
 
 #define FDEBUGS Fundamental::LoggerStream(Fundamental::LogLevel::debug)
-#define FINFOS Fundamental::LoggerStream(Fundamental::LogLevel::info)
-#define FERRS Fundamental::LoggerStream(Fundamental::LogLevel::err)
-#define FFAILS Fundamental::LoggerStream(Fundamental::LogLevel::critical)
-#define FWARNS Fundamental::LoggerStream(Fundamental::LogLevel::warn)
+#define FINFOS  Fundamental::LoggerStream(Fundamental::LogLevel::info)
+#define FERRS   Fundamental::LoggerStream(Fundamental::LogLevel::err, __FILE__, __func__, __LINE__)
+#define FFAILS  Fundamental::LoggerStream(Fundamental::LogLevel::critical, __FILE__, __func__, __LINE__)
+#define FWARNS  Fundamental::LoggerStream(Fundamental::LogLevel::warn, __FILE__, __func__, __LINE__)
 
 #ifndef DISABLE_ASSERT
-    #define FASSERT(_check, ...)                                                                                                             \
-        if (!(_check))                                                                                                                       \
-        {                                                                                                                                    \
-            Fundamental::Logger::LogOutput(Fundamental::LogLevel::critical, "[" __FILE__ ":"                                                 \
-                                                                            "(" STR_HELPER(__LINE__) ")] [check:" #_check "] " __VA_ARGS__); \
-            Fundamental::Logger::PrintBackTrace();                                                                                           \
-            assert((_check));                                                                                                                \
-        }
+    #define FASSERT(_check, ...) FASSERT_THROWN(_check, ##__VA_ARGS__)
 
     #define FASSERT_ACTION(_check, _action, ...)                                                                                             \
         if (!(_check))                                                                                                                       \
         {                                                                                                                                    \
             Fundamental::Logger::LogOutput(Fundamental::LogLevel::critical, "[" __FILE__ ":"                                                 \
-                                                                            "(" STR_HELPER(__LINE__) ")] [check:" #_check "] " __VA_ARGS__); \
+                                                                            "(" STR_HELPER(__LINE__) ")] [####check####:" #_check "] " __VA_ARGS__); \
             _action;                                                                                                                         \
         }
 #else

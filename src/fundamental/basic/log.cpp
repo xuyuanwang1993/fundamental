@@ -546,6 +546,11 @@ LoggerStream::LoggerStream(LogLevel level) :
 level_(level)
 {
 }
+LoggerStream::LoggerStream(LogLevel level, const char* fileName, const char* funcName, std::int32_t line) :
+level_(level)
+{
+    ss_ << Fundamental::StringFormat("[{}:{}({})] ", fileName, funcName, line);
+}
 LoggerStream::~LoggerStream()
 {
 #ifndef DISABLE_FLOG

@@ -5,7 +5,7 @@ namespace network
 {
 namespace proxy
 {
-using TrafficProxySizeType = std::uint32_t;
+using TrafficProxySizeType = std::uint64_t;
 using TrafficProxyDataType = Fundamental::Buffer<TrafficProxySizeType>;
 enum TrafficProxyOperation : std::int32_t
 {

@@ -13,7 +13,7 @@ enum AgentCode : std::int32_t
     AgentFailed  = 1,
 };
 
-using AgentSizeType = std::uint32_t;
+using AgentSizeType = std::uint64_t;
 using AgentDataType = Fundamental::Buffer<AgentSizeType>;
 struct AgentEntryInfo
 {

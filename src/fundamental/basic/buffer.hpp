@@ -456,6 +456,13 @@ public:
     {
         SizeType size = 0;
         ReadValue(&size);
+        if (size + m_currentPosition > m_bufferSize)
+        {
+            std::string ex = std::string("vec buffer overflow");
+            ex += " pos:" + std::to_string(m_currentPosition) + " need:" +
+                  std::to_string(size) + " max:" + std::to_string(m_bufferSize);
+            throw std::invalid_argument(ex);
+        }
         vectorLike.resize(size / sizeof(typename VectorLikeType::value_type));
 
         if (size > 0)
