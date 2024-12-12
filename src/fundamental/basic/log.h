@@ -87,6 +87,11 @@ inline std::string StringFormat(const T& data)
     return std::string(msg.formatted.data(), msg.formatted.size());
 }
 
+inline std::string StringFormat(const char* data)
+{
+    return std::string(data, strlen(data));
+}
+
 template <typename Arg1, typename... Args>
 inline std::string StringFormat(const char* fmt, const Arg1& arg1, const Args&... args)
 {
@@ -158,13 +163,13 @@ private:
 
 #ifndef NDEBUG
     #define FDEBUG(...) FLOG(Fundamental::LogLevel::debug, __VA_ARGS__)
-    #define FASSERT_THROWN(_check, ...)                                                                        \
-        if (!(_check))                                                                                         \
-        {                                                                                                      \
-            auto __debugInfo__ = Fundamental::StringFormat("[" __FILE__ ":{}"                                  \
+    #define FASSERT_THROWN(_check, ...)                                                                                \
+        if (!(_check))                                                                                                 \
+        {                                                                                                              \
+            auto __debugInfo__ = Fundamental::StringFormat("[" __FILE__ ":{}"                                          \
                                                            "(" STR_HELPER(__LINE__) ")] [####check####:" #_check "] ", \
-                                                           __func__);                                          \
-            throw std::runtime_error(__debugInfo__ + Fundamental::StringFormat(__VA_ARGS__));                  \
+                                                           __func__);                                                  \
+            throw std::runtime_error(__debugInfo__ + Fundamental::StringFormat(__VA_ARGS__));                          \
         }
 #else
     #define FDEBUG(...)                 (void)0
@@ -184,12 +189,12 @@ private:
 #ifndef DISABLE_ASSERT
     #define FASSERT(_check, ...) FASSERT_THROWN(_check, ##__VA_ARGS__)
 
-    #define FASSERT_ACTION(_check, _action, ...)                                                                                             \
-        if (!(_check))                                                                                                                       \
-        {                                                                                                                                    \
-            Fundamental::Logger::LogOutput(Fundamental::LogLevel::critical, "[" __FILE__ ":"                                                 \
+    #define FASSERT_ACTION(_check, _action, ...)                                                                                                     \
+        if (!(_check))                                                                                                                               \
+        {                                                                                                                                            \
+            Fundamental::Logger::LogOutput(Fundamental::LogLevel::critical, "[" __FILE__ ":"                                                         \
                                                                             "(" STR_HELPER(__LINE__) ")] [####check####:" #_check "] " __VA_ARGS__); \
-            _action;                                                                                                                         \
+            _action;                                                                                                                                 \
         }
 #else
     #define FASSERT(_check, ...)                 (void)0

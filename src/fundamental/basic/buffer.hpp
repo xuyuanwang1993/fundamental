@@ -30,7 +30,7 @@ static constexpr auto kHostEndian = []() constexpr -> Endian
 template <Endian targetEndian>
 inline constexpr bool NeedConvertEndian()
 {
-    return targetEndian == kHostEndian;
+    return targetEndian != kHostEndian;
 }
 
 static constexpr auto kNeedConvertForTransfer = []() constexpr -> bool
@@ -56,7 +56,7 @@ public:
     explicit Buffer(const void* pData,
                     _SizeType sizeInBytes);
     explicit Buffer(const char* cStr);
-    
+
     ~Buffer();
 
     // overwrite copy

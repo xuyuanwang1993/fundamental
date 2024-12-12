@@ -1,8 +1,12 @@
 #pragma once
-#include "fundamental/basic/buffer.hpp"
-#include <asio.hpp>
+
 #include <cstdint>
 #include <vector>
+
+#include "fundamental/basic/buffer.hpp"
+#include "fundamental/basic/log.h"
+#include <asio.hpp>
+
 namespace network
 {
 namespace proxy
@@ -35,6 +39,7 @@ struct ProxyFrame
     ProxySizeType sizeStorage = 0;
     Fundamental::Buffer<ProxySizeType> payload;
     // functions
+    
     std::vector<asio::const_buffer> ToAsioBuffers()
     {
         std::vector<asio::const_buffer> ret;
@@ -51,31 +56,48 @@ struct ProxyFrame
 
 // a sample for payload
 
+struct PayloadFrameHeader
+{
+    using SizeType                           = ProxySizeType;
+    static constexpr std::size_t kSizeCount  = sizeof(SizeType);
+    static constexpr std::size_t kHeaderSize = kSizeCount * 4;
+    SizeType totalSize;
+    SizeType cmdSize;
+    SizeType descriptionSize;
+    SizeType binarySize;
+};
+
 struct PayloadFrame
 {
-    using SizeType                             = std::uint64_t;
+    using SizeType                             = PayloadFrameHeader::SizeType;
+    using BinaryType                           = std::vector<std::uint8_t>;
     static constexpr std::size_t kMaxFrameSize = 1024LLU * 1024 * 1024 * 4; // 8G
-    static constexpr std::size_t kSizeCount    = sizeof(SizeType);
+
     std::string cmd;
     std::string description;
-    std::vector<std::uint8_t> binaryData;
+    BinaryType binaryData;
     std::size_t size() const
     {
-        return kSizeCount +
-               sizeof(SizeType) +
-               sizeof(SizeType) +
-               sizeof(SizeType) +
+        return PayloadFrameHeader::kHeaderSize +
                cmd.size() +
                description.size() +
                binaryData.size();
     }
-    static bool ReadFrameSize(SizeType& size, std::uint8_t* data, std::size_t dataLen)
+    static bool ReadFrameHeader(PayloadFrameHeader& header, std::uint8_t* data, std::size_t dataLen)
     {
         Fundamental::BufferReader<SizeType> reader;
         reader.SetBuffer(data, dataLen);
         try
         {
-            reader.ReadValue(&size);
+            reader.ReadValue(&header.totalSize);
+            reader.ReadValue(&header.cmdSize);
+            reader.ReadValue(&header.descriptionSize);
+            reader.ReadValue(&header.binarySize);
+            if (header.totalSize != (PayloadFrameHeader::kHeaderSize + header.cmdSize + header.descriptionSize + header.binarySize))
+            {
+                FDEBUG("payload size not matched");
+                return false;
+            }
             return true;
         }
         catch (const std::exception& e)
@@ -84,15 +106,18 @@ struct PayloadFrame
         }
     }
 
-    static bool DecodeFrame(PayloadFrame& frame, std::uint8_t* data, std::size_t dataLen)
+    static bool DecodeFrame(PayloadFrame& frame, const PayloadFrameHeader& header, std::uint8_t* data, std::size_t dataLen)
     {
         Fundamental::BufferReader<SizeType> reader;
         reader.SetBuffer(data, dataLen);
         try
         {
-            reader.ReadVectorLike(frame.cmd);
-            reader.ReadVectorLike(frame.description);
-            reader.ReadVectorLike(frame.binaryData);
+            frame.cmd.resize(header.cmdSize);
+            frame.description.resize(header.descriptionSize);
+            frame.binaryData.resize(header.binarySize);
+            reader.ReadValue(frame.cmd.data(), header.cmdSize);
+            reader.ReadValue(frame.description.data(), header.descriptionSize);
+            reader.ReadValue(frame.binaryData.data(), header.binarySize);
             return true;
         }
         catch (const std::exception& e)
@@ -102,35 +127,71 @@ struct PayloadFrame
     }
 };
 
-struct PayloadFrameView
+struct PayloadFrameEncodeView
 {
-    explicit PayloadFrameView(PayloadFrame& frame) :
-    frame(frame),
-    totalSize(htole64(frame.size())),
-    cmdSize(htole64(static_cast<PayloadFrame::SizeType>(frame.cmd.size()))),
-    descriptionSize(htole64(static_cast<PayloadFrame::SizeType>(frame.description.size()))),
-    binarySize(htole64(static_cast<PayloadFrame::SizeType>(frame.binaryData.size())))
+    explicit PayloadFrameEncodeView(PayloadFrame& frame) :
+    frame(frame)
+
     {
+        header.totalSize       = htole64(frame.size());
+        header.cmdSize         = htole64(static_cast<PayloadFrame::SizeType>(frame.cmd.size()));
+        header.descriptionSize = htole64(static_cast<PayloadFrame::SizeType>(frame.description.size()));
+        header.binarySize      = htole64(static_cast<PayloadFrame::SizeType>(frame.binaryData.size()));
     }
 
     std::vector<asio::const_buffer> ToAsioBuffers()
     {
         std::vector<asio::const_buffer> ret;
-        ret.push_back(asio::const_buffer(&totalSize, PayloadFrame::kSizeCount));
-        ret.push_back(asio::const_buffer(&cmdSize, PayloadFrame::kSizeCount));
+        ret.push_back(asio::const_buffer(&header.totalSize, PayloadFrameHeader::kSizeCount));
+        ret.push_back(asio::const_buffer(&header.cmdSize, PayloadFrameHeader::kSizeCount));
+        ret.push_back(asio::const_buffer(&header.descriptionSize, PayloadFrameHeader::kSizeCount));
+        ret.push_back(asio::const_buffer(&header.binarySize, PayloadFrameHeader::kSizeCount));
         ret.push_back(asio::const_buffer(frame.cmd.data(), frame.cmd.size()));
-        ret.push_back(asio::const_buffer(&descriptionSize, PayloadFrame::kSizeCount));
         ret.push_back(asio::const_buffer(frame.description.data(), frame.description.size()));
-        ret.push_back(asio::const_buffer(&binarySize, PayloadFrame::kSizeCount));
         ret.push_back(asio::const_buffer(frame.binaryData.data(), frame.binaryData.size()));
         return ret;
     }
 
     const PayloadFrame& frame;
-    const PayloadFrame::SizeType totalSize;
-    const PayloadFrame::SizeType cmdSize;
-    const PayloadFrame::SizeType descriptionSize;
-    const PayloadFrame::SizeType binarySize;
+    PayloadFrameHeader header;
 };
+
 } // namespace proxy
+
+namespace error
+{
+enum class proxy_errors : std::int32_t
+{
+    read_header_failed   = 0,
+    read_payload_failed  = 1,
+    parse_payload_failed = 2
+};
+
+class proxy_category : public std::error_category, public Fundamental::Singleton<proxy_category>
+{
+public:
+    const char* name() const noexcept override
+    {
+        return "network.proxy";
+    }
+    std::string message(int value) const override
+    {
+        switch (static_cast<proxy_errors>(value))
+        {
+        case proxy_errors::read_header_failed: return "read header failed";
+        case proxy_errors::read_payload_failed: return "read payload failed";
+        case proxy_errors::parse_payload_failed: return "parse payload failed";
+        default: return "network.proxy error";
+        }
+    }
+};
+
+inline std::error_code make_error_code(proxy_errors e)
+{
+    return std::error_code(
+        static_cast<int>(e), proxy_category::Instance());
+}
+
+} // namespace error
+
 } // namespace network

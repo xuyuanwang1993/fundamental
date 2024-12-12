@@ -89,5 +89,88 @@ void Connection::StopTimeCheck()
     checkTimer.cancel();
 }
 
+ClientSession::ClientSession(const std::string& host, const std::string& service) :
+host(host),
+service(service),
+socket_(io_context_pool::Instance().get_io_context()),
+resolver(socket_.get_executor())
+{
+}
+
+void ClientSession::Cancel()
+{
+    resolver.cancel();
+    socket_.cancel();
+}
+
+void ClientSession::HandelFailed(std::error_code ec)
+{
+    Cancel();
+}
+
+void ClientSession::Start()
+{
+    StartDnsResolve();
+}
+
+void ClientSession::Abort()
+{
+    asio::post(resolver.get_executor(),
+               [ref = shared_from_this(), this]() {
+                   Cancel();
+               });
+}
+
+void ClientSession::StartDnsResolve()
+{
+    resolver.async_resolve(asio::ip::tcp::v4(),
+                           host, service,
+                           [ref = shared_from_this(), this](asio::error_code ec,
+                                                            decltype(resolver)::results_type result) {
+                               FinishDnsResolve(ec, std::move(result));
+                           });
+}
+
+void ClientSession::FinishDnsResolve(asio::error_code ec, asio::ip::tcp::resolver::results_type result)
+{
+    if (ec)
+    {
+        HandelFailed(ec);
+        return;
+    }
+    StartConnect(std::move(result));
+}
+
+void ClientSession::StartConnect(asio::ip::tcp::resolver::results_type result)
+{
+    asio::async_connect(socket_, result,
+                        [this, self = shared_from_this()](std::error_code ec, asio::ip::tcp::endpoint endpoint) {
+                            FinishConnect(ec, std::move(endpoint));
+                        });
+}
+
+void ClientSession::FinishConnect(std::error_code ec, asio::ip::tcp::endpoint endpoint)
+{
+    if (ec)
+    {
+        HandelFailed(ec);
+        return;
+    }
+    Process(std::move(endpoint));
+}
+
+void ClientSession::Process(asio::ip::tcp::endpoint endpoint)
+{
+    auto address = endpoint.address();
+
+    if (address.is_v4())
+    {
+        FDEBUG("sample: ipv4:endpoint:{}->{}", address.to_string(), endpoint.port());
+    }
+    else
+    {
+        FDEBUG("sample: ipv6:endpoint:{}->{}", address.to_string(), endpoint.port());
+    }
+}
 } // namespace proxy
 } // namespace network

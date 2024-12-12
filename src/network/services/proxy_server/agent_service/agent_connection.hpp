@@ -18,9 +18,15 @@ public:
     inline static std::unordered_map<AgentDataType, CmdHandlerType, Fundamental::BufferHash<AgentSizeType>> cmd_handlers;
 
 public:
-    explicit AgentConnection(asio::ip::tcp::socket&& socket, ProxyFrame&& frame);
     void SetUp() override;
     ~AgentConnection();
+    static std::shared_ptr<AgentConnection> MakeShared(asio::ip::tcp::socket&& socket, ProxyFrame&& frame)
+    {
+        return std::shared_ptr<AgentConnection>(new AgentConnection(std::move(socket), std::move(frame)));
+    }
+
+protected:
+    explicit AgentConnection(asio::ip::tcp::socket&& socket, ProxyFrame&& frame);
 
 private:
     void ProcessCmd();

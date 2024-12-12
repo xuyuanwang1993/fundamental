@@ -148,14 +148,14 @@ void ProxyRequestHandler::UpgradeProtocal(Connection&& connection)
     {
     case ProxyOpCode::AgentServiceOp:
     {
-        std::make_shared<AgentConnection>(
+        AgentConnection::MakeShared(
             std::move(connection.socket_), std::move(connection.requestFrame))
             ->SetUp();
     }
     break;
     case ProxyOpCode::TrafficProxyOp:
     {
-        std::make_shared<TrafficProxyConnection>(
+        TrafficProxyConnection::MakeShared(
             std::move(connection.socket_), std::move(connection.requestFrame))
             ->SetUp();
     }

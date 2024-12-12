@@ -54,11 +54,15 @@ class TrafficProxyConnection : public ProxeServiceBase, public std::enable_share
     };
 
 public:
-    explicit TrafficProxyConnection(asio::ip::tcp::socket&& socket, ProxyFrame&& frame);
+    
     void SetUp() override;
     ~TrafficProxyConnection();
-
+     static std::shared_ptr<TrafficProxyConnection> MakeShared(asio::ip::tcp::socket&& socket, ProxyFrame&& frame)
+    {
+        return std::shared_ptr<TrafficProxyConnection>(new TrafficProxyConnection(std::move(socket), std::move(frame)));
+    }
 protected:
+    explicit TrafficProxyConnection(asio::ip::tcp::socket&& socket, ProxyFrame&& frame);
     void Process();
     void ProcessTrafficProxy();
     void HandleDisconnect(asio::error_code ec, const std::string& callTag = "");
