@@ -47,12 +47,6 @@ void TrafficProxyConnection::Process()
     case TrafficProxyDataOp:
         ProcessTrafficProxy();
         break;
-    case UpdateTrafficProxyHostInfoOp:
-        ProcessTrafficProxy();
-        break;
-    case RemoveTrafficProxyHostInfoOp:
-        ProcessTrafficProxy();
-        break;
     default:
         FWARN("unsupported traffic proxy op {}", op);
         break;
