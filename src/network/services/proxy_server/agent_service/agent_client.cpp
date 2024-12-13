@@ -1,11 +1,14 @@
 #include "agent_client.hpp"
-#include "fundamental/application/application.hpp"
-#include "fundamental/basic/log.h"
 #include "network/server/io_context_pool.hpp"
+#include "agent_defines.h"
+
 #include <array>
 #include <atomic>
 #include <iostream>
 #include <memory>
+
+#include "fundamental/application/application.hpp"
+#include "fundamental/basic/log.h"
 namespace network
 {
 namespace proxy
@@ -150,7 +153,7 @@ template <typename ContextType>
 AgentClientToken AgentClient::AgentHandler::HandleAgentRequest(AgentClient* client, const ContextType& context)
 {
     ProxyFrame frame;
-    frame.op = ProxyOpCode::AgentServiceOp;
+    frame.op = network::proxy::kAgentOpcode;
     AgentRequestFrame requestFrame;
     requestFrame.cmd = context.request.kCmd;
     PackageProxyFrame(requestFrame, context);

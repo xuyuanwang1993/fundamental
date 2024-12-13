@@ -7,6 +7,7 @@ namespace network
 {
 namespace proxy
 {
+constexpr std::uint8_t kAgentOpcode = 0;
 enum AgentCode : std::int32_t
 {
     AgentSuccess = 0,

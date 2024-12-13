@@ -12,12 +12,6 @@ namespace network
 namespace proxy
 {
 
-enum ProxyOpCode : std::uint8_t
-{
-    AgentServiceOp = 0,
-    TrafficProxyOp = 1
-};
-
 using ProxySizeType                     = std::uint64_t;
 static constexpr std::size_t kProxySize = sizeof(ProxySizeType);
 struct ProxyFrame

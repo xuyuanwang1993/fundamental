@@ -39,8 +39,8 @@ int main(int argc, char* argv[])
             InitTrafficProxyManager();
             // Initialise the server.
             network::proxy::ProxyServer s(argv[1], argv[2]);
-            s.GetHandler().RegisterProtocal(network::proxy::AgentServiceOp, network::proxy::AgentConnection::MakeShared);
-            s.GetHandler().RegisterProtocal(network::proxy::TrafficProxyOp, network::proxy::TrafficProxyConnection::MakeShared);
+            s.GetHandler().RegisterProtocal(network::proxy::kAgentOpcode, network::proxy::AgentConnection::MakeShared);
+            s.GetHandler().RegisterProtocal(network::proxy::kTrafficProxyOpcode, network::proxy::TrafficProxyConnection::MakeShared);
             s.Start();
             Fundamental::Application::Instance().Loop();
         }

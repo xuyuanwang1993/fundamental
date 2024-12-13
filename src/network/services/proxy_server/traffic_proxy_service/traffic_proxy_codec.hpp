@@ -24,7 +24,7 @@ struct TrafficDecoder
 template <typename CommandFrame>
 inline void TrafficEncoder::EncodeProxyFrame(ProxyFrame& dstFrame, const CommandFrame& command_frame)
 {
-    dstFrame.op = ProxyOpCode::TrafficProxyOp;
+    dstFrame.op = kTrafficProxyOpcode;
     EncodeCommandFrame(dstFrame.payload, command_frame);
     ProxyRequestHandler::EncodeFrame(dstFrame);
 }

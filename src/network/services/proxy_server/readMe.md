@@ -2,13 +2,6 @@
 ## 通讯
 ```
 //数字采用小端字节序
-enum ProxyOpCode : std::uint8_t
-{
-    //信息存储服务
-    AgentServiceOp = 0,
-    //流量代理
-    TrafficProxyOp = 1
-};
 
 struct Binary
 {
@@ -34,7 +27,7 @@ checkSum=payload[0]^payload[1]^.....^payload[payloadLen-1]
 ### 1.信息存储和查询
 #### 描述
 ```
-op=AgentServiceOp
+op=kAgentOpcode
 //数字采用小端字节序
 enum AgentCode : std::int32_t
 {
@@ -93,7 +86,7 @@ response paylod:
 ### 2.聚合流量代理
 ```
 //数字采用小端字节序
-op=TrafficProxyOp
+op=kTrafficProxyOpcode
 
 enum TrafficProxyOperation : std::int32_t
 {

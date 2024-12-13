@@ -9,13 +9,12 @@ namespace network
 {
 namespace proxy
 {
+constexpr std::uint8_t kTrafficProxyOpcode = 1;
 using TrafficProxySizeType = ProxySizeType;
 using TrafficProxyDataType = Fundamental::Buffer<TrafficProxySizeType>;
 enum TrafficProxyOperation : std::int32_t
 {
-    TrafficProxyDataOp           = 0,
-    UpdateTrafficProxyHostInfoOp = 1,
-    RemoveTrafficProxyHostInfoOp = 2
+    TrafficProxyDataOp           = 0
 };
 
 struct TrafficProxyRequestBase
