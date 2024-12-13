@@ -33,6 +33,16 @@ rttr::variant from_json_obj(const json& jsonObj, const rttr::type& t, const Rttr
      type = ret.template get_value<DataType>();
      return true;
  }
+  template <typename EnumType,typename DataType>
+ inline bool EnumTypeFromString(const std::string& str, DataType& type)
+ {
+     auto e   = rttr::type::get<EnumType>().get_enumeration();
+     auto ret = e.name_to_value(str);
+     if (!ret.is_valid())
+         return false;
+     type = static_cast<DataType>(ret.template get_value<EnumType>());
+     return true;
+ }
  } // namespace io
 void TestRttrInstance();
 } // namespace RealiNative

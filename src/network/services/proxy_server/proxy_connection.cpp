@@ -89,6 +89,19 @@ void Connection::StopTimeCheck()
     checkTimer.cancel();
 }
 
+bool ClientSession::AbortCheckPoint()
+{
+    if (is_aborted_)
+    {
+        HandelFailed(network::error::make_error_code(network::error::proxy_errors::request_aborted));
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}
+
 ClientSession::ClientSession(const std::string& host, const std::string& service) :
 host(host),
 service(service),
@@ -100,7 +113,7 @@ resolver(socket_.get_executor())
 void ClientSession::Cancel()
 {
     resolver.cancel();
-    socket_.cancel();
+    socket_.close();
 }
 
 void ClientSession::HandelFailed(std::error_code ec)
@@ -110,15 +123,31 @@ void ClientSession::HandelFailed(std::error_code ec)
 
 void ClientSession::Start()
 {
+    is_aborted_.exchange(false);
     StartDnsResolve();
 }
 
 void ClientSession::Abort()
 {
-    asio::post(resolver.get_executor(),
-               [ref = shared_from_this(), this]() {
-                   Cancel();
-               });
+    bool expected = false;
+    if (is_aborted_.compare_exchange_strong(expected, true))
+    {
+        Cancel();
+    }
+}
+
+void ClientSession::AcquireInitLocker()
+{
+    //spin lock wait
+    while(init_fence_.test_and_set())
+    {
+
+    };
+}
+
+void ClientSession::ReleaseInitLocker()
+{
+    init_fence_.clear();
 }
 
 void ClientSession::StartDnsResolve()
@@ -129,15 +158,22 @@ void ClientSession::StartDnsResolve()
                                                             decltype(resolver)::results_type result) {
                                FinishDnsResolve(ec, std::move(result));
                            });
+    DnsResloveStarted.Emit();
 }
 
 void ClientSession::FinishDnsResolve(asio::error_code ec, asio::ip::tcp::resolver::results_type result)
 {
+    //wait init finished
+    AcquireInitLocker();
+    ReleaseInitLocker();
+    DnsResloveFinished.Emit(ec, result);
     if (ec)
     {
         HandelFailed(ec);
         return;
     }
+    if(AbortCheckPoint())
+        return;
     StartConnect(std::move(result));
 }
 
@@ -147,15 +183,19 @@ void ClientSession::StartConnect(asio::ip::tcp::resolver::results_type result)
                         [this, self = shared_from_this()](std::error_code ec, asio::ip::tcp::endpoint endpoint) {
                             FinishConnect(ec, std::move(endpoint));
                         });
+    ConnectStarted.Emit(result);
 }
 
 void ClientSession::FinishConnect(std::error_code ec, asio::ip::tcp::endpoint endpoint)
 {
+    ConnectFinished(ec, endpoint);
     if (ec)
     {
         HandelFailed(ec);
         return;
     }
+    if(AbortCheckPoint())
+        return;
     Process(std::move(endpoint));
 }
 

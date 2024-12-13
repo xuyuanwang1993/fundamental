@@ -21,5 +21,13 @@ inline std::string EnumTypeToString(DataType type)
     return ret ? ret : "";
 }
 
+template <typename EnumType,typename DataType>
+inline std::string EnumTypeToString(DataType type)
+{
+    auto e   = rttr::type::get<EnumType>().get_enumeration();
+    auto ret = e.value_to_name(static_cast<EnumType>(type)).data();
+    return ret ? ret : "";
+}
+
 } // namespace io
 } // namespace Fundamental

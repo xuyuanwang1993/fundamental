@@ -39,7 +39,7 @@ struct ProxyFrame
     ProxySizeType sizeStorage = 0;
     Fundamental::Buffer<ProxySizeType> payload;
     // functions
-    
+
     std::vector<asio::const_buffer> ToAsioBuffers()
     {
         std::vector<asio::const_buffer> ret;
@@ -162,6 +162,7 @@ namespace error
 {
 enum class proxy_errors : std::int32_t
 {
+    request_aborted      = -1,
     read_header_failed   = 0,
     read_payload_failed  = 1,
     parse_payload_failed = 2
@@ -178,6 +179,7 @@ public:
     {
         switch (static_cast<proxy_errors>(value))
         {
+        case proxy_errors::request_aborted: return "request aborted";
         case proxy_errors::read_header_failed: return "read header failed";
         case proxy_errors::read_payload_failed: return "read payload failed";
         case proxy_errors::parse_payload_failed: return "parse payload failed";

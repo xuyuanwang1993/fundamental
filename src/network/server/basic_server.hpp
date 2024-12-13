@@ -94,11 +94,14 @@ inline void Server<Connection, RequestHandler>::Stop()
     bool expected_value = true;
     if (!has_started_.compare_exchange_strong(expected_value, false))
         return;
-    asio::post(io_context_pool::Instance().get_io_context(), [=, ref = std::weak_ptr<asio::ip::tcp::acceptor>(acceptor_)]() {
-        auto instance = ref.lock();
-        if (instance)
-            instance->close();
-    });
+    try
+    {
+        //close acceptor directly
+        acceptor_->close();
+    }
+    catch (const std::exception& e)
+    {
+    }
 }
 
 template <typename Connection, typename RequestHandler>
