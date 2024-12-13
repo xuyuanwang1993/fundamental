@@ -231,7 +231,8 @@ int main(int argc, char* argv[])
         {
             std::cout << "Usage: client <server> <path>\n";
             std::cout << "Example:\n";
-            std::cout << "  async_client www.boost.org /LICENSE_1_0.txt\n";
+            std::cout << "  async_client www.baidu.com /\n";
+            std::cout << "  set USE_TRAFFIC_PROXY=1 to test proxy\n";
             return 1;
         }
 

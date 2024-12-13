@@ -1,11 +1,15 @@
 #pragma once
+
+#include "network/services/proxy_server/proxy_defines.h"
 #include "fundamental/basic/buffer.hpp"
+
 #include <unordered_map>
+
 namespace network
 {
 namespace proxy
 {
-using TrafficProxySizeType = std::uint64_t;
+using TrafficProxySizeType = ProxySizeType;
 using TrafficProxyDataType = Fundamental::Buffer<TrafficProxySizeType>;
 enum TrafficProxyOperation : std::int32_t
 {
@@ -54,41 +58,6 @@ using TrafficProxyHostMap = std::unordered_map<TrafficProxyDataType /*proxyServi
                                                TrafficProxyHostInfo,
                                                Fundamental::BufferHash<TrafficProxySizeType>>;
 
-struct UpdateTrafficProxyRequest : TrafficProxyRequestBase
-{
-    UpdateTrafficProxyRequest() :
-    TrafficProxyRequestBase { UpdateTrafficProxyHostInfoOp }
-    {
-    }
-    std::int32_t req = 0;
-    TrafficProxyDataType proxyServiceName;
-    TrafficProxyHostInfo hostInfo;
-};
 
-struct UpdateTrafficProxyResponse : TrafficProxyResponseBase
-{
-    UpdateTrafficProxyResponse() :
-    TrafficProxyResponseBase { UpdateTrafficProxyHostInfoOp }
-    {
-    }
-};
-
-struct RemoveTrafficProxyRequest : TrafficProxyRequestBase
-{
-    RemoveTrafficProxyRequest() :
-    TrafficProxyRequestBase { RemoveTrafficProxyHostInfoOp }
-    {
-    }
-    std::int32_t req = 0;
-    TrafficProxyDataType proxyServiceName;
-};
-
-struct RemoveTrafficProxyResponse : TrafficProxyResponseBase
-{
-    RemoveTrafficProxyResponse() :
-    TrafficProxyResponseBase { RemoveTrafficProxyHostInfoOp }
-    {
-    }
-};
 } // namespace proxy
 } // namespace network

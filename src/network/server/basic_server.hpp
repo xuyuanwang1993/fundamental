@@ -44,6 +44,11 @@ public:
     ///  stop accept
     void Stop();
 
+    RequestHandler& GetHandler()
+    {
+        return request_handler_;
+    }
+
 protected:
     void DoAccept();
 
@@ -96,7 +101,7 @@ inline void Server<Connection, RequestHandler>::Stop()
         return;
     try
     {
-        //close acceptor directly
+        // close acceptor directly
         acceptor_->close();
     }
     catch (const std::exception& e)

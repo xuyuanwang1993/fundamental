@@ -10,11 +10,6 @@ namespace network
 namespace proxy
 {
 
-namespace internal
-{
-static std::map<std::uint8_t, ProxyRequestHandler::ProtocalHandler> s_handlers;
-}
-
 bool ProxyRequestHandler::DecodeHeader(const std::uint8_t* data, std::size_t len, ProxyFrame& dstFrame)
 {
     do
@@ -140,60 +135,31 @@ void ProxyRequestHandler::EncodeFrame(ProxyFrame& dstFrame)
 
 void ProxyRequestHandler::UpgradeProtocal(Connection&& connection)
 {
-    FDEBUG("proxy version {} op {} size:{}", connection.requestFrame.version,
-           connection.requestFrame.op,
-           connection.requestFrame.payload.GetSize());
+
     auto op = connection.requestFrame.op;
-    switch (op)
+    auto iter = handlers_.find(op);
+    if (iter != handlers_.end())
     {
-    case ProxyOpCode::AgentServiceOp:
-    {
-        AgentConnection::MakeShared(
-            std::move(connection.socket_), std::move(connection.requestFrame))
-            ->SetUp();
+        auto newConnection = iter->second(std::move(connection.socket_), std::move(connection.requestFrame));
+        if (newConnection)
+            newConnection->SetUp();
     }
-    break;
-    case ProxyOpCode::TrafficProxyOp:
+    else
     {
-        TrafficProxyConnection::MakeShared(
-            std::move(connection.socket_), std::move(connection.requestFrame))
-            ->SetUp();
-    }
-    break;
-    default:
-    {
-        auto iter = internal::s_handlers.find(op);
-        if (iter != internal::s_handlers.end())
-        {
-            auto newConnection = iter->second(std::move(connection.socket_), std::move(connection.requestFrame));
-            if (newConnection)
-                newConnection->SetUp();
-        }
-        else
-        {
-            FWARN("unsupported proxy op {} for version {}", ProxyFrame::kVersion,
-                  connection.requestFrame.op);
-        }
-    }
-    break;
+        FWARN("unsupported proxy op {} for version {}", ProxyFrame::kVersion,
+              connection.requestFrame.op);
     }
 }
 
 void ProxyRequestHandler::RegisterProtocal(std::uint8_t opCode, ProtocalHandler handler)
 {
-    switch (opCode)
+    auto iter = handlers_.find(opCode);
+    if (iter != handlers_.end())
     {
-    case ProxyOpCode::AgentServiceOp:
-    case ProxyOpCode::TrafficProxyOp:
         throw std::runtime_error(Fundamental::StringFormat("conflict proxy op:{}", opCode));
-        break;
-    default:
-    {
-        if (handler)
-            internal::s_handlers[opCode] = handler;
     }
-    break;
-    }
+    if (handler)
+        handlers_[opCode] = handler;
 }
 
 ProxeServiceBase::ProxeServiceBase(asio::ip::tcp::socket&& socket, ProxyFrame&& frame) :
