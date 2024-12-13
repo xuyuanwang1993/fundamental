@@ -92,7 +92,7 @@ int main(int argc, char* argv[])
                 auto token = client.Update(context);
                 FINFO("create task token:{}", token);
             }
-            if (mode == "sniff")
+            else if (mode == "sniff")
             {
                 network::proxy::rpc::AgentSniffContext context;
                 context.host    = argv[1];
