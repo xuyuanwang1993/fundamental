@@ -3,6 +3,8 @@
 #include "fundamental/basic/utils.hpp"
 #include <string>
 #include <unordered_map>
+
+#include "network/services/proxy_server/proxy_defines.h"
 namespace network
 {
 namespace proxy
@@ -14,7 +16,7 @@ enum AgentCode : std::int32_t
     AgentFailed  = 1,
 };
 
-using AgentSizeType = std::uint64_t;
+using AgentSizeType = ProxySizeType;
 using AgentDataType = Fundamental::Buffer<AgentSizeType>;
 struct AgentEntryInfo
 {

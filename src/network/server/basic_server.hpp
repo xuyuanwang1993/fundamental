@@ -56,7 +56,7 @@ protected:
     std::atomic_bool has_started_ = false;
 
     /// Acceptor used to listen for incoming connections.
-    std::shared_ptr<asio::ip::tcp::acceptor> acceptor_;
+    asio::ip::tcp::acceptor acceptor_;
 
     /// The handler for all incoming requests.
     RequestHandler request_handler_;
@@ -69,7 +69,7 @@ protected:
 template <typename Connection, typename RequestHandler>
 inline Server<Connection, RequestHandler>::Server(const std::string& address,
                                                   const std::string& port) :
-acceptor_(std::make_shared<asio::ip::tcp::acceptor>(io_context_pool::Instance().get_io_context())),
+acceptor_(io_context_pool::Instance().get_io_context()),
 address(address),
 port(port)
 {
@@ -82,13 +82,13 @@ inline void Server<Connection, RequestHandler>::Start()
     if (!has_started_.compare_exchange_strong(expected_value, true))
         return;
     // Open the acceptor with the option to reuse the address (i.e. SO_REUSEADDR).
-    asio::ip::tcp::resolver resolver(acceptor_->get_executor());
+    asio::ip::tcp::resolver resolver(acceptor_.get_executor());
     asio::ip::tcp::endpoint endpoint =
         *resolver.resolve(address, port).begin();
-    acceptor_->open(endpoint.protocol());
-    acceptor_->set_option(asio::ip::tcp::acceptor::reuse_address(true));
-    acceptor_->bind(endpoint);
-    acceptor_->listen();
+    acceptor_.open(endpoint.protocol());
+    acceptor_.set_option(asio::ip::tcp::acceptor::reuse_address(true));
+    acceptor_.bind(endpoint);
+    acceptor_.listen();
 
     DoAccept();
 }
@@ -102,7 +102,7 @@ inline void Server<Connection, RequestHandler>::Stop()
     try
     {
         // close acceptor directly
-        acceptor_->close();
+        acceptor_.close();
     }
     catch (const std::exception& e)
     {
@@ -112,11 +112,11 @@ inline void Server<Connection, RequestHandler>::Stop()
 template <typename Connection, typename RequestHandler>
 inline void Server<Connection, RequestHandler>::DoAccept()
 {
-    acceptor_->async_accept(io_context_pool::Instance().get_io_context(),
+    acceptor_.async_accept(io_context_pool::Instance().get_io_context(),
                             [this](std::error_code ec, asio::ip::tcp::socket socket) {
                                 // Check whether the server was stopped by a signal before this
                                 // completion handler had a chance to run.
-                                if (!acceptor_->is_open())
+                                if (!acceptor_.is_open())
                                 {
                                     return;
                                 }
