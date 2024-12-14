@@ -23,6 +23,7 @@ void TrafficProxyConnection::SetUp()
 
 TrafficProxyConnection::~TrafficProxyConnection()
 {
+    FDEBUG("~TrafficProxyConnection");
     HandleDisconnect({}, "");
 }
 
@@ -155,6 +156,7 @@ void TrafficProxyConnection::HandShake()
                               HandleProxyFinished(ec, "HandShake");
                               return;
                           }
+                          FDEBUG("handshake sucess");
                           StartTrafficClientRead();
                           StartProxyRead();
                           request_client_.InitStatistics();

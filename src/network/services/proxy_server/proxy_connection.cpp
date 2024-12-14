@@ -11,6 +11,11 @@ checkTimer(socket_.get_executor(), asio::chrono::seconds(kMaxRecvRequestFrameTim
 {
 }
 
+Connection::~Connection()
+{
+    FDEBUG("~Connection");
+}
+
 void Connection::Start()
 {
     StartTimerCheck();
@@ -42,7 +47,9 @@ void Connection::ReadHeader()
                          {
                              if (ec)
                              {
-                                 FWARN("disconnected for read header:[{}-{}] :{}", ec.category().name(), ec.value(), ec.message());
+                                 FWARN("disconnected [{}:{}] for read header:[{}-{}] :{}",
+                                 socket_.remote_endpoint().address().to_string(),
+                                 socket_.remote_endpoint().port(),ec.category().name(), ec.value(), ec.message());
                                  break;
                              }
                              if (!request_handler_.DecodeHeader(headerBuffer.data(),
