@@ -9,6 +9,8 @@
 //
 
 #include "network/services/proxy_server/traffic_proxy_service/traffic_proxy_codec.hpp"
+#include "network/services/proxy_server/proxy_encode.h"
+
 #include <asio.hpp>
 #include <functional>
 #include <iostream>
@@ -51,20 +53,28 @@ public:
                                           asio::placeholders::results));
         }
     }
-
+    ~client()
+    {
+        proxy_free_output(&proxy_frame);
+    }
 private:
     void prepare_traffic(const std::string& host)
     {
         auto* ptr = ::getenv("USE_TRAFFIC_PROXY");
         if (!ptr)
             return;
-        std::ostream request_stream(&request_);
-        network::proxy::TrafficProxyRequest request;
-        request.proxyServiceName = "test_http";
-        request.field            = host;
-        request.token            = "test_http_token";
-        network::proxy::TrafficEncoder::EncodeProxyFrame(frame_, request);
-        buffers_ = frame_.ToAsioBuffers();
+        proxy_encode_input input;
+        std::string proxyServiceName = "test_http";
+        input.service=proxyServiceName.data();
+        input.serviceLen=proxyServiceName.size();
+        std::string field            = host;
+        input.field=field.data();
+        input.fieldLen=field.size();
+        std::string token            = "test_http_token";
+        input.token=token.data();
+        input.tokenLen=token.size();
+        proxy_encode_request(input,proxy_frame);
+        buffers_.emplace_back(asio::const_buffer(proxy_frame.buf,proxy_frame.bufLen));
     }
 
     void handle_resolve(const std::error_code& err,
@@ -216,7 +226,7 @@ private:
         }
     }
     std::vector<asio::const_buffer> buffers_;
-    network::proxy::ProxyFrame frame_;
+    proxy_encode_output proxy_frame;
     tcp::resolver resolver_;
     tcp::socket socket_;
     asio::streambuf request_;

@@ -9,14 +9,13 @@ template <>
 void TrafficEncoder::EncodeCommandFrame<TrafficProxyRequest>(TrafficProxyDataType& dstBuffer, const TrafficProxyRequest& command_frame)
 {
     using SizeType = decltype(dstBuffer.GetSize());
-    SizeType size  = sizeof(command_frame.op) + sizeof(SizeType) * 3 +
+    SizeType size  = sizeof(SizeType) * 3 +
                     command_frame.field.GetSize() +
                     command_frame.proxyServiceName.GetSize() +
                     command_frame.token.GetSize();
     Fundamental::BufferWriter<SizeType> writer;
     dstBuffer.Reallocate(size);
     writer.SetBuffer(dstBuffer.GetData(), dstBuffer.GetSize());
-    writer.WriteValue(&command_frame.op);
     writer.WriteRawMemory(command_frame.proxyServiceName);
     writer.WriteRawMemory(command_frame.field);
     writer.WriteRawMemory(command_frame.token);
@@ -30,8 +29,8 @@ bool TrafficDecoder::DecodeCommandFrame<TrafficProxyRequest>(const TrafficProxyD
     {
         using SizeType = decltype(srcBuffer.GetSize());
         Fundamental::BufferReader<SizeType> reader;
-        reader.SetBuffer(srcBuffer.GetData() + sizeof(TrafficProxyOperation),
-                         srcBuffer.GetSize() - sizeof(TrafficProxyOperation));
+        reader.SetBuffer(srcBuffer.GetData(),
+                         srcBuffer.GetSize());
         reader.ReadRawMemory(dst_command_frame.proxyServiceName);
         reader.ReadRawMemory(dst_command_frame.field);
         reader.ReadRawMemory(dst_command_frame.token);
@@ -43,8 +42,6 @@ bool TrafficDecoder::DecodeCommandFrame<TrafficProxyRequest>(const TrafficProxyD
     }
     return true;
 }
-
-
 
 } // namespace proxy
 } // namespace network

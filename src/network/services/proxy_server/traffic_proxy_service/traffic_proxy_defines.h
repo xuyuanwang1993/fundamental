@@ -12,28 +12,9 @@ namespace proxy
 constexpr std::uint8_t kTrafficProxyOpcode = 1;
 using TrafficProxySizeType = ProxySizeType;
 using TrafficProxyDataType = Fundamental::Buffer<TrafficProxySizeType>;
-enum TrafficProxyOperation : std::int32_t
-{
-    TrafficProxyDataOp           = 0
-};
 
-struct TrafficProxyRequestBase
+struct TrafficProxyRequest
 {
-    const TrafficProxyOperation op = TrafficProxyDataOp;
-};
-
-struct TrafficProxyResponseBase
-{
-    const TrafficProxyOperation op = TrafficProxyDataOp;
-    std::int32_t req;
-};
-
-struct TrafficProxyRequest : TrafficProxyRequestBase
-{
-    TrafficProxyRequest() :
-    TrafficProxyRequestBase { TrafficProxyDataOp }
-    {
-    }
     TrafficProxyDataType proxyServiceName;
     TrafficProxyDataType field;
     TrafficProxyDataType token;

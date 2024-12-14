@@ -28,29 +28,7 @@ TrafficProxyConnection::~TrafficProxyConnection()
 
 void TrafficProxyConnection::Process()
 {
-
-    using SizeType = decltype(frame.payload.GetSize());
-    Fundamental::BufferReader<SizeType> reader;
-    reader.SetBuffer(frame.payload.GetData(), frame.payload.GetSize());
-    TrafficProxyOperation op;
-    try
-    {
-        reader.ReadValue(&op);
-    }
-    catch (const std::exception& e)
-    {
-        FERR("process TrafficProxyConnection op failed {}", e.what());
-        return;
-    }
-    switch (op)
-    {
-    case TrafficProxyDataOp:
-        ProcessTrafficProxy();
-        break;
-    default:
-        FWARN("unsupported traffic proxy op {}", op);
-        break;
-    }
+    ProcessTrafficProxy();
 }
 
 void TrafficProxyConnection::ProcessTrafficProxy()

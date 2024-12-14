@@ -14,6 +14,7 @@ namespace proxy
 
 using ProxySizeType                     = std::uint64_t;
 static constexpr std::size_t kProxySize = sizeof(ProxySizeType);
+/// @note when we update proxyfram's structure or encoder,we should update proxy_encode.h
 struct ProxyFrame
 {
     static constexpr std::size_t kHeaderSize     = 2 /*fixed*/ + 1 /*checkSum*/ + 2 + 4 /*mask*/ + kProxySize /*payloadLen*/;
