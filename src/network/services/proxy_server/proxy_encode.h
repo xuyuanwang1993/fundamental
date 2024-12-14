@@ -61,9 +61,9 @@ extern "C"
     {
         uint64_t payload_len = sizeof(uint64_t) * 3 +
                                input.fieldLen + input.serviceLen + input.tokenLen;
-        size_t size_total = sizeof(uint16_t) + 1 + 1 + 1 +
+        output.bufLen = sizeof(uint16_t) + 1 + 1 + 1 +
                             sizeof(uint32_t) + sizeof(uint64_t) + payload_len;
-        output.buf         = (unsigned char*)malloc(size_total);
+        output.buf         = (unsigned char*)malloc(output.bufLen);
         unsigned char* ptr = output.buf;
         // encode
         size_t offset = 0;
@@ -94,8 +94,8 @@ extern "C"
         memcpy(ptr + offset, input.token, input.tokenLen); // token
 
         // mask operation
-        size_t leftSize           = size_total % 4;
-        size_t alignBufferSize    = size_total - leftSize;
+        size_t leftSize           = payload_len % 4;
+        size_t alignBufferSize    = payload_len - leftSize;
         uint32_t opeationCheckSum = 0;
         // mask the origin data
         for (size_t i = 0; i < alignBufferSize; i += 4)
@@ -114,8 +114,8 @@ extern "C"
         // fix left bytes
         for (size_t i = 0; i < leftSize; ++i)
         {
-            checkSum ^= ptr[i + alignBufferSize];
-            ptr[i + alignBufferSize] ^= p_mask[i % 4];
+            checkSum ^= payload_ptr[i + alignBufferSize];
+            payload_ptr[i + alignBufferSize] ^= p_mask[i % 4];
         }
     }
 
