@@ -29,7 +29,7 @@ struct ProxyFrame
     union
     {
         std::uint8_t data[4];
-        std::int32_t v;
+        std::uint32_t v;
     } mask;
     ProxySizeType sizeStorage = 0;
     Fundamental::Buffer<ProxySizeType> payload;

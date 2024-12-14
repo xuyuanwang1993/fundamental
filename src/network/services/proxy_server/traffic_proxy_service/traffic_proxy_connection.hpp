@@ -1,5 +1,7 @@
 #pragma once
 #include "network/services/proxy_server/proxy_request_handler.hpp"
+#include "traffic_proxy_defines.h"
+
 #include <array>
 #include <asio.hpp>
 #include <deque>
@@ -54,13 +56,13 @@ class TrafficProxyConnection : public ProxeServiceBase, public std::enable_share
     };
 
 public:
-    
     void SetUp() override;
     ~TrafficProxyConnection();
-     static std::shared_ptr<TrafficProxyConnection> MakeShared(asio::ip::tcp::socket&& socket, ProxyFrame&& frame)
+    static std::shared_ptr<TrafficProxyConnection> MakeShared(asio::ip::tcp::socket&& socket, ProxyFrame&& frame)
     {
         return std::shared_ptr<TrafficProxyConnection>(new TrafficProxyConnection(std::move(socket), std::move(frame)));
     }
+
 protected:
     explicit TrafficProxyConnection(asio::ip::tcp::socket&& socket, ProxyFrame&& frame);
     void Process();
@@ -73,17 +75,19 @@ protected:
 protected:
     void StartDnsResolve(const std::string& host, const std::string& service);
     void StartConnect(asio::ip::tcp::resolver::results_type&& result);
+    void HandShake();
     void StartTrafficWrite();
     void StartTrafficClientRead();
     void StartProxyWrite();
     void StartProxyRead();
     void DoStatistics();
     void StopStatistics();
+
 protected:
     asio::ip::tcp::socket proxy_socket_;
     asio::ip::tcp::resolver resolver;
     asio::steady_timer checkTimer;
-
+    char handshakeBuf[2];
     std::int32_t status = TrafficClientConnected;
     EndponitCacheStatus request_client_;
     EndponitCacheStatus passive_server_;

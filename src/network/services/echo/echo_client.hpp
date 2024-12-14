@@ -83,6 +83,9 @@ private:
                             [this](std::error_code ec, tcp::endpoint) {
                                 if (!ec)
                                 {
+                                    asio::error_code error_code;
+                                    asio::ip::tcp::no_delay option(true);
+                                    socket_.set_option(option, error_code);
                                     is_connected.exchange(true);
                                     connect_promise_.set_value();
                                     handle_proxy_header();

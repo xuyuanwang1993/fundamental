@@ -54,10 +54,15 @@ public:
                                               asio::placeholders::error,
                                               asio::placeholders::results));
         }
+        std::memset(&proxy_frame, 0, sizeof(proxy_frame));
     }
     ~client()
     {
-        proxy_free_output(&proxy_frame);
+        if (::getenv("USE_TRAFFIC_PROXY"))
+        {
+            proxy_free_output(&proxy_frame);
+            FINFO("finish USE_TRAFFIC_PROXY");
+        }
     }
 
 private:
@@ -78,8 +83,6 @@ private:
         input.token                  = token.data();
         input.tokenLen               = token.size();
         proxy_encode_request(input, proxy_frame);
-        network::proxy::ProxyFrame frame;
-        assert(network::proxy::ProxyRequestHandler::DecodeHeader(proxy_frame.buf, proxy_frame.bufLen, frame));
         buffers_.emplace_back(asio::const_buffer(proxy_frame.buf, proxy_frame.bufLen));
     }
 
@@ -106,10 +109,16 @@ private:
             send_request();
         else
         {
+            FINFO("write proxy handshake");
             asio::async_write(socket_, std::move(buffers_), [this](const std::error_code& err, std::size_t) {
                 if (err)
                     return;
-                send_request();
+                handshake.resize(2);
+                asio::async_read(socket_, asio::mutable_buffer(handshake.data(), 2), [this](const std::error_code& err, std::size_t) {
+                    if (err || handshake != "ok")
+                        return;
+                    send_request();
+                });
             });
         }
     }
@@ -237,6 +246,7 @@ private:
     tcp::socket socket_;
     asio::streambuf request_;
     asio::streambuf response_;
+    std::string handshake;
 };
 
 int main(int argc, char* argv[])

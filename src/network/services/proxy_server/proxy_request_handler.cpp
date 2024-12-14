@@ -1,9 +1,11 @@
 #include "proxy_request_handler.hpp"
 #include "agent_service/agent_connection.hpp"
 #include "fundamental/basic/log.h"
+#include "fundamental/basic/utils.hpp"
 #include "fundamental/delay_queue/delay_queue.h"
 #include "proxy_connection.hpp"
 #include "traffic_proxy_service/traffic_proxy_connection.hpp"
+
 #include <map>
 namespace network
 {
@@ -64,7 +66,7 @@ bool ProxyRequestHandler::DecodePayload(ProxyFrame& dstFrame)
     union
     {
         std::uint8_t data[4];
-        std::int32_t v;
+        std::uint32_t v;
     } opeationCheckSum;
     opeationCheckSum.v                   = 0;
     std::size_t leftSize                 = bufferSize % 4;
@@ -72,22 +74,23 @@ bool ProxyRequestHandler::DecodePayload(ProxyFrame& dstFrame)
     // restore to origin data
     for (decltype(bufferSize) i = 0; i < alignBufferSize; i += 4)
     {
-        std::int32_t& operationNum = *((std::int32_t*)(ptr + i));
+        std::uint32_t& operationNum = *((std::uint32_t*)(ptr + i));
         operationNum ^= dstFrame.mask.v;
         opeationCheckSum.v ^= operationNum;
     }
     // update mask
-    dstFrame.checkSum ^= opeationCheckSum.data[0];
-    dstFrame.checkSum ^= opeationCheckSum.data[1];
-    dstFrame.checkSum ^= opeationCheckSum.data[2];
-    dstFrame.checkSum ^= opeationCheckSum.data[3];
+    std::uint8_t checkSum=0;
+    checkSum^= opeationCheckSum.data[0];
+    checkSum ^= opeationCheckSum.data[1];
+    checkSum ^= opeationCheckSum.data[2];
+    checkSum ^= opeationCheckSum.data[3];
     // fix left bytes
     for (size_t i = 0; i < leftSize; ++i)
     {
         ptr[i + alignBufferSize] ^= dstFrame.mask.data[i % 4];
-        dstFrame.checkSum ^= ptr[i + alignBufferSize];
+        checkSum^= ptr[i + alignBufferSize];
     }
-    return dstFrame.checkSum == 0;
+    return dstFrame.checkSum == checkSum;
 }
 
 void ProxyRequestHandler::EncodeFrame(ProxyFrame& dstFrame)
@@ -136,7 +139,7 @@ void ProxyRequestHandler::EncodeFrame(ProxyFrame& dstFrame)
 void ProxyRequestHandler::UpgradeProtocal(Connection&& connection)
 {
 
-    auto op = connection.requestFrame.op;
+    auto op   = connection.requestFrame.op;
     auto iter = handlers_.find(op);
     if (iter != handlers_.end())
     {

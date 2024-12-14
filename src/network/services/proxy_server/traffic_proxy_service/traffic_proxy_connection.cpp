@@ -45,6 +45,9 @@ void TrafficProxyConnection::ProcessTrafficProxy()
     {
         return;
     }
+    FINFO("start proxy {} {} {} -> {}:{}", request.proxyServiceName.ToString(),
+          request.token.ToString(), request.field.ToString(), hostInfo.host.ToString(),
+          hostInfo.service.ToString());
     StartDnsResolve(hostInfo.host.ToString(), hostInfo.service.ToString());
 }
 
@@ -133,17 +136,35 @@ void TrafficProxyConnection::StartConnect(asio::ip::tcp::resolver::results_type&
                                 HandleProxyFinished(ec, "connect");
                                 return;
                             }
+                            asio::error_code error_code;
+                            asio::ip::tcp::no_delay option(true);
+                            proxy_socket_.set_option(option, error_code);
                             status |= ProxyConnected;
-                            StartTrafficClientRead();
-                            StartProxyRead();
-                            request_client_.InitStatistics();
-                            passive_server_.InitStatistics();
-                            if (s_trafficStatisticsIntervalSec > 0)
-                            {
-                                status |= CheckTimerStarted;
-                                DoStatistics();
-                            }
+                            HandShake();
                         });
+}
+
+void TrafficProxyConnection::HandShake()
+{
+    handshakeBuf[0] = 'o';
+    handshakeBuf[1] = 'k';
+    asio::async_write(socket_, asio::const_buffer(handshakeBuf, 2),
+                      [this, self = shared_from_this()](std::error_code ec, std::size_t bytesWrite) {
+                          if (ec)
+                          {
+                              HandleProxyFinished(ec, "HandShake");
+                              return;
+                          }
+                          StartTrafficClientRead();
+                          StartProxyRead();
+                          request_client_.InitStatistics();
+                          passive_server_.InitStatistics();
+                          if (s_trafficStatisticsIntervalSec > 0)
+                          {
+                              status |= CheckTimerStarted;
+                              DoStatistics();
+                          }
+                      });
 }
 
 void TrafficProxyConnection::StartTrafficWrite()

@@ -1,5 +1,6 @@
 #pragma once
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -62,13 +63,14 @@ extern "C"
         uint64_t payload_len = sizeof(uint64_t) * 3 +
                                input.fieldLen + input.serviceLen + input.tokenLen;
         output.bufLen = sizeof(uint16_t) + 1 + 1 + 1 +
-                            sizeof(uint32_t) + sizeof(uint64_t) + payload_len;
+                        sizeof(uint32_t) + sizeof(uint64_t) + payload_len;
         output.buf         = (unsigned char*)malloc(output.bufLen);
         unsigned char* ptr = output.buf;
         // encode
         size_t offset = 0;
         proxy__encode_16__(ptr + offset, 0x6668);
         offset += 2; // fixed
+        ptr[offset]             = 0;
         unsigned char& checkSum = ptr[offset];
         ++offset;
         ptr[offset] = 0x01; // version

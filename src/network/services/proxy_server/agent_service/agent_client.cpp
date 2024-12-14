@@ -277,6 +277,9 @@ void AgentClient::AgentSession::StartConnect(asio::ip::tcp::resolver::results_ty
                                 HandleFailed(ec);
                                 return;
                             }
+                            asio::error_code error_code;
+                            asio::ip::tcp::no_delay option(true);
+                            socket_.set_option(option, error_code);
                             SendRequest();
                         });
 }
