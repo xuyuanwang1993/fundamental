@@ -53,40 +53,52 @@ void TrafficProxyConnection::ProcessTrafficProxy()
     StartDnsResolve(hostInfo.host.ToString(), hostInfo.service.ToString());
 }
 
-void TrafficProxyConnection::HandleDisconnect(asio::error_code ec, const std::string& callTag)
+void TrafficProxyConnection::HandleDisconnect(asio::error_code ec, const std::string& callTag, std::int32_t closeMask)
 {
     if (!callTag.empty())
         FINFO("disconnect for {} -> ec:{}-{}", callTag, ec.category().name(), ec.message());
-    if (status & ClientProxying)
+    if (closeMask & ClientProxying)
     {
-        status ^= ClientProxying;
-        asio::error_code code;
-        socket_.close(code);
-        if (!callTag.empty())
-            FDEBUG("close proxy remote endpoint ");
+        if (status & ClientProxying)
+        {
+            status ^= ClientProxying;
+            asio::error_code code;
+            socket_.close(code);
+            if (!callTag.empty())
+                FDEBUG("close proxy remote endpoint ");
+        }
     }
-    if (status & CheckTimerHandling)
+    if (closeMask & CheckTimerHandling)
     {
-        status ^= CheckTimerHandling;
-        checkTimer.cancel();
-        if (!callTag.empty())
-            FDEBUG("stop proxy statistics");
+        if (status & CheckTimerHandling)
+        {
+            status ^= CheckTimerHandling;
+            checkTimer.cancel();
+            if (!callTag.empty())
+                FDEBUG("stop proxy statistics");
+        }
     }
-    if (status & ProxyDnsResolving)
+    if (closeMask & ProxyDnsResolving)
     {
-        status ^= ProxyDnsResolving;
-        resolver.cancel();
-        if (!callTag.empty())
-            FDEBUG("stop proxy dns resolving");
+        if (status & ProxyDnsResolving)
+        {
+            status ^= ProxyDnsResolving;
+            resolver.cancel();
+            if (!callTag.empty())
+                FDEBUG("stop proxy dns resolving");
+        }
     }
-    if ((status & ServerProxying) || (status & ServerConnecting))
+    if ((closeMask & ServerProxying) || (closeMask & ServerConnecting))
     {
-        status &= (~ServerProxying);
-        status &= (~ServerConnecting);
-        asio::error_code code;
-        proxy_socket_.close(code);
-        if (!callTag.empty())
-            FDEBUG("close proxy local endpoint");
+        if ((status & ServerProxying) || (status & ServerConnecting))
+        {
+            status &= (~ServerProxying);
+            status &= (~ServerConnecting);
+            asio::error_code code;
+            proxy_socket_.close(code);
+            if (!callTag.empty())
+                FDEBUG("close proxy local endpoint");
+        }
     }
 }
 
@@ -104,7 +116,8 @@ void TrafficProxyConnection::StartDnsResolve(const std::string& host, const std:
                                    HandleDisconnect(ec, "dns resolve");
                                    return;
                                }
-                               StartConnect(std::move(result));
+                               if (status & ClientProxying)
+                                   StartConnect(std::move(result));
                            });
 }
 
@@ -125,6 +138,8 @@ void TrafficProxyConnection::StartConnect(asio::ip::tcp::resolver::results_type&
                             }
                             status ^= ServerConnecting;
                             status |= ServerProxying;
+                            if (!(status & ClientProxying))
+                                return;
                             asio::error_code error_code;
                             asio::ip::tcp::no_delay option(true);
                             proxy_socket_.set_option(option, error_code);
@@ -165,6 +180,7 @@ void TrafficProxyConnection::StartServer2ClientWrite()
     {
         socket_.async_write_some(server2client.GetWriteBuffer(),
                                  [this, self = shared_from_this()](std::error_code ec, std::size_t bytesWrite) {
+                                     FDEBUG("Server2ClientWrite {} bytes", bytesWrite);
                                      if (ec)
                                      {
                                          HandleDisconnect(ec, "Server2ClientWrite");
@@ -181,6 +197,7 @@ void TrafficProxyConnection::StartClientRead()
     client2server.PrepareReadCache();
     socket_.async_read_some(client2server.GetReadBuffer(),
                             [this, self = shared_from_this()](std::error_code ec, std::size_t bytesRead) {
+                                FDEBUG("ClientRead {} bytes", bytesRead);
                                 client2server.UpdateReadBuffer(bytesRead);
                                 Fundamental::ScopeGuard guard([this]() {
                                     StartClient2ServerWrite();
@@ -188,7 +205,7 @@ void TrafficProxyConnection::StartClientRead()
 
                                 if (ec)
                                 {
-                                    HandleDisconnect(ec, "ClientRead");
+                                    HandleDisconnect(ec, "ClientRead", TrafficProxyCloseExceptServerProxying);
                                     return;
                                 }
                                 StartClientRead();
@@ -204,9 +221,10 @@ void TrafficProxyConnection::StartClient2ServerWrite()
     {
         proxy_socket_.async_write_some(client2server.GetWriteBuffer(),
                                        [this, self = shared_from_this()](std::error_code ec, std::size_t bytesWrite) {
+                                           FDEBUG("Client2ServerWrite {} bytes", bytesWrite);
                                            if (ec)
                                            {
-                                               HandleDisconnect(ec, "StartClient2ServerWrite");
+                                               HandleDisconnect(ec, "Client2ServerWrite");
                                                return;
                                            }
                                            client2server.UpdateWriteBuffer(bytesWrite);
@@ -220,13 +238,14 @@ void TrafficProxyConnection::StartServerRead()
     server2client.PrepareReadCache();
     proxy_socket_.async_read_some(server2client.GetReadBuffer(),
                                   [this, self = shared_from_this()](std::error_code ec, std::size_t bytesRead) {
+                                      FDEBUG("ServerRead {} bytes", bytesRead);
                                       server2client.UpdateReadBuffer(bytesRead);
                                       Fundamental::ScopeGuard guard([this]() {
                                           StartServer2ClientWrite();
                                       });
                                       if (ec)
                                       {
-                                          HandleDisconnect(ec, "ProxyRead");
+                                          HandleDisconnect(ec, "ServerRead", TrafficProxyCloseExceptClientProxying);
                                           return;
                                       }
                                       StartServerRead();

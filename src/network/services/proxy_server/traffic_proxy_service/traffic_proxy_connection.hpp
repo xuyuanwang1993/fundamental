@@ -46,11 +46,14 @@ class TrafficProxyConnection : public ProxeServiceBase, public std::enable_share
     };
     enum TrafficProxyStatusMask : std::int32_t
     {
-        ClientProxying     = (1 << 0),
-        CheckTimerHandling = (1 << 1),
-        ProxyDnsResolving  = (1 << 2),
-        ServerProxying     = (1 << 3),
-        ServerConnecting     = (1 << 4)
+        ClientProxying                        = (1 << 0),
+        CheckTimerHandling                    = (1 << 1),
+        ProxyDnsResolving                     = (1 << 2),
+        ServerProxying                        = (1 << 3),
+        ServerConnecting                      = (1 << 4),
+        TrafficProxyCloseExceptClientProxying = static_cast<std::int32_t>(~ClientProxying),
+        TrafficProxyCloseExceptServerProxying = static_cast<std::int32_t>(~ServerProxying),
+        TrafficProxyCloseAll                  = static_cast<std::int32_t>(~0),
     };
 
 public:
@@ -65,7 +68,7 @@ protected:
     explicit TrafficProxyConnection(asio::ip::tcp::socket&& socket, ProxyFrame&& frame);
     void Process();
     void ProcessTrafficProxy();
-    void HandleDisconnect(asio::error_code ec, const std::string& callTag = "");
+    void HandleDisconnect(asio::error_code ec, const std::string& callTag = "",std::int32_t closeMask=TrafficProxyCloseAll);
 
 protected:
     void StartDnsResolve(const std::string& host, const std::string& service);
