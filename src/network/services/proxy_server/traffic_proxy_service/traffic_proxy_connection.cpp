@@ -175,20 +175,29 @@ void TrafficProxyConnection::StartServer2ClientWrite()
 {
     if (!(status & ClientProxying))
         return;
-    server2client.PrepareWriteCache();
-    if (server2client.isWriting)
+    auto needWrite = server2client.PrepareWriteCache();
+    if (needWrite)
     {
         socket_.async_write_some(server2client.GetWriteBuffer(),
                                  [this, self = shared_from_this()](std::error_code ec, std::size_t bytesWrite) {
                                      FDEBUG("Server2ClientWrite {} bytes", bytesWrite);
+                                     server2client.ClearWriteStatus();
                                      if (ec)
                                      {
-                                         HandleDisconnect(ec, "Server2ClientWrite");
+                                         HandleDisconnect(ec, "Server2ClientWrite", TrafficProxyCloseExceptServerProxying);
                                          return;
                                      }
                                      server2client.UpdateWriteBuffer(bytesWrite);
                                      StartServer2ClientWrite();
                                  });
+    }
+    else
+
+    { // when server connection is aborted and remaining data to transfer to client
+        if (!(status & ServerProxying))
+        {
+            HandleDisconnect({}, "finish client transfer", ClientProxying);
+        }
     }
 }
 
@@ -216,20 +225,28 @@ void TrafficProxyConnection::StartClient2ServerWrite()
 {
     if (!(status & ServerProxying))
         return;
-    client2server.PrepareWriteCache();
-    if (client2server.isWriting)
+    auto needWrite = client2server.PrepareWriteCache();
+    if (needWrite)
     {
         proxy_socket_.async_write_some(client2server.GetWriteBuffer(),
                                        [this, self = shared_from_this()](std::error_code ec, std::size_t bytesWrite) {
                                            FDEBUG("Client2ServerWrite {} bytes", bytesWrite);
+                                           client2server.ClearWriteStatus();
                                            if (ec)
                                            {
-                                               HandleDisconnect(ec, "Client2ServerWrite");
+                                               HandleDisconnect(ec, "Client2ServerWrite", TrafficProxyCloseExceptClientProxying);
                                                return;
                                            }
                                            client2server.UpdateWriteBuffer(bytesWrite);
                                            StartClient2ServerWrite();
                                        });
+    }
+    else
+    { // when client is aborted and remaining data to transfer to server
+        if (!(status & ClientProxying))
+        {
+            HandleDisconnect({}, "finish server transfer", ServerProxying);
+        }
     }
 }
 
@@ -269,9 +286,15 @@ void TrafficProxyConnection::DoStatistics()
     });
 }
 
-void TrafficProxyConnection::EndponitCacheStatus::PrepareWriteCache()
+void TrafficProxyConnection::EndponitCacheStatus::ClearWriteStatus()
 {
-    auto& front = cache_.front();
+    isWriting = false;
+}
+
+bool TrafficProxyConnection::EndponitCacheStatus::PrepareWriteCache()
+{
+    auto oldStatus = isWriting;
+    auto& front    = cache_.front();
     if (front.readOffset == front.writeOffset && cache_.size() > 1)
         cache_.pop_front();
     if (cache_.size() == 1)
@@ -280,10 +303,11 @@ void TrafficProxyConnection::EndponitCacheStatus::PrepareWriteCache()
         if (back.readOffset == back.writeOffset)
         {
             isWriting = false;
-            return;
+            return false;
         }
     }
     isWriting = true;
+    return !oldStatus && isWriting;
 }
 
 void TrafficProxyConnection::EndponitCacheStatus::PrepareReadCache()

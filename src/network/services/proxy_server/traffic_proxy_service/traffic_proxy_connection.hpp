@@ -34,7 +34,8 @@ class TrafficProxyConnection : public ProxeServiceBase, public std::enable_share
         std::int64_t lastCheckSecTimePoint = 0;
         std::size_t lastReadBytesNum       = 0;
         std::size_t lastWriteBytesNum      = 0;
-        void PrepareWriteCache();
+        void ClearWriteStatus();
+        bool PrepareWriteCache();
         void PrepareReadCache();
         asio::mutable_buffer GetReadBuffer();
         asio::const_buffer GetWriteBuffer();
