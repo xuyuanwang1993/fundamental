@@ -180,7 +180,6 @@ void TrafficProxyConnection::StartServer2ClientWrite()
     {
         socket_.async_write_some(server2client.GetWriteBuffer(),
                                  [this, self = shared_from_this()](std::error_code ec, std::size_t bytesWrite) {
-                                     FDEBUG("Server2ClientWrite {} bytes", bytesWrite);
                                      server2client.ClearWriteStatus();
                                      if (ec)
                                      {
@@ -206,7 +205,6 @@ void TrafficProxyConnection::StartClientRead()
     client2server.PrepareReadCache();
     socket_.async_read_some(client2server.GetReadBuffer(),
                             [this, self = shared_from_this()](std::error_code ec, std::size_t bytesRead) {
-                                FDEBUG("ClientRead {} bytes", bytesRead);
                                 client2server.UpdateReadBuffer(bytesRead);
                                 Fundamental::ScopeGuard guard([this]() {
                                     StartClient2ServerWrite();
@@ -230,7 +228,6 @@ void TrafficProxyConnection::StartClient2ServerWrite()
     {
         proxy_socket_.async_write_some(client2server.GetWriteBuffer(),
                                        [this, self = shared_from_this()](std::error_code ec, std::size_t bytesWrite) {
-                                           FDEBUG("Client2ServerWrite {} bytes", bytesWrite);
                                            client2server.ClearWriteStatus();
                                            if (ec)
                                            {
@@ -255,7 +252,6 @@ void TrafficProxyConnection::StartServerRead()
     server2client.PrepareReadCache();
     proxy_socket_.async_read_some(server2client.GetReadBuffer(),
                                   [this, self = shared_from_this()](std::error_code ec, std::size_t bytesRead) {
-                                      FDEBUG("ServerRead {} bytes", bytesRead);
                                       server2client.UpdateReadBuffer(bytesRead);
                                       Fundamental::ScopeGuard guard([this]() {
                                           StartServer2ClientWrite();
