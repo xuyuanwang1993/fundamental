@@ -61,22 +61,34 @@ private:
         }
         else
         {
-            buf_slices_.emplace_back(asio::const_buffer(proxy_host_info.data(), proxy_host_info.size()));
-            asio::async_write(socket_, buf_slices_.front(), [this](std::error_code ec, std::size_t length) {
-                if (!ec)
-                {
-                    buf_slices_.pop_front();
+            do_proxy_handshake();
+        }
+    }
+    void do_proxy_handshake()
+    {
+        buf_slices_.emplace_back(asio::const_buffer(proxy_host_info.data(), proxy_host_info.size()));
+        asio::async_write(socket_, buf_slices_.front(), [this](std::error_code ec, std::size_t length) {
+            if (!ec)
+            {
+                buf_slices_.pop_front();
+                asio::async_read(socket_, asio::mutable_buffer(handshake, 2), [this](std::error_code ec, std::size_t length) {
+                    if (ec || strncmp(handshake, "ok", 2) != 0)
+                    {
+                        handle_disconnected(ec);
+                        return;
+                    }
                     if (!write_msgs_.empty())
                         do_write();
                     do_read_header();
-                }
-                else
-                {
-                    handle_disconnected(ec);
-                }
-            });
-        }
+                });
+            }
+            else
+            {
+                handle_disconnected(ec);
+            }
+        });
     }
+
     void do_connect(const tcp::resolver::results_type& endpoints)
     {
         asio::async_connect(socket_, endpoints,
@@ -240,6 +252,7 @@ private:
     std::deque<asio::const_buffer> buf_slices_;
     std::atomic<bool> is_connected = false;
     std::promise<void> connect_promise_;
+    char handshake[2];
 };
 
 } // namespace echo

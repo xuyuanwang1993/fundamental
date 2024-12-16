@@ -49,58 +49,45 @@ void TrafficProxyConnection::ProcessTrafficProxy()
     FINFO("start proxy {} {} {} -> {}:{}", request.proxyServiceName.ToString(),
           request.token.ToString(), request.field.ToString(), hostInfo.host.ToString(),
           hostInfo.service.ToString());
+    HandShake();
     StartDnsResolve(hostInfo.host.ToString(), hostInfo.service.ToString());
 }
 
 void TrafficProxyConnection::HandleDisconnect(asio::error_code ec, const std::string& callTag)
 {
-    HandleTrafficDataFinished(ec, callTag);
-    HandleProxyFinished(ec, callTag);
-    StopStatistics();
-}
-
-void TrafficProxyConnection::HandleTrafficDataFinished(asio::error_code ec, const std::string& callTag)
-{
-    if (status & TrafficClientConnected)
-        status ^= TrafficClientConnected;
-    if (status ^ TrafficClientClosed)
+    if (!callTag.empty())
+        FINFO("disconnect for {} -> ec:{}-{}", callTag, ec.category().name(), ec.message());
+    if (status & ClientProxying)
     {
-        status |= TrafficClientClosed;
-        socket_.close();
+        status ^= ClientProxying;
+        asio::error_code code;
+        socket_.close(code);
+        if (!callTag.empty())
+            FDEBUG("close proxy remote endpoint ");
     }
-
-    AbortCheck();
-}
-
-void TrafficProxyConnection::HandleProxyFinished(asio::error_code ec, const std::string& callTag)
-{
-    if (status & ProxyConnected)
-        status ^= ProxyConnected;
-    if (status ^ ProxyClosed)
+    if (status & CheckTimerHandling)
     {
-        status |= ProxyClosed;
-        proxy_socket_.close();
+        status ^= CheckTimerHandling;
+        checkTimer.cancel();
+        if (!callTag.empty())
+            FDEBUG("stop proxy statistics");
     }
     if (status & ProxyDnsResolving)
     {
         status ^= ProxyDnsResolving;
         resolver.cancel();
+        if (!callTag.empty())
+            FDEBUG("stop proxy dns resolving");
     }
-    AbortCheck();
-}
-
-void TrafficProxyConnection::AbortCheck()
-{
-    do
+    if ((status & ServerProxying) || (status & ServerConnecting))
     {
-        if ((status & ProxyConnected) && (status & TrafficClientConnected))
-            break;
-        if ((status & ProxyConnected) && passive_server_.isWriting)
-            break;
-        if ((status & TrafficClientConnected) && request_client_.isWriting)
-            break;
-        StopStatistics();
-    } while (0);
+        status &= (~ServerProxying);
+        status &= (~ServerConnecting);
+        asio::error_code code;
+        proxy_socket_.close(code);
+        if (!callTag.empty())
+            FDEBUG("close proxy local endpoint");
+    }
 }
 
 void TrafficProxyConnection::StartDnsResolve(const std::string& host, const std::string& service)
@@ -114,7 +101,7 @@ void TrafficProxyConnection::StartDnsResolve(const std::string& host, const std:
                                status ^= ProxyDnsResolving;
                                if (ec || result.empty())
                                {
-                                   HandleProxyFinished(ec, "dns resolve");
+                                   HandleDisconnect(ec, "dns resolve");
                                    return;
                                }
                                StartConnect(std::move(result));
@@ -128,20 +115,27 @@ void TrafficProxyConnection::StartConnect(asio::ip::tcp::resolver::results_type&
            result.begin()->service_name(),
            result.begin()->endpoint().address().to_string(),
            result.begin()->endpoint().port());
-    status |= ProxyConnecting;
+    status |= ServerConnecting;
     asio::async_connect(proxy_socket_, result,
                         [this, self = shared_from_this()](std::error_code ec, asio::ip::tcp::endpoint) {
-                            status ^= ProxyConnecting;
                             if (ec)
                             {
-                                HandleProxyFinished(ec, "connect");
+                                HandleDisconnect(ec, "connect");
                                 return;
                             }
+                            status ^= ServerConnecting;
+                            status |= ServerProxying;
                             asio::error_code error_code;
                             asio::ip::tcp::no_delay option(true);
                             proxy_socket_.set_option(option, error_code);
-                            status |= ProxyConnected;
-                            HandShake();
+                            StartServerRead();
+                            StartClient2ServerWrite();
+                            server2client.InitStatistics();
+                            if (s_trafficStatisticsIntervalSec > 0)
+                            {
+                                status |= CheckTimerHandling;
+                                DoStatistics();
+                            }
                         });
 }
 
@@ -153,124 +147,95 @@ void TrafficProxyConnection::HandShake()
                       [this, self = shared_from_this()](std::error_code ec, std::size_t bytesWrite) {
                           if (ec)
                           {
-                              HandleProxyFinished(ec, "HandShake");
+                              HandleDisconnect(ec, "HandShake");
                               return;
                           }
                           FDEBUG("handshake sucess");
-                          StartTrafficClientRead();
-                          StartProxyRead();
-                          request_client_.InitStatistics();
-                          passive_server_.InitStatistics();
-                          if (s_trafficStatisticsIntervalSec > 0)
-                          {
-                              status |= CheckTimerStarted;
-                              DoStatistics();
-                          }
                       });
+    StartClientRead();
+    client2server.InitStatistics();
 }
 
-void TrafficProxyConnection::StartTrafficWrite()
+void TrafficProxyConnection::StartServer2ClientWrite()
 {
-    if (status & TrafficClientClosed)
+    if (!(status & ClientProxying))
         return;
-    passive_server_.PrepareWriteCache();
-    if (passive_server_.isWriting)
+    server2client.PrepareWriteCache();
+    if (server2client.isWriting)
     {
-        socket_.async_write_some(passive_server_.GetWriteBuffer(),
+        socket_.async_write_some(server2client.GetWriteBuffer(),
                                  [this, self = shared_from_this()](std::error_code ec, std::size_t bytesWrite) {
                                      if (ec)
                                      {
-                                         HandleTrafficDataFinished(ec, "TrafficClientWrite");
+                                         HandleDisconnect(ec, "Server2ClientWrite");
                                          return;
                                      }
-                                     passive_server_.UpdateWriteBuffer(bytesWrite);
-                                     StartTrafficWrite();
+                                     server2client.UpdateWriteBuffer(bytesWrite);
+                                     StartServer2ClientWrite();
                                  });
-    }
-    else
-    {
-        if (status & ProxyClosed)
-        {
-            FDEBUG("traffic proxy finished");
-            HandleTrafficDataFinished({}, "");
-            StopStatistics();
-        }
     }
 }
 
-void TrafficProxyConnection::StartTrafficClientRead()
+void TrafficProxyConnection::StartClientRead()
 {
-    if (status & TrafficClientClosed)
-        return;
-    request_client_.PrepareReadCache();
-    socket_.async_read_some(request_client_.GetReadBuffer(),
+    client2server.PrepareReadCache();
+    socket_.async_read_some(client2server.GetReadBuffer(),
                             [this, self = shared_from_this()](std::error_code ec, std::size_t bytesRead) {
-                                request_client_.UpdateReadBuffer(bytesRead);
+                                client2server.UpdateReadBuffer(bytesRead);
                                 Fundamental::ScopeGuard guard([this]() {
-                                    StartProxyWrite();
+                                    StartClient2ServerWrite();
                                 });
 
                                 if (ec)
                                 {
-                                    HandleTrafficDataFinished(ec, "TrafficClientRead");
+                                    HandleDisconnect(ec, "ClientRead");
                                     return;
                                 }
-                                StartTrafficClientRead();
+                                StartClientRead();
                             });
 }
 
-void TrafficProxyConnection::StartProxyWrite()
+void TrafficProxyConnection::StartClient2ServerWrite()
 {
-    if (status & ProxyClosed)
+    if (!(status & ServerProxying))
         return;
-    request_client_.PrepareWriteCache();
-    if (request_client_.isWriting)
+    client2server.PrepareWriteCache();
+    if (client2server.isWriting)
     {
-        proxy_socket_.async_write_some(request_client_.GetWriteBuffer(),
+        proxy_socket_.async_write_some(client2server.GetWriteBuffer(),
                                        [this, self = shared_from_this()](std::error_code ec, std::size_t bytesWrite) {
                                            if (ec)
                                            {
-                                               HandleProxyFinished(ec, "ProxyWrite");
+                                               HandleDisconnect(ec, "StartClient2ServerWrite");
                                                return;
                                            }
-                                           request_client_.UpdateWriteBuffer(bytesWrite);
-                                           StartProxyWrite();
+                                           client2server.UpdateWriteBuffer(bytesWrite);
+                                           StartClient2ServerWrite();
                                        });
-    }
-    else
-    {
-        if (status & TrafficClientClosed)
-        {
-            FDEBUG("proxy finished");
-            HandleProxyFinished({}, "");
-            StopStatistics();
-        }
     }
 }
 
-void TrafficProxyConnection::StartProxyRead()
+void TrafficProxyConnection::StartServerRead()
 {
-    if (status & ProxyClosed)
-        return;
-    passive_server_.PrepareReadCache();
-    proxy_socket_.async_read_some(passive_server_.GetReadBuffer(),
+    server2client.PrepareReadCache();
+    proxy_socket_.async_read_some(server2client.GetReadBuffer(),
                                   [this, self = shared_from_this()](std::error_code ec, std::size_t bytesRead) {
-                                      passive_server_.UpdateReadBuffer(bytesRead);
+                                      server2client.UpdateReadBuffer(bytesRead);
                                       Fundamental::ScopeGuard guard([this]() {
-                                          StartTrafficWrite();
+                                          StartServer2ClientWrite();
                                       });
                                       if (ec)
                                       {
-                                          HandleProxyFinished(ec, "ProxyRead");
+                                          HandleDisconnect(ec, "ProxyRead");
                                           return;
                                       }
-                                      StartProxyRead();
+                                      StartServerRead();
                                   });
 }
 
 void TrafficProxyConnection::DoStatistics()
 {
-    if (!(status & CheckTimerStarted))
+    if (!(status & CheckTimerHandling))
         return;
     checkTimer.expires_after(asio::chrono::seconds(s_trafficStatisticsIntervalSec));
     checkTimer.async_wait([this, self = shared_from_this()](const std::error_code& e) {
@@ -279,19 +244,10 @@ void TrafficProxyConnection::DoStatistics()
             FERR("stop proxy statistics for reason:{}", e.message());
             return;
         }
-        request_client_.UpdateStatistics("client");
-        passive_server_.UpdateStatistics("proxy");
+        client2server.UpdateStatistics("client");
+        server2client.UpdateStatistics("proxy");
         DoStatistics();
     });
-}
-
-void TrafficProxyConnection::StopStatistics()
-{
-    if (status & CheckTimerStarted)
-    {
-        status ^= CheckTimerStarted;
-        checkTimer.cancel();
-    }
 }
 
 void TrafficProxyConnection::EndponitCacheStatus::PrepareWriteCache()

@@ -58,11 +58,6 @@ int main(int argc, char* argv[])
             std::string host = argv[1];
             std::string port = argv[2];
             tcp::resolver resolver(io_context);
-            if (::getenv("USE_TRAFFIC_PROXY"))
-            {
-                host = "0.0.0.0";
-                port = "4885";
-            }
 
             auto endpoints = resolver.resolve(host, port);
 
@@ -72,7 +67,7 @@ int main(int argc, char* argv[])
                 network::proxy::ProxyFrame frame_;
                 network::proxy::TrafficProxyRequest request;
                 request.proxyServiceName = "test_tcp";
-                request.field            = host;
+                request.field            = ::getenv("USE_TRAFFIC_PROXY");
                 request.token            = "test_tcp_token";
                 network::proxy::TrafficEncoder::EncodeProxyFrame(frame_, request);
                 auto buffers_ = frame_.ToAsioBuffers();
