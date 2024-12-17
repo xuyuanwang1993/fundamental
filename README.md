@@ -2,91 +2,121 @@
 
 fundamental kits for develper
 
-## Getting started
+# 目录结构
+```
+.
+├── .clang-format
+├── .gitignore
+├── .gitmodules
+├── CMakeLists.txt
+├── LICENSE.txt
+├── README.md
+├── build-linux     release 构建目录
+├── build-linux-debug debug构建目录
+├── cmake    cmake文件目录
+│   ├── TemplateLib.cmake.in  库导出模板
+│   ├── config-target.cmake   配置target的相关函数声明
+│   ├── import_gtest_config.cmake  gtest导入相关配置
+│   ├── lib-deploy.cmake    自定义库安装相关配置
+│   ├── platform.h.in   c++编译precompile头，可参考此文件的方式添加自己的预编译头
+│   └── reflect-helper.cmake 反射注册辅助函数
+├── samples   测试用例
+│   ├── CMakeLists.txt
+│   ├── GtestSample   gtest库导入测试
+│   ├── TestApplication application流程测试
+│   ├── TestAsio   asio库导入测试
+│   ├── TestBasic  c++环境测试
+│   ├── TestDelayQueue    定时器测试
+│   ├── TestEvents   事件测试
+│   ├── TestLog   日志测试
+│   ├── TestMemoryTracker  内存跟踪测试
+│   ├── TestParallel  并行单元测试
+│   ├── TestProxyServer   转发服务及客户端
+│   ├── TestRttr   rttr反射测试
+│   └── TestTrafficProxy  流量代理客户端
+├── test-gen-linux-debug.sh  debug版本构建脚本
+├── test-gen-linux.sh    release版本构建脚本
+└── third-parties 三方库源码目录
+    ├── CMakeLists.txt
+    ├── asio-source   
+    ├── eventpp-source   
+    ├── nlohmann-source
+    ├── rttr-source
+    └── spdlog-source
+./src/
+├── CMakeLists.txt
+├── fundamental   基础组件
+│   ├── CMakeLists.txt
+│   ├── application   应用程序启动流程标准化定义
+│   │   ├── application.cpp
+│   │   └── application.hpp
+│   ├── basic  
+│   │   ├── async_utils.hpp  异步相关
+│   │   ├── buffer.hpp  自定义buffer
+│   │   ├── log.cpp 
+│   │   ├── log.h   spdlog封装logger
+│   │   ├── parallel.cpp
+│   │   ├── parallel.hpp  并行封装,基于thread_pol
+│   │   ├── utils.cpp
+│   │   └── utils.hpp  常用的utils
+│   ├── delay_queue  定时器事件实现
+│   │   ├── delay_queue.cpp
+│   │   └── delay_queue.h
+│   ├── events   基于eventpp异步事件/同步信号定义
+│   │   ├── event.h
+│   │   ├── event_process.cpp
+│   │   ├── event_process.h 应用层事件/信号定义
+│   │   ├── event_system.cpp
+│   │   └── event_system.h  事件系统封装
+│   ├── rttr_handler  基于rttr及nlohmann-json的序列化实现
+│   │   ├── deserializer.cpp
+│   │   ├── deserializer.h   序列化
+│   │   ├── meta_control.cpp
+│   │   ├── meta_control.h  序列化反序列化流程控制
+│   │   ├── serializer.cpp
+│   │   └── serializer.h  反序列化
+│   ├── thread_pool  可取消等待中任务/提供future的线程池实现
+│   │   ├── thread_pool.cpp
+│   │   └── thread_pool.h
+│   └── tracker  
+│       └── memory_tracker.hpp  内存分配跟踪器基类
+└── network  基于asio的网络模块实现
+    ├── CMakeLists.txt
+    ├── server  
+    │   ├── basic_server.hpp  通用tcp服务器声明
+    │   ├── io_context_pool.cpp 
+    │   └── io_context_pool.hpp  asio-io-context-pool实现，基于thread_pool
+    └── services 基于basic_server的echo实例
+        ├── echo
+        └── proxy_server 多服务共用端口的server实现
+            ├── agent_service  数据存储/查询服务实现
+            ├── proxy_connection.cpp
+            ├── proxy_connection.hpp
+            ├── proxy_defines.h proxy数据格式定义
+            ├── proxy_encode.h  prxoy数据编码
+            ├── proxy_request_handler.cpp
+            ├── proxy_request_handler.hpp proxy数据处理
+            ├── readMe.md
+            └── traffic_proxy_service   流量代理服务实现
+```
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+# 构建
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+## 构建系统要求
+```
+ubuntu 22.04及以上
+cmake 3.22及以上
+g++9及以上
+c++17
+```
+## 编译
+```
+##release
+./test-gen-linux.sh
+cd ./build-linux && make -j8
 
-## Add your files
-
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/ee/gitlab-basics/add-file.html#add-a-file-using-the-command-line) or push an existing Git repository with the following command:
+##debug
+./test-gen-linux-debug.sh
+cd ./build-linux-debug && make -j8
 
 ```
-cd existing_repo
-git remote add origin http://192.168.50.101:8787/rdd/fh-fundamental.git
-git branch -M main
-git push -uf origin main
-```
-
-## Integrate with your tools
-
-- [ ] [Set up project integrations](http://192.168.50.101:8787/rdd/fh-fundamental/-/settings/integrations)
-
-## Collaborate with your team
-
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Automatically merge when pipeline succeeds](https://docs.gitlab.com/ee/user/project/merge_requests/merge_when_pipeline_succeeds.html)
-
-## Test and Deploy
-
-Use the built-in continuous integration in GitLab.
-
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/index.html)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing(SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
-
-***
-
-# Editing this README
-
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!).  Thank you to [makeareadme.com](https://www.makeareadme.com/) for this template.
-
-## Suggestions for a good README
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
-
-## Name
-Choose a self-explaining name for your project.
-
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
-
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
-
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
-
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
-
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
-
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
-
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
-
-## License
-For open source projects, say how it is licensed.
-
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
