@@ -24,7 +24,7 @@ source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${lib_source})
 add_library(${lib_name}_property INTERFACE)
 
 target_include_directories(${lib_name}_property INTERFACE
-${src_root_dir}
+    ${src_root_dir}
 )
 
 set_target_properties(${lib_name}_property PROPERTIES
@@ -38,25 +38,25 @@ target_link_libraries(${lib_name}_property INTERFACE
     asio
 )
 if(F_BUILD_STATIC)
-# Create the static library
-add_library(${lib_name}${STATIC_LIB_SUFFIX} STATIC ${lib_source})
+    # Create the static library
+    add_library(${lib_name}${STATIC_LIB_SUFFIX} STATIC ${lib_source})
 
-# Config link dependencies
-target_link_libraries(${lib_name}${STATIC_LIB_SUFFIX}
-    PUBLIC
-    ${lib_name}_property
-)
-add_library(${GLOB_NAMESPACE}${lib_name}${STATIC_LIB_SUFFIX} ALIAS ${lib_name}${STATIC_LIB_SUFFIX})
+    # Config link dependencies
+    target_link_libraries(${lib_name}${STATIC_LIB_SUFFIX}
+        PUBLIC
+        ${lib_name}_property
+    )
+    add_library(${GLOB_NAMESPACE}${lib_name}${STATIC_LIB_SUFFIX} ALIAS ${lib_name}${STATIC_LIB_SUFFIX})
 endif()
 
 if(F_BUILD_SHARED)
-# Create the shared library
-add_library(${lib_name} SHARED ${lib_source})
-# Config link dependencies
-target_link_libraries(${lib_name}
-    PUBLIC
-    ${lib_name}_property
-)
+    # Create the shared library
+    add_library(${lib_name} SHARED ${lib_source})
+    # Config link dependencies
+    target_link_libraries(${lib_name}
+        PUBLIC
+        ${lib_name}_property
+    )
 
-add_library(${GLOB_NAMESPACE}${lib_name} ALIAS ${lib_name})
+    add_library(${GLOB_NAMESPACE}${lib_name} ALIAS ${lib_name})
 endif()
