@@ -12,7 +12,10 @@ TrafficProxyConnection::TrafficProxyConnection(asio::ip::tcp::socket&& socket, P
 ProxeServiceBase(std::move(socket), std::move(frame)),
 proxy_socket_(socket_.get_executor()),
 resolver(socket_.get_executor()),
-checkTimer(socket_.get_executor(), asio::chrono::seconds(s_trafficStatisticsIntervalSec))
+checkTimer(socket_.get_executor(), asio::chrono::seconds(s_trafficStatisticsIntervalSec)),
+cachePool(Fundamental::MakePoolMemorySource()),
+client2server(cachePool),
+server2client(cachePool)
 {
 }
 

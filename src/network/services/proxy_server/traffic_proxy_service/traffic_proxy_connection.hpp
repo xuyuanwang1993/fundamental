@@ -1,11 +1,13 @@
 #pragma once
-#include "network/services/proxy_server/proxy_request_handler.hpp"
 #include "traffic_proxy_defines.h"
 
 #include <array>
 #include <asio.hpp>
 #include <deque>
 #include <memory>
+
+#include "fundamental/basic/allocator.hpp"
+#include "network/services/proxy_server/proxy_request_handler.hpp"
 namespace network
 {
 namespace proxy
@@ -25,7 +27,11 @@ class TrafficProxyConnection : public ProxeServiceBase, public std::enable_share
 
     struct EndponitCacheStatus
     {
-        std::deque<DataCahceItem> cache_;
+        explicit EndponitCacheStatus(decltype(Fundamental::MakePoolMemorySource()) dataSource) :
+        cache_(dataSource.get())
+        {
+        }
+        std::deque<DataCahceItem, Fundamental::AllocatorType<DataCahceItem>> cache_;
         bool isWriting = false;
         // Statistics
         std::size_t writeBytesNum = 0;
@@ -69,7 +75,7 @@ protected:
     explicit TrafficProxyConnection(asio::ip::tcp::socket&& socket, ProxyFrame&& frame);
     void Process();
     void ProcessTrafficProxy();
-    void HandleDisconnect(asio::error_code ec, const std::string& callTag = "",std::int32_t closeMask=TrafficProxyCloseAll);
+    void HandleDisconnect(asio::error_code ec, const std::string& callTag = "", std::int32_t closeMask = TrafficProxyCloseAll);
 
 protected:
     void StartDnsResolve(const std::string& host, const std::string& service);
@@ -87,6 +93,8 @@ protected:
     asio::steady_timer checkTimer;
     char handshakeBuf[2];
     std::int32_t status = ClientProxying;
+    //
+    decltype(Fundamental::MakePoolMemorySource()) cachePool;
     EndponitCacheStatus client2server;
     EndponitCacheStatus server2client;
 };
