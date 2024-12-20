@@ -24,3 +24,7 @@ if(IMPORT_GTEST)
 add_subdirectory(GtestSample)
 add_subdirectory(TestParallel)
 endif()
+
+if(IMPORT_BENCHMARK)
+add_subdirectory(BenchmarkSample)
+endif()
