@@ -33,7 +33,7 @@ endif()
 target_precompile_headers(BuildSettings INTERFACE "${CMAKE_CURRENT_LIST_DIR}/platform.h.in")
 
 target_compile_options(BuildSettings INTERFACE
-    "$<$<CONFIG:Debug>:-DDEBUG_MODE -O0 -Wall -g2 -ggdb>"
+    "$<$<CONFIG:Debug>:-DDEBUG_MODE -O0 -Wall -g2 -ggdb -fsanitize=address -fno-omit-frame-pointer>"
     "$<$<CONFIG:Release>:-DNDEBUG -O3 -Wall>"
 )
 
