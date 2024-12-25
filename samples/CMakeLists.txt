@@ -14,6 +14,7 @@ add_subdirectory(TestTrafficProxy)
 add_subdirectory(TestBasic)
 add_subdirectory(TestMemoryPool)
 add_subdirectory(TestApplication)
+add_subdirectory(TestTimerTracker)
 endif()
 
 if(F_BUILD_SHARED)
