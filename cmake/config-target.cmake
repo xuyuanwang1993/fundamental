@@ -2,10 +2,11 @@ if(__FUNDAMENTAL__)
     return()
 endif()
 set(__FUNDAMENTAL__ TRUE)
-
+include(clang-tidy-helper)
 option(F_BUILD_STATIC "build static fundamental lib" ON)
 option(F_BUILD_SHARED "build dynamic fundamental lib" OFF)
 option(ENABLE_DEBUG_MEMORY_TRACE "enable memory track" ON)
+option(CLANG_BUILD_WITH_STD_CXX "clang build with libstdc++" ON)
 
 set(RTTR_LIB RTTR::Core_Lib CACHE STRING "use rttr static lib")
 set(GLOB_NAMESPACE "fh::" CACHE STRING "generated lib namespace")
@@ -55,9 +56,12 @@ endif()
 
 set_target_properties(BuildSettings PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
+
+
 target_link_libraries(BuildSettings INTERFACE
     pthread
 )
+target_enable_clang_tidy(BuildSettings)
 
 function(add_plugin plugin_name)
     if(PLUGIN_USE_STATIC)
@@ -78,3 +82,23 @@ function(add_plugin plugin_name)
         PLUGIN_NAME= "${plugin_name}"
     )
 endfunction()
+
+#add specific compile options 
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    message(STATUS "use gnu compiler")
+    if(MINGW)
+        set(GNU_STATIC_LINKER_FLAGS "-static-libgcc -static-libstdc++ -static")
+    else()
+        set(GNU_STATIC_LINKER_FLAGS "-static-libgcc -static-libstdc++")
+    endif()
+elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    message(STATUS "use clang compiler")
+    add_compile_options(-Wno-implicit-const-int-float-conversion)
+    if(CLANG_BUILD_WITH_STD_CXX)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libstdc++")
+        set(CLANG_STATIC_LINKER_FLAGS "-stdlib=libstdc++ -static-libstdc++")
+    else()
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
+        set(CLANG_STATIC_LINKER_FLAGS "-stdlib=libc++ -static-libc++")
+    endif()
+endif()
