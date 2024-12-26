@@ -112,6 +112,11 @@ struct TimeTracker {
 };
 
 } // namespace Fundamental
+#if (defined(DEBUG) && !defined(NDEBUG))
+#pragma message("#####################ENABLE TIME TRACKER FOR DEBUG MODE####################")
+#elif defined(FORCE_TIME_TRACKER)
+#pragma message("#####################FORCE TIME TRACKER ####################")
+#endif
 
 #if (defined(DEBUG) && !defined(NDEBUG)) || defined(FORCE_TIME_TRACKER)
     #define DeclareTimeTacker(type, name, tag, msg, threshold, enable_debug, outputer)                                 \
