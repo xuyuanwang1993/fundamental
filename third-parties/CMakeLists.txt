@@ -9,7 +9,6 @@ add_subdirectory(eventpp-source)
 
 set(SPDLOG_BUILD_TESTING OFF)
 set(SPDLOG_BUILD_EXAMPLES OFF)
-set(CLANG_BUILD_WITH_STD_CXX ON)
 add_subdirectory(spdlog-source)
 
 set(BUILD_RTTR_DYNAMIC ON)

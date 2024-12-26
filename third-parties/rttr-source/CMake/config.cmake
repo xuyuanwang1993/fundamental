@@ -47,7 +47,7 @@ set(CMAKE_EXECUTABLE_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/bin")
 
 # here we specify the installation directory
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-  set(CMAKE_INSTALL_PREFIX "${PROJECT_BINARY_DIR}/install" CACHE PATH  "RTTR install prefix" FORCE)
+  set(CMAKE_INSTALL_PREFIX "${PROJECT_BINARY_DIR}/install" CACHE PATH "RTTR install prefix" FORCE)
 endif()
 
 # in order to group in visual studio the targets into solution filters
@@ -62,7 +62,7 @@ is_vs_based_build(VS_BUILD)
 # set all install directories for the targets
 if(UNIX)
   include(GNUInstallDirs)
-  set(RTTR_RUNTIME_INSTALL_DIR "${CMAKE_INSTALL_BINDIR}") 
+  set(RTTR_RUNTIME_INSTALL_DIR "${CMAKE_INSTALL_BINDIR}")
   set(RTTR_LIBRARY_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}")
   set(RTTR_ARCHIVE_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}")
   set(RTTR_FRAMEWORK_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}")
@@ -73,9 +73,9 @@ if(UNIX)
   set(RTTR_ADDITIONAL_FILES_INSTALL_DIR "${CMAKE_INSTALL_DATADIR}/rttr")
 
 elseif(WIN32)
-  set(RTTR_RUNTIME_INSTALL_DIR   "bin") 
-  set(RTTR_LIBRARY_INSTALL_DIR   "bin")
-  set(RTTR_ARCHIVE_INSTALL_DIR   "lib")
+  set(RTTR_RUNTIME_INSTALL_DIR "bin")
+  set(RTTR_LIBRARY_INSTALL_DIR "bin")
+  set(RTTR_ARCHIVE_INSTALL_DIR "lib")
   set(RTTR_FRAMEWORK_INSTALL_DIR "bin")
 
   set(RTTR_CMAKE_CONFIG_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/cmake")
@@ -86,11 +86,11 @@ endif()
 
 # to avoid a setting a global debug flag automatically for all targets
 # we use an own variable
-set(RTTR_DEBUG_POSTFIX "_d") 
+set(RTTR_DEBUG_POSTFIX "_d")
 
 # set the rpath for executables
-set(CMAKE_SKIP_BUILD_RPATH OFF)            # use, i.e. don't skip the full RPATH for the build tree
-set(CMAKE_BUILD_WITH_INSTALL_RPATH OFF)    # when building, don't use the install RPATH already (but later on when installing)
+set(CMAKE_SKIP_BUILD_RPATH OFF) # use, i.e. don't skip the full RPATH for the build tree
+set(CMAKE_BUILD_WITH_INSTALL_RPATH OFF) # when building, don't use the install RPATH already (but later on when installing)
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH OFF) # NO automatic rpath for INSTALL
 if(APPLE)
   set(MACOSX_RPATH ON CACHE STRING "Set this to off if you dont want @rpath in install names") # uses a install name @rpath/... for libraries
@@ -105,12 +105,12 @@ elseif(WIN32)
 endif()
 
 # detect architecture
-if (CMAKE_SIZEOF_VOID_P EQUAL 8)
-    set(RTTR_NATIVE_ARCH 64)
-    message(STATUS "Architecture: x64")
+if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+  set(RTTR_NATIVE_ARCH 64)
+  message(STATUS "Architecture: x64")
 else()
-    set(RTTR_NATIVE_ARCH 32)
-    message(STATUS "Architecture: x86")
+  set(RTTR_NATIVE_ARCH 32)
+  message(STATUS "Architecture: x86")
 endif()
 
 # use standard c++ insteaf of extented (-std=c++17 vs. std=gnu++17)
@@ -128,7 +128,7 @@ message(STATUS "using C++: ${MAX_CXX_STANDARD}")
 if(MSVC)
   set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELEASE}")
   set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /Zi /DEBUG")
-elseif(CMAKE_COMPILER_IS_GNUCXX )
+elseif(CMAKE_COMPILER_IS_GNUCXX)
   set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELEASE}")
   set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -g")
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -139,38 +139,42 @@ else()
 endif()
 
 if(MSVC)
-    # we have to remove the default warning level,
-    # otherwise we get ugly compiler warnings, because of later replacing 
-    # option /W3 with /W4 (which will be later added)
-    replace_compiler_option("/W3" " ") 
-    if (BUILD_WITH_STATIC_RUNTIME_LIBS)
-        replace_compiler_option("/MD" " ")
-        replace_compiler_option("/MDd" " ")
-    endif()
-   
+  # we have to remove the default warning level,
+  # otherwise we get ugly compiler warnings, because of later replacing 
+  # option /W3 with /W4 (which will be later added)
+  replace_compiler_option("/W3" " ")
+  if(BUILD_WITH_STATIC_RUNTIME_LIBS)
+    replace_compiler_option("/MD" " ")
+    replace_compiler_option("/MDd" " ")
+  endif()
+
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    if(MINGW)
-        set(GNU_STATIC_LINKER_FLAGS "-static-libgcc -static-libstdc++ -static")
-    else()
-        set(GNU_STATIC_LINKER_FLAGS "-static-libgcc -static-libstdc++")
-    endif()
+  if(MINGW)
+    set(GNU_STATIC_LINKER_FLAGS "-static-libgcc -static-libstdc++ -static")
+  else()
+    set(GNU_STATIC_LINKER_FLAGS "-static-libgcc -static-libstdc++")
+  endif()
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    set(CLANG_STATIC_LINKER_FLAGS "-stdlib=libc++ -static-libstdc++")
+  if(CLANG_BUILD_WITH_STD_CXX)
+    set(CLANG_STATIC_LINKER_FLAGS "-stdlib=libstdc++ -static-libstdc++")
+  else()
+    set(CLANG_STATIC_LINKER_FLAGS "-stdlib=libc++ -static-libc++")
+  endif()
 endif()
 
 include(CMakePackageConfigHelpers)
 write_basic_package_version_file(
-    "${CMAKE_CURRENT_BINARY_DIR}/CMake/rttr-config-version.cmake"
-    VERSION ${RTTR_VERSION_STR}
-    COMPATIBILITY AnyNewerVersion
+  "${CMAKE_CURRENT_BINARY_DIR}/CMake/rttr-config-version.cmake"
+  VERSION ${RTTR_VERSION_STR}
+  COMPATIBILITY AnyNewerVersion
 )
 
-if (BUILD_INSTALLER)
-    install(FILES "${CMAKE_CURRENT_BINARY_DIR}/CMake/rttr-config-version.cmake"
-            DESTINATION ${RTTR_CMAKE_CONFIG_INSTALL_DIR}
-            COMPONENT Devel)
+if(BUILD_INSTALLER)
+  install(FILES "${CMAKE_CURRENT_BINARY_DIR}/CMake/rttr-config-version.cmake"
+    DESTINATION ${RTTR_CMAKE_CONFIG_INSTALL_DIR}
+    COMPONENT Devel)
 
-    install(FILES "${LICENSE_FILE}" "${README_FILE}"
-            DESTINATION ${RTTR_ADDITIONAL_FILES_INSTALL_DIR}
-            PERMISSIONS OWNER_READ GROUP_READ WORLD_READ)
+  install(FILES "${LICENSE_FILE}" "${README_FILE}"
+    DESTINATION ${RTTR_ADDITIONAL_FILES_INSTALL_DIR}
+    PERMISSIONS OWNER_READ GROUP_READ WORLD_READ)
 endif()
