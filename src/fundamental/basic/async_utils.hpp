@@ -2,12 +2,10 @@
 #include <future>
 #include <memory>
 
-namespace Fundamental
-{
+namespace Fundamental {
 
 template <typename T>
-inline decltype(auto) MakeSharedPromise()
-{
+inline decltype(auto) MakeSharedPromise() {
     return std::make_shared<std::promise<T>>();
 }
 } // namespace Fundamental

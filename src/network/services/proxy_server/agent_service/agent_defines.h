@@ -5,37 +5,32 @@
 #include <unordered_map>
 
 #include "network/services/proxy_server/proxy_defines.h"
-namespace network
-{
-namespace proxy
-{
+namespace network {
+namespace proxy {
 constexpr std::uint8_t kAgentOpcode = 0;
-enum AgentCode : std::int32_t
-{
+enum AgentCode : std::int32_t {
     AgentSuccess = 0,
     AgentFailed  = 1,
 };
 
 using AgentSizeType = ProxySizeType;
 using AgentDataType = Fundamental::Buffer<AgentSizeType>;
-struct AgentEntryInfo
-{
+struct AgentEntryInfo {
     std::int64_t timestamp = 0;
     AgentDataType data;
 };
-using AgentItemMap = std::unordered_map<AgentDataType /*section*/, AgentEntryInfo, Fundamental::BufferHash<AgentSizeType>>;
-using AgentMap     = std::unordered_map<AgentDataType /*id*/, AgentItemMap, Fundamental::BufferHash<AgentSizeType>>;
+using AgentItemMap =
+    std::unordered_map<AgentDataType /*section*/, AgentEntryInfo, Fundamental::BufferHash<AgentSizeType>>;
+using AgentMap = std::unordered_map<AgentDataType /*id*/, AgentItemMap, Fundamental::BufferHash<AgentSizeType>>;
 
 // network
-struct AgentRequestFrame
-{
+struct AgentRequestFrame {
     AgentDataType cmd;
     std::int32_t version = 0;
     AgentDataType payload;
 };
 
-struct AgentResponseFrame
-{
+struct AgentResponseFrame {
     AgentDataType cmd;
     std::int32_t code = AgentSuccess;
     AgentDataType msg;
@@ -43,22 +38,16 @@ struct AgentResponseFrame
 };
 
 // api payload
-struct AgentDummyRequest
-{
-};
+struct AgentDummyRequest {};
 
-struct AgentDummyResponse
-{
-};
+struct AgentDummyResponse {};
 
-enum AgentUpdateOperation : std::uint32_t
-{
+enum AgentUpdateOperation : std::uint32_t {
     AgentUpdateSetValueOp,
     AgentUpdateRemoveValueOp
 };
 
-struct AgentUpdateRequest
-{
+struct AgentUpdateRequest {
     static constexpr const char* kCmd = "update";
     AgentDataType id;
     AgentDataType section;
@@ -68,27 +57,22 @@ struct AgentUpdateRequest
 
 using AgentUpdateResponse = AgentDummyResponse;
 
-struct AgentQueryRequest
-{
+struct AgentQueryRequest {
     static constexpr const char* kCmd = "query";
     AgentDataType id;
     AgentDataType section;
     std::int32_t max_query_wait_time_sec = 0;
 };
 
-struct AgentQueryResponse : AgentEntryInfo
-{
-};
+struct AgentQueryResponse : AgentEntryInfo {};
 
-struct AgentSniffRequest
-{
+struct AgentSniffRequest {
     static constexpr const char* kCmd        = "sniff";
     static constexpr const char* kLoopbackIp = "127.0.0.1";
     static constexpr const char* kPreferEth  = "eth0";
 };
 
-struct AgentSniffResponse
-{
+struct AgentSniffResponse {
     AgentDataType host;
 };
 } // namespace proxy

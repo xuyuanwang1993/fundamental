@@ -8,28 +8,22 @@
 
 #include "fundamental/basic/allocator.hpp"
 #include "network/services/proxy_server/proxy_request_handler.hpp"
-namespace network
-{
-namespace proxy
-{
-class TrafficProxyConnection : public ProxeServiceBase, public std::enable_shared_from_this<TrafficProxyConnection>
-{
+namespace network {
+namespace proxy {
+class TrafficProxyConnection : public ProxeServiceBase, public std::enable_shared_from_this<TrafficProxyConnection> {
     inline static constexpr std::size_t kCacheBufferSize     = 32 * 1024; // 32k
     inline static constexpr std::size_t kMinPerReadSize      = 1200;
     inline static std::size_t s_trafficStatisticsIntervalSec = 2;
     using DataCacheType                                      = std::array<std::uint8_t, kCacheBufferSize>;
-    struct DataCahceItem
-    {
+    struct DataCahceItem {
         DataCacheType data;
         std::size_t readOffset  = 0;
         std::size_t writeOffset = 0;
     };
 
-    struct EndponitCacheStatus
-    {
+    struct EndponitCacheStatus {
         explicit EndponitCacheStatus(decltype(Fundamental::MakePoolMemorySource()) dataSource) :
-        cache_(dataSource.get())
-        {
+        cache_(dataSource.get()) {
         }
         std::deque<DataCahceItem, Fundamental::AllocatorType<DataCahceItem>> cache_;
         bool isWriting = false;
@@ -51,8 +45,7 @@ class TrafficProxyConnection : public ProxeServiceBase, public std::enable_share
         void InitStatistics();
         void UpdateStatistics(const std::string& tag);
     };
-    enum TrafficProxyStatusMask : std::int32_t
-    {
+    enum TrafficProxyStatusMask : std::int32_t {
         ClientProxying                        = (1 << 0),
         CheckTimerHandling                    = (1 << 1),
         ProxyDnsResolving                     = (1 << 2),
@@ -66,8 +59,7 @@ class TrafficProxyConnection : public ProxeServiceBase, public std::enable_share
 public:
     void SetUp() override;
     ~TrafficProxyConnection();
-    static std::shared_ptr<TrafficProxyConnection> MakeShared(asio::ip::tcp::socket&& socket, ProxyFrame&& frame)
-    {
+    static std::shared_ptr<TrafficProxyConnection> MakeShared(asio::ip::tcp::socket&& socket, ProxyFrame&& frame) {
         return std::shared_ptr<TrafficProxyConnection>(new TrafficProxyConnection(std::move(socket), std::move(frame)));
     }
 
@@ -75,7 +67,8 @@ protected:
     explicit TrafficProxyConnection(asio::ip::tcp::socket&& socket, ProxyFrame&& frame);
     void Process();
     void ProcessTrafficProxy();
-    void HandleDisconnect(asio::error_code ec, const std::string& callTag = "", std::int32_t closeMask = TrafficProxyCloseAll);
+    void HandleDisconnect(asio::error_code ec, const std::string& callTag = "",
+                          std::int32_t closeMask = TrafficProxyCloseAll);
 
 protected:
     void StartDnsResolve(const std::string& host, const std::string& service);

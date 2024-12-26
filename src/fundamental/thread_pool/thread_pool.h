@@ -28,41 +28,34 @@
 #include <queue> //priority_queue
 #include <thread>
 #include <vector>
-namespace Fundamental
-{
+namespace Fundamental {
 template <typename _Callable, typename... _Args>
 using invoke_future_t = std::future<std::invoke_result_t<_Callable, _Args...>>;
 using clock_t         = std::chrono::steady_clock;
 
-enum ThreadPoolType : std::int32_t
-{
+enum ThreadPoolType : std::int32_t {
     ShortTimeThreadPool = 0,
     LongTimeThreadPool  = 1,
     BlockTimeThreadPool = 2,
     PrallelThreadPool   = 3
 };
 
-enum ThreadPoolTaskStatus : std::uint32_t
-{
+enum ThreadPoolTaskStatus : std::uint32_t {
     ThreadTaskWaitting,
     ThreadTaskRunning,
     ThreadTaskDone,
     ThreadTaskCancelled
 };
 
-struct ThreadPoolTaskStatusSyncerWarpper
-{
+struct ThreadPoolTaskStatusSyncerWarpper {
     std::atomic<ThreadPoolTaskStatus> status = ThreadTaskWaitting;
 };
 
 template <typename _Callable, typename... _Args>
-struct ThreadPoolTaskToken
-{
-    bool CancelTask()
-    {
+struct ThreadPoolTaskToken {
+    bool CancelTask() {
         ThreadPoolTaskStatus old = status->status.load();
-        if (status->status.compare_exchange_strong(old, ThreadTaskCancelled))
-        {
+        if (status->status.compare_exchange_strong(old, ThreadTaskCancelled)) {
             return true;
         }
         return false;
@@ -71,27 +64,22 @@ struct ThreadPoolTaskToken
     invoke_future_t<_Callable, _Args...> resultFuture;
 };
 
-class ThreadPool final
-{
-    struct Task
-    {
+class ThreadPool final {
+    struct Task {
         clock_t::time_point time;
         std::function<void()> func = nullptr;
         std::shared_ptr<ThreadPoolTaskStatusSyncerWarpper> status;
-        bool operator>(const Task& other) const
-        {
+        bool operator>(const Task& other) const {
             return time > other.time;
         }
-        bool operator<(const Task& other) const
-        {
+        bool operator<(const Task& other) const {
             return time < other.time;
         }
     };
 
 public:
     template <std::int32_t Index = ShortTimeThreadPool>
-    static ThreadPool& Instance()
-    {
+    static ThreadPool& Instance() {
         // Init handles joining on cleanup
         static ThreadPool* instance = new ThreadPool(Index);
         return *instance;
@@ -109,39 +97,31 @@ public:
     bool RunOne();
 
     template <typename _Callable, typename... _Args>
-    auto Enqueue(_Callable&& f, _Args&&... args) -> ThreadPoolTaskToken<_Callable, _Args...>
-    {
+    auto Enqueue(_Callable&& f, _Args&&... args) -> ThreadPoolTaskToken<_Callable, _Args...> {
         return Schedule(clock_t::now(), std::forward<_Callable>(f), std::forward<_Args>(args)...);
     }
 
     template <typename _Callable, typename... _Args>
-    auto Schedule(clock_t::duration delay, _Callable&& f, _Args&&... args) -> ThreadPoolTaskToken<_Callable, _Args...>
-    {
+    auto Schedule(clock_t::duration delay, _Callable&& f, _Args&&... args) -> ThreadPoolTaskToken<_Callable, _Args...> {
         return Schedule(clock_t::now() + delay, std::forward<_Callable>(f), std::forward<_Args>(args)...);
     }
 
     template <typename _Callable, typename... _Args>
-    auto Schedule(clock_t::time_point time, _Callable&& f, _Args&&... args) -> ThreadPoolTaskToken<_Callable, _Args...>
-    {
+    auto Schedule(clock_t::time_point time, _Callable&& f, _Args&&... args)
+        -> ThreadPoolTaskToken<_Callable, _Args...> {
 
         using R      = std::invoke_result_t<_Callable, _Args...>;
         auto promise = std::make_shared<std::promise<R>>();
         auto bound   = std::bind(std::forward<_Callable>(f), std::forward<_Args>(args)...);
         auto task    = [bound, promise]() {
-            try
-            {
-                if constexpr (std::is_same_v<R, void>)
-                {
+            try {
+                if constexpr (std::is_same_v<R, void>) {
                     bound();
                     promise->set_value();
-                }
-                else
-                {
+                } else {
                     promise->set_value(bound());
                 }
-            }
-            catch (const std::exception& e)
-            {
+            } catch (const std::exception& e) {
                 promise->set_exception(std::make_exception_ptr(e));
             }
         };
@@ -156,9 +136,7 @@ public:
     bool InThreadPool();
 
 protected:
-    ThreadPool(std::int32_t type = ThreadPoolType::ShortTimeThreadPool) :
-    type(type)
-    {
+    ThreadPool(std::int32_t type = ThreadPoolType::ShortTimeThreadPool) : type(type) {
     }
     ~ThreadPool();
 

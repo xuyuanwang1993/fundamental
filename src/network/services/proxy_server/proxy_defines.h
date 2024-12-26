@@ -7,17 +7,15 @@
 #include "fundamental/basic/log.h"
 #include <asio.hpp>
 
-namespace network
-{
-namespace proxy
-{
+namespace network {
+namespace proxy {
 
 using ProxySizeType                     = std::uint64_t;
 static constexpr std::size_t kProxySize = sizeof(ProxySizeType);
 /// @note when we update proxyfram's structure or encoder,we should update proxy_encode.h
-struct ProxyFrame
-{
-    static constexpr std::size_t kHeaderSize     = 2 /*fixed*/ + 1 /*checkSum*/ + 2 + 4 /*mask*/ + kProxySize /*payloadLen*/;
+struct ProxyFrame {
+    static constexpr std::size_t kHeaderSize =
+        2 /*fixed*/ + 1 /*checkSum*/ + 2 + 4 /*mask*/ + kProxySize /*payloadLen*/;
     static constexpr std::uint16_t kFixed        = 0x6668;
     static constexpr std::uint8_t kVersion       = 0x01;
     static constexpr ProxySizeType kMaxFrameSize = 512 * 1024; // 512k
@@ -26,8 +24,7 @@ struct ProxyFrame
     // version should be 0x01
     std::uint8_t version = kVersion;
     std::uint8_t op      = 0x00;
-    union
-    {
+    union {
         std::uint8_t data[4];
         std::uint32_t v;
     } mask;
@@ -35,8 +32,7 @@ struct ProxyFrame
     Fundamental::Buffer<ProxySizeType> payload;
     // functions
 
-    std::vector<asio::const_buffer> ToAsioBuffers()
-    {
+    std::vector<asio::const_buffer> ToAsioBuffers() {
         std::vector<asio::const_buffer> ret;
         ret.push_back(asio::const_buffer(&fixed, 2));
         ret.push_back(asio::const_buffer(&checkSum, 1));
@@ -51,8 +47,7 @@ struct ProxyFrame
 
 // a sample for payload
 
-struct PayloadFrameHeader
-{
+struct PayloadFrameHeader {
     using SizeType                           = ProxySizeType;
     static constexpr std::size_t kSizeCount  = sizeof(SizeType);
     static constexpr std::size_t kHeaderSize = kSizeCount * 4;
@@ -62,8 +57,7 @@ struct PayloadFrameHeader
     SizeType binarySize;
 };
 
-struct PayloadFrame
-{
+struct PayloadFrame {
     using SizeType                             = PayloadFrameHeader::SizeType;
     using BinaryType                           = std::vector<std::uint8_t>;
     static constexpr std::size_t kMaxFrameSize = 1024LLU * 1024 * 1024 * 4; // 8G
@@ -71,42 +65,33 @@ struct PayloadFrame
     std::string cmd;
     std::string description;
     BinaryType binaryData;
-    std::size_t size() const
-    {
-        return PayloadFrameHeader::kHeaderSize +
-               cmd.size() +
-               description.size() +
-               binaryData.size();
+    std::size_t size() const {
+        return PayloadFrameHeader::kHeaderSize + cmd.size() + description.size() + binaryData.size();
     }
-    static bool ReadFrameHeader(PayloadFrameHeader& header, std::uint8_t* data, std::size_t dataLen)
-    {
+    static bool ReadFrameHeader(PayloadFrameHeader& header, std::uint8_t* data, std::size_t dataLen) {
         Fundamental::BufferReader<SizeType> reader;
         reader.SetBuffer(data, dataLen);
-        try
-        {
+        try {
             reader.ReadValue(&header.totalSize);
             reader.ReadValue(&header.cmdSize);
             reader.ReadValue(&header.descriptionSize);
             reader.ReadValue(&header.binarySize);
-            if (header.totalSize != (PayloadFrameHeader::kHeaderSize + header.cmdSize + header.descriptionSize + header.binarySize))
-            {
+            if (header.totalSize !=
+                (PayloadFrameHeader::kHeaderSize + header.cmdSize + header.descriptionSize + header.binarySize)) {
                 FDEBUG("payload size not matched");
                 return false;
             }
             return true;
-        }
-        catch (const std::exception& e)
-        {
+        } catch (const std::exception& e) {
             return false;
         }
     }
 
-    static bool DecodeFrame(PayloadFrame& frame, const PayloadFrameHeader& header, std::uint8_t* data, std::size_t dataLen)
-    {
+    static bool DecodeFrame(PayloadFrame& frame, const PayloadFrameHeader& header, std::uint8_t* data,
+                            std::size_t dataLen) {
         Fundamental::BufferReader<SizeType> reader;
         reader.SetBuffer(data, dataLen);
-        try
-        {
+        try {
             frame.cmd.resize(header.cmdSize);
             frame.description.resize(header.descriptionSize);
             frame.binaryData.resize(header.binarySize);
@@ -114,16 +99,13 @@ struct PayloadFrame
             reader.ReadValue(frame.description.data(), header.descriptionSize);
             reader.ReadValue(frame.binaryData.data(), header.binarySize);
             return true;
-        }
-        catch (const std::exception& e)
-        {
+        } catch (const std::exception& e) {
             return false;
         }
     }
 };
 
-struct PayloadFrameEncodeView
-{
+struct PayloadFrameEncodeView {
     explicit PayloadFrameEncodeView(PayloadFrame& frame) :
     frame(frame)
 
@@ -134,8 +116,7 @@ struct PayloadFrameEncodeView
         header.binarySize      = htole64(static_cast<PayloadFrame::SizeType>(frame.binaryData.size()));
     }
 
-    std::vector<asio::const_buffer> ToAsioBuffers()
-    {
+    std::vector<asio::const_buffer> ToAsioBuffers() {
         std::vector<asio::const_buffer> ret;
         ret.push_back(asio::const_buffer(&header.totalSize, PayloadFrameHeader::kSizeCount));
         ret.push_back(asio::const_buffer(&header.cmdSize, PayloadFrameHeader::kSizeCount));
@@ -153,27 +134,21 @@ struct PayloadFrameEncodeView
 
 } // namespace proxy
 
-namespace error
-{
-enum class proxy_errors : std::int32_t
-{
+namespace error {
+enum class proxy_errors : std::int32_t {
     request_aborted      = -1,
     read_header_failed   = 0,
     read_payload_failed  = 1,
     parse_payload_failed = 2
 };
 
-class proxy_category : public std::error_category, public Fundamental::Singleton<proxy_category>
-{
+class proxy_category : public std::error_category, public Fundamental::Singleton<proxy_category> {
 public:
-    const char* name() const noexcept override
-    {
+    const char* name() const noexcept override {
         return "network.proxy";
     }
-    std::string message(int value) const override
-    {
-        switch (static_cast<proxy_errors>(value))
-        {
+    std::string message(int value) const override {
+        switch (static_cast<proxy_errors>(value)) {
         case proxy_errors::request_aborted: return "request aborted";
         case proxy_errors::read_header_failed: return "read header failed";
         case proxy_errors::read_payload_failed: return "read payload failed";
@@ -183,10 +158,8 @@ public:
     }
 };
 
-inline std::error_code make_error_code(proxy_errors e)
-{
-    return std::error_code(
-        static_cast<int>(e), proxy_category::Instance());
+inline std::error_code make_error_code(proxy_errors e) {
+    return std::error_code(static_cast<int>(e), proxy_category::Instance());
 }
 
 } // namespace error

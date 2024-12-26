@@ -7,55 +7,33 @@
 #include <string_view>
 #include <type_traits>
 
-namespace Fundamental
-{
+namespace Fundamental {
 
 template <typename T, typename... Types>
-struct is_one_of : std::disjunction<std::is_same<T, Types>...>
-{
-};
+struct is_one_of : std::disjunction<std::is_same<T, Types>...> {};
 template <typename T>
-inline constexpr bool check_support_chrono_v = is_one_of<T, std::chrono::nanoseconds,
-                                                         std::chrono::microseconds,
-                                                         std::chrono::milliseconds,
-                                                         std::chrono::seconds,
-                                                         std::chrono::minutes,
-                                                         std::chrono::hours>::value;
+inline constexpr bool check_support_chrono_v =
+    is_one_of<T, std::chrono::nanoseconds, std::chrono::microseconds, std::chrono::milliseconds, std::chrono::seconds,
+              std::chrono::minutes, std::chrono::hours>::value;
 
 template <typename ChronoTimeType_>
-struct TimeTrackerUnit
-{
+struct TimeTrackerUnit {
     using ChronoTimeType = ChronoTimeType_;
-    static std::string_view Unit()
-    {
-        static_assert(check_support_chrono_v<ChronoTimeType>,
-                      "unsupport type for cplusplus 17");
-        if constexpr (std::is_same_v<ChronoTimeType_, std::chrono::nanoseconds>)
-        {
+    static std::string_view Unit() {
+        static_assert(check_support_chrono_v<ChronoTimeType>, "unsupport type for cplusplus 17");
+        if constexpr (std::is_same_v<ChronoTimeType_, std::chrono::nanoseconds>) {
             return "ns";
-        }
-        else if constexpr (std::is_same_v<ChronoTimeType_, std::chrono::microseconds>)
-        {
+        } else if constexpr (std::is_same_v<ChronoTimeType_, std::chrono::microseconds>) {
             return "us";
-        }
-        else if constexpr (std::is_same_v<ChronoTimeType_, std::chrono::milliseconds>)
-        {
+        } else if constexpr (std::is_same_v<ChronoTimeType_, std::chrono::milliseconds>) {
             return "ms";
-        }
-        else if constexpr (std::is_same_v<ChronoTimeType_, std::chrono::seconds>)
-        {
+        } else if constexpr (std::is_same_v<ChronoTimeType_, std::chrono::seconds>) {
             return "s";
-        }
-        else if constexpr (std::is_same_v<ChronoTimeType_, std::chrono::minutes>)
-        {
+        } else if constexpr (std::is_same_v<ChronoTimeType_, std::chrono::minutes>) {
             return "min";
-        }
-        else if constexpr (std::is_same_v<ChronoTimeType_, std::chrono::hours>)
-        {
+        } else if constexpr (std::is_same_v<ChronoTimeType_, std::chrono::hours>) {
             return "h";
-        }
-        else
-        {
+        } else {
             return "";
         }
     }
@@ -64,106 +42,61 @@ struct TimeTrackerUnit
 using TimeTrackerMsgOutputer = std::function<void(const std::string_view&)>;
 
 template <typename ChronoTimeType_ = std::chrono::milliseconds>
-struct TimeTracker
-{
+struct TimeTracker {
     using ChronoTimeType = ChronoTimeType_;
     using UnitHelper     = TimeTrackerUnit<ChronoTimeType_>;
-    explicit TimeTracker(std::string_view tag,
-                         std::string_view msg,
-                         std::int64_t warningThreshold   = 0,
-                         bool enable_debug               = false,
-                         TimeTrackerMsgOutputer outputer = nullptr) :
+    explicit TimeTracker(std::string_view tag, std::string_view msg, std::int64_t warningThreshold = 0,
+                         bool enable_debug = false, TimeTrackerMsgOutputer outputer = nullptr) :
     warningThreshold(warningThreshold),
-    enable_debug(enable_debug),
-    outputer(outputer),
-    tag(tag),
-    msg(msg)
-    {
+    enable_debug(enable_debug), outputer(outputer), tag(tag), msg(msg) {
         ReStartTracker();
     }
-    ~TimeTracker()
-    {
+    ~TimeTracker() {
         StopTracker();
     }
-    void ReStartTracker()
-    {
+    void ReStartTracker() {
         m_previousTime = std::chrono::high_resolution_clock::now();
         need_print_.exchange(true);
-        if (enable_debug)
-        {
+        if (enable_debug) {
             std::stringstream ss;
-            ss << "timetracker [start "
-               << tag
-               << " threshold:"
-               << warningThreshold
-               << " "
-               << UnitHelper::Unit()
-               << "] "
+            ss << "timetracker [start " << tag << " threshold:" << warningThreshold << " " << UnitHelper::Unit() << "] "
                << msg;
             // c++20 can return a string_view
             auto pMsg = ss.str();
             if (outputer)
                 outputer(pMsg);
-            else
-            {
+            else {
                 std::cout << pMsg << std::endl;
             }
         }
     }
 
-    void StopTracker()
-    {
+    void StopTracker() {
         bool expected = true;
-        if (need_print_.compare_exchange_strong(expected, false))
-        {
+        if (need_print_.compare_exchange_strong(expected, false)) {
             auto elapsedTime       = std::chrono::high_resolution_clock::now() - m_previousTime;
             std::int64_t time_diff = std::chrono::duration_cast<ChronoTimeType>(elapsedTime).count();
             double elapsedTimeSec  = std::chrono::duration_cast<std::chrono::duration<double>>(elapsedTime).count();
             std::string print_str;
-            if (time_diff > warningThreshold)
-            {
+            if (time_diff > warningThreshold) {
                 std::stringstream ss;
-                ss << "timetracker [warn "
-                   << tag << " "
-                   << time_diff
-                   << UnitHelper::Unit()
-                   << "{"
-                   << elapsedTimeSec
-                   << TimeTrackerUnit<std::chrono::seconds>::Unit()
-                   << "}"
-                   << ">"
-                   << warningThreshold
-                   << UnitHelper::Unit()
-                   << "] "
-                   << msg;
+                ss << "timetracker [warn " << tag << " " << time_diff << UnitHelper::Unit() << "{" << elapsedTimeSec
+                   << TimeTrackerUnit<std::chrono::seconds>::Unit() << "}"
+                   << ">" << warningThreshold << UnitHelper::Unit() << "] " << msg;
+                // c++20 can return a string_view
+                print_str = ss.str();
+            } else if (enable_debug) {
+                std::stringstream ss;
+                ss << "timetracker [finish " << tag << " " << time_diff << UnitHelper::Unit() << "{" << elapsedTimeSec
+                   << TimeTrackerUnit<std::chrono::seconds>::Unit() << "}"
+                   << "<" << warningThreshold << UnitHelper::Unit() << "] " << msg;
                 // c++20 can return a string_view
                 print_str = ss.str();
             }
-            else if (enable_debug)
-            {
-                std::stringstream ss;
-                ss << "timetracker [finish "
-                   << tag << " "
-                   << time_diff
-                   << UnitHelper::Unit()
-                   << "{"
-                   << elapsedTimeSec
-                   << TimeTrackerUnit<std::chrono::seconds>::Unit()
-                   << "}"
-                   << "<"
-                   << warningThreshold
-                   << UnitHelper::Unit()
-                   << "] "
-                   << msg;
-                // c++20 can return a string_view
-                print_str = ss.str();
-            }
-            if (!print_str.empty())
-            {
+            if (!print_str.empty()) {
                 if (outputer)
                     outputer(print_str);
-                else
-                {
+                else {
                     std::cout << print_str << std::endl;
                 }
             }
@@ -181,7 +114,7 @@ struct TimeTracker
 } // namespace Fundamental
 
 #if (defined(DEBUG) && !defined(NDEBUG)) || defined(FORCE_TIME_TRACKER)
-    #define DeclareTimeTacker(type, name, tag, msg, threshold, enable_debug, outputer) \
+    #define DeclareTimeTacker(type, name, tag, msg, threshold, enable_debug, outputer)                                 \
         type name(tag, msg, threshold, enable_debug, outputer)
     #define RestartTimeTracker(name) name.ReStartTracker()
     #define StopTimeTracker(name)    name.StopTracker()

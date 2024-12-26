@@ -4,15 +4,12 @@
 #include <functional>
 #include <limits>
 #include <mutex>
-namespace Fundamental
-{
-class Timer 
-{
+namespace Fundamental {
+class Timer {
 
 public:
     // Type of time scales
-    enum class TimeScale : std::uint8_t
-    {
+    enum class TimeScale : std::uint8_t {
         Second = 0,
         Millisecond
     };
@@ -30,22 +27,21 @@ public:
 
     // GetTimestamp from 1970
     template <class ChronoTimeType = std::chrono::milliseconds, typename ClockType = std::chrono::steady_clock>
-    inline static std::int64_t GetTimeNow()
-    {
+    inline static std::int64_t GetTimeNow() {
         auto timePoint = ClockType::now();
         return std::chrono::duration_cast<ChronoTimeType>(timePoint.time_since_epoch()).count();
     }
 
     static std::string GetTimeStr(const char* format = "%F %T");
     // t should be convert to seconds
-    static std::string ToTimeStr(std::time_t t,const char* format = "%F %T");
+    static std::string ToTimeStr(std::time_t t, const char* format = "%F %T");
+
 private:
     std::chrono::high_resolution_clock::time_point m_previousTime;
     mutable std::mutex m_timePointMutex;
 };
 
-class  DelayQueue
-{
+class DelayQueue {
     struct Imp;
 
 public:
@@ -62,7 +58,8 @@ public:
      * autoManager : when delay task is stopped, it will be released
      * Notice! task won't start automatically
      */
-    HandleType AddDelayTask(std::int64_t intervalMs, const TaskType& task, bool isSingle = false, bool autoManager = true);
+    HandleType AddDelayTask(std::int64_t intervalMs, const TaskType& task, bool isSingle = false,
+                            bool autoManager = true);
     /*
      * start a delay task
      * return false when handle is invalid
@@ -109,8 +106,8 @@ public:
     void HandleEvent();
 
     /*
-    * this callback will be called when delay queue has been modified
-    */
+     * this callback will be called when delay queue has been modified
+     */
     void SetStateChangedCallback(const std::function<void()>& cb);
 
 public:

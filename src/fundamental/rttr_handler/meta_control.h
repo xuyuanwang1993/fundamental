@@ -7,17 +7,15 @@
 #include <string>
 #include <string_view>
 
-namespace Fundamental
-{
+namespace Fundamental {
 using RttrControlMetaDataType = std::set<std::string>;
-struct RttrMetaControlOption
-{
+struct RttrMetaControlOption {
     RttrControlMetaDataType excludeDatas;
     RttrControlMetaDataType includeDatas;
     static std::string ExcludeMetaDataKey();
     static std::string IncludeMetaDataKey();
     static bool HasInterSection(const RttrControlMetaDataType& data1, const RttrControlMetaDataType& data2);
-    bool ValidateSerialize(const rttr::property &prop) const;
+    bool ValidateSerialize(const rttr::property& prop) const;
 };
 
 using RttrSerializeOption   = RttrMetaControlOption;

@@ -5,24 +5,21 @@
 #include "eventpp/eventqueue.h"
 #include <functional>
 #include <set>
-namespace Fundamental
-{
-using EQ              = eventpp::EventQueue<EventType, void(const EventPointerType&), EventPolicy>;
-using EventHandleType = decltype(std::declval<EQ>().appendListener(std::declval<EventType>(), std::declval<EventCallbackType>()));
+namespace Fundamental {
+using EQ = eventpp::EventQueue<EventType, void(const EventPointerType&), EventPolicy>;
+using EventHandleType =
+    decltype(std::declval<EQ>().appendListener(std::declval<EventType>(), std::declval<EventCallbackType>()));
 //---------------------------------------------------------------//
-struct InternalNotifyQueuedEvent : Fundamental::Event
-{
+struct InternalNotifyQueuedEvent : Fundamental::Event {
     // an event must contain 'kEventType' field;
-    constexpr inline static std::size_t kEventType = ComputeEventHash(0, "InternalNotifyQueuedEvent", "InternalNotifyQueuedEvent", "internal") | 1;
+    constexpr inline static std::size_t kEventType =
+        ComputeEventHash(0, "InternalNotifyQueuedEvent", "InternalNotifyQueuedEvent", "internal") | 1;
 
-    InternalNotifyQueuedEvent() :
-    Event(kEventType)
-    {
+    InternalNotifyQueuedEvent() : Event(kEventType) {
     }
 };
 
-class EventSystem
-{
+class EventSystem {
 public:
     EventSystem()          = default;
     virtual ~EventSystem() = default;
@@ -34,7 +31,8 @@ public:
      * this function must be called in this module inited thread
      * return the proceed events nums
      */
-    std::size_t EventsTick(std::size_t maxProcessEventNums = static_cast<std::size_t>(~0), std::uint32_t maxProcessTimeMsec = 20);
+    std::size_t EventsTick(std::size_t maxProcessEventNums  = static_cast<std::size_t>(~0),
+                           std::uint32_t maxProcessTimeMsec = 20);
 
     /*
      * throw std::invalid_argument when the eventHash is existed
@@ -73,8 +71,7 @@ protected:
  */
 
 template <typename EventDataType, typename... Args>
-inline decltype(auto) EventSystem::DispatcherImmediateEvent(Args&&... args)
-{
+inline decltype(auto) EventSystem::DispatcherImmediateEvent(Args&&... args) {
     return m_syncer.dispatch(std::make_shared<EventDataType>(std::forward<Args>(args)...));
 }
 
@@ -84,36 +81,28 @@ inline decltype(auto) EventSystem::DispatcherImmediateEvent(Args&&... args)
  */
 
 template <typename EventDataType, typename... Args>
-inline decltype(auto) EventSystem::DispatcherEvent(Args&&... args)
-{
+inline decltype(auto) EventSystem::DispatcherEvent(Args&&... args) {
     EventSystem::template DispatcherImmediateEvent<InternalNotifyQueuedEvent>();
     return m_syncer.enqueue(std::make_shared<EventDataType>(std::forward<Args>(args)...));
 }
 
-template <
-    typename Prototype,
-    typename PoliciesType>
+template <typename Prototype, typename PoliciesType>
 class SignalBase;
 
 // callbacklist wapper class
-template <
-    typename PoliciesType,
-    typename ReturnType, typename... Args>
-class SignalBase<
-    ReturnType(Args...),
-    PoliciesType>
-{
+template <typename PoliciesType, typename ReturnType, typename... Args>
+class SignalBase<ReturnType(Args...), PoliciesType> {
 public:
-    using Callback_ = typename eventpp::internal_::SelectCallback<
-        PoliciesType,
-        eventpp::internal_::HasTypeCallback<PoliciesType>::value,
-        std::function<ReturnType(Args...)>>::Type;
+    using Callback_ =
+        typename eventpp::internal_::SelectCallback<PoliciesType,
+                                                    eventpp::internal_::HasTypeCallback<PoliciesType>::value,
+                                                    std::function<ReturnType(Args...)>>::Type;
     using HandleType = typename eventpp::CallbackList<ReturnType(Args...), PoliciesType>::Handle;
 
 public:
     /// @brief bind excutors for this signal
     /// @param callback  the excutor function
-    /// @param append_mode true means the excutor will be append to the process deque tail,false means the excutor 
+    /// @param append_mode true means the excutor will be append to the process deque tail,false means the excutor
     /// will be add to the process deque top
     /// @return the handle which can be used to cancel the excutor binding
     HandleType Connect(const Callback_& callback, bool append_mode = true);
@@ -126,41 +115,31 @@ private:
 };
 
 template <typename PoliciesType, typename ReturnType, typename... Args>
-inline typename SignalBase<ReturnType(Args...), PoliciesType>::HandleType SignalBase<ReturnType(Args...), PoliciesType>::Connect(const Callback_& callback, bool append_mode)
-{
-    if (append_mode)
-    {
+inline typename SignalBase<ReturnType(Args...), PoliciesType>::HandleType SignalBase<
+    ReturnType(Args...), PoliciesType>::Connect(const Callback_& callback, bool append_mode) {
+    if (append_mode) {
         return _connections.append(callback);
-    }
-    else
-    {
+    } else {
         return _connections.prepend(callback);
     }
 }
 
 template <typename PoliciesType, typename ReturnType, typename... Args>
-inline bool SignalBase<ReturnType(Args...), PoliciesType>::DisConnect(HandleType handle)
-{
+inline bool SignalBase<ReturnType(Args...), PoliciesType>::DisConnect(HandleType handle) {
     return _connections.remove(handle);
 }
 
 template <typename PoliciesType, typename ReturnType, typename... Args>
-inline void SignalBase<ReturnType(Args...), PoliciesType>::Emit(Args... args)
-{
+inline void SignalBase<ReturnType(Args...), PoliciesType>::Emit(Args... args) {
     _connections(std::forward<Args>(args)...);
 }
 
 template <typename PoliciesType, typename ReturnType, typename... Args>
-inline void SignalBase<ReturnType(Args...), PoliciesType>::operator()(Args... args)
-{
+inline void SignalBase<ReturnType(Args...), PoliciesType>::operator()(Args... args) {
     _connections(std::forward<Args>(args)...);
 }
 
-template <
-    typename Prototype_,
-    typename Policies_ = eventpp::DefaultPolicies>
-class Signal : public SignalBase<Prototype_, Policies_>
-{
-};
+template <typename Prototype_, typename Policies_ = eventpp::DefaultPolicies>
+class Signal : public SignalBase<Prototype_, Policies_> {};
 
 } // namespace Fundamental

@@ -2,26 +2,23 @@
 #include "agent_defines.h"
 #include "network/services/proxy_server/proxy_request_handler.hpp"
 #include <memory>
-namespace network
-{
-namespace proxy
-{
+namespace network {
+namespace proxy {
 // restful
-class AgentConnection : public ProxeServiceBase, public std::enable_shared_from_this<AgentConnection>
-{
+class AgentConnection : public ProxeServiceBase, public std::enable_shared_from_this<AgentConnection> {
 public:
     struct details;
     friend struct details;
 
 public:
     using CmdHandlerType = std::function<void(AgentRequestFrame&, std::shared_ptr<AgentConnection>)>;
-    inline static std::unordered_map<AgentDataType, CmdHandlerType, Fundamental::BufferHash<AgentSizeType>> cmd_handlers;
+    inline static std::unordered_map<AgentDataType, CmdHandlerType, Fundamental::BufferHash<AgentSizeType>>
+        cmd_handlers;
 
 public:
     void SetUp() override;
     ~AgentConnection();
-    static std::shared_ptr<AgentConnection> MakeShared(asio::ip::tcp::socket&& socket, ProxyFrame&& frame)
-    {
+    static std::shared_ptr<AgentConnection> MakeShared(asio::ip::tcp::socket&& socket, ProxyFrame&& frame) {
         return std::shared_ptr<AgentConnection>(new AgentConnection(std::move(socket), std::move(frame)));
     }
 

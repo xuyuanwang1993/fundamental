@@ -6,50 +6,43 @@
 #include <functional>
 #include <map>
 #include <mutex>
-namespace network
-{
-namespace proxy
-{
-namespace rpc
-{
-struct AgentResponse
-{
+namespace network {
+namespace proxy {
+namespace rpc {
+struct AgentResponse {
     std::int32_t code;
     std::string msg;
     std::vector<std::uint8_t> data;
 };
 using AgentClientToken      = std::intptr_t;
 using AgentFinishedCallback = std::function<void(bool, AgentClientToken, AgentResponse&&)>;
-struct AgentUpdateContext
-{
+struct AgentUpdateContext {
     std::string host;
     std::string service;
     AgentUpdateRequest request;
     AgentFinishedCallback cb;
 };
 
-struct AgentQueryContext
-{
+struct AgentQueryContext {
     std::string host;
     std::string service;
     AgentQueryRequest request;
     AgentFinishedCallback cb;
 };
 
-struct AgentSniffContext
-{
+struct AgentSniffContext {
     std::string host;
     std::string service;
     AgentSniffRequest request;
     AgentFinishedCallback cb;
 };
 
-class AgentClient
-{
+class AgentClient {
 public:
     struct AgentSession;
     struct AgentHandler;
     friend struct AgentHandler;
+
 public:
     AgentClient();
     ~AgentClient();
@@ -58,6 +51,7 @@ public:
     AgentClientToken Update(const AgentUpdateContext& context);
     AgentClientToken Query(const AgentQueryContext& context);
     AgentClientToken Sniff(const AgentSniffContext& context);
+
 protected:
     std::mutex mutex_;
     std::map<AgentClientToken, std::weak_ptr<AgentSession>> sessions_;

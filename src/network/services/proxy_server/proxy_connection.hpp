@@ -11,23 +11,17 @@
 
 #include "fundamental/events/event_system.h"
 
-namespace network
-{
-namespace proxy
-{
+namespace network {
+namespace proxy {
 
 /// Represents a single Connection from a client.
-class Connection
-: public ConnectionInterface<ProxyRequestHandler>,
-  public std::enable_shared_from_this<Connection>
-{
+class Connection : public ConnectionInterface<ProxyRequestHandler>, public std::enable_shared_from_this<Connection> {
     static constexpr std::size_t kMaxRecvRequestFrameTimeSec = 30;
     friend struct ProxyRequestHandler;
 
 public:
     /// Construct a Connection with the given socket.
-    explicit Connection(asio::ip::tcp::socket socket,
-                        ProxyRequestHandler& handler);
+    explicit Connection(asio::ip::tcp::socket socket, ProxyRequestHandler& handler);
     ~Connection();
     /// Start the first asynchronous operation for the Connection.
     void Start() override;
@@ -47,19 +41,18 @@ private:
 
 using ProxyServer = network::Server<Connection, ProxyRequestHandler>;
 
-class ClientSession : public std::enable_shared_from_this<ClientSession>
-{
+class ClientSession : public std::enable_shared_from_this<ClientSession> {
 public:
     // this signals will not be blocked
     Fundamental::Signal<void()> DnsResloveStarted;
-    Fundamental::Signal<void(const asio::error_code& ec, const asio::ip::tcp::resolver::results_type& result)> DnsResloveFinished;
+    Fundamental::Signal<void(const asio::error_code& ec, const asio::ip::tcp::resolver::results_type& result)>
+        DnsResloveFinished;
     Fundamental::Signal<void(const asio::ip::tcp::resolver::results_type& endpoint)> ConnectStarted;
     Fundamental::Signal<void(const std::error_code& ec, const asio::ip::tcp::endpoint& endpoint)> ConnectFinished;
 
 public:
     /// @note you should ensure all clientsession instance was be managered by std::shared_ptr
-    static decltype(auto) MakeShared(const std::string& host, const std::string& service)
-    {
+    static decltype(auto) MakeShared(const std::string& host, const std::string& service) {
         return std::shared_ptr<ClientSession>(new ClientSession(host, service));
     }
     /// @brief start client session task
@@ -72,6 +65,7 @@ public:
     void AcquireInitLocker();
     /// @brief call this function when you have done all initialization operations
     void ReleaseInitLocker();
+
 protected:
     virtual void StartDnsResolve();
     virtual void FinishDnsResolve(asio::error_code ec, asio::ip::tcp::resolver::results_type result);
@@ -85,6 +79,7 @@ protected:
     /// @brief return true means session operation has already been aborted,it will call HandelFailed
     /// with an error code request_aborted
     virtual bool AbortCheckPoint();
+
 protected:
     explicit ClientSession(const std::string& host, const std::string& service);
 

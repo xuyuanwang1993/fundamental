@@ -1,4 +1,4 @@
----
+Language: Cpp
 BasedOnStyle: Microsoft
 Standard: Cpp11
 
@@ -8,14 +8,16 @@ AlignConsecutiveMacros: true
 AlignAfterOpenBracket: Align
 AlignConsecutiveAssignments: true
 AllowShortCaseLabelsOnASingleLine: true
+BreakBeforeBraces: Attach
+AllowShortIfStatementsOnASingleLine: true
 
-IncludeBlocks:                        Preserve
-IndentPPDirectives:                   BeforeHash
-IndentWidth:                          4
-SpacesBeforeTrailingComments:         1
+IncludeBlocks: Preserve
+IndentPPDirectives: BeforeHash
+IndentWidth: 4
+SpacesBeforeTrailingComments: 1
 
 AlignOperands: Align 
-AlwaysBreakTemplateDeclarations: Yes
+AlwaysBreakTemplateDeclarations: true 
 BraceWrapping:
   AfterCaseLabel: true
   AfterUnion: true
@@ -24,6 +26,5 @@ BreakConstructorInitializers: AfterColon
 Cpp11BracedListStyle: false
 PointerBindsToType: true
 SpaceBeforeCpp11BracedList: true
-ColumnLimit: 0
-ConstructorInitializerIndentWidth:    0
-...
+ColumnLimit: 120  
+ConstructorInitializerIndentWidth: 0

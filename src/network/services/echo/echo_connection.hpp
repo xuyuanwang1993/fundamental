@@ -5,43 +5,34 @@
 #include <deque>
 #include <memory>
 #include <vector>
-namespace network
-{
-namespace echo
-{
+namespace network {
+namespace echo {
 
-struct EchoMsg
-{
+struct EchoMsg {
 
     static constexpr std::size_t kHeaderSize    = sizeof(std::uint32_t);
     static constexpr std::size_t kTimeStampSize = 8;
-    union
-    {
+    union {
         std::uint8_t data[kHeaderSize];
         std::uint32_t v;
     } header;
     std::vector<std::uint8_t> msg;
-    std::int64_t& TimeStamp()
-    {
+    std::int64_t& TimeStamp() {
         return *((std::int64_t*)msg.data());
     }
-    std::uint8_t* Data()
-    {
+    std::uint8_t* Data() {
         return msg.data() + kTimeStampSize;
     }
-    std::size_t Size()
-    {
+    std::size_t Size() {
         return msg.size() - kTimeStampSize;
     }
 
     void Dump();
 };
 
-struct MsgContext
-{
+struct MsgContext {
 
-    enum
-    {
+    enum {
         PaserFinished,
         PaserFailed,
         PaserWaitSize,
@@ -54,38 +45,31 @@ struct MsgContext
     bool IsWaitSize();
 };
 
-struct EchoRequestHandler
-{
+struct EchoRequestHandler {
     static void Process(const MsgContext& req, EchoMsg& reply);
     static void ProcessFailed(const std::string& msg, EchoMsg& reply);
 };
 
-struct Paser
-{
+struct Paser {
     static constexpr std::size_t kMaxMsgSize = 2048;
     static decltype(MsgContext::status) PaserRequest(MsgContext& msgContext, std::size_t dataLen);
 };
 
-struct Builder
-{
+struct Builder {
     static std::vector<asio::const_buffer> ToAsioBuffers(EchoMsg& reply);
 };
 
 /// Represents a single connection from a client.
-class connection
-:public ConnectionInterface<EchoRequestHandler>,  public std::enable_shared_from_this<connection>
-{
+class connection : public ConnectionInterface<EchoRequestHandler>, public std::enable_shared_from_this<connection> {
 public:
     static constexpr std::size_t kPerReadMaxBytes = 16;
 
 public:
-
     /// Construct a connection with the given socket.
-    explicit connection(asio::ip::tcp::socket socket,
-                        EchoRequestHandler& handler);
+    explicit connection(asio::ip::tcp::socket socket, EchoRequestHandler& handler);
 
     /// Start the first asynchronous operation for the connection.
-    void Start()override;
+    void Start() override;
 
 private:
     void handle_close();
@@ -101,6 +85,6 @@ private:
 
 typedef std::shared_ptr<connection> connection_ptr;
 
-using EchoServer=network::Server<connection,EchoRequestHandler>;
+using EchoServer = network::Server<connection, EchoRequestHandler>;
 } // namespace echo
 } // namespace network

@@ -17,37 +17,30 @@
  */
 #include "thread_pool.h"
 #include "fundamental/basic/utils.hpp"
-namespace Fundamental
-{
-bool ThreadPool::InThreadPool()
-{
+namespace Fundamental {
+bool ThreadPool::InThreadPool() {
     std::unique_lock<std::mutex> lock(m_workersMutex);
-    return std::any_of(m_workers.begin(), m_workers.end(), [](const std::thread& t) -> bool {
-        return t.get_id() == std::this_thread::get_id();
-    });
+    return std::any_of(m_workers.begin(), m_workers.end(),
+                       [](const std::thread& t) -> bool { return t.get_id() == std::this_thread::get_id(); });
 }
 
-ThreadPool::~ThreadPool()
-{
+ThreadPool::~ThreadPool() {
     Join();
 }
 
-std::size_t ThreadPool::Count() const
-{
+std::size_t ThreadPool::Count() const {
     std::unique_lock<std::mutex> lock(m_workersMutex);
     return m_workers.size();
 }
 
-void ThreadPool::Spawn(int count)
-{
+void ThreadPool::Spawn(int count) {
     std::unique_lock<std::mutex> lock(m_workersMutex);
     m_joining = false;
     while (count-- > 0)
         m_workers.emplace_back(std::bind(&ThreadPool::Run, this, m_workers.size()));
 }
 
-void ThreadPool::Join()
-{
+void ThreadPool::Join() {
     std::unique_lock<std::mutex> lock(m_workersMutex);
     m_joining = true;
     m_condition.notify_all();
@@ -58,21 +51,16 @@ void ThreadPool::Join()
     m_workers.clear();
 }
 
-void ThreadPool::Run(std::size_t index)
-{
+void ThreadPool::Run(std::size_t index) {
     Fundamental::Utils::SetThreadName("thp_" + std::to_string(type) + "_" + std::to_string(index));
-    while (RunOne())
-    {
+    while (RunOne()) {
     }
 }
 
-bool ThreadPool::RunOne()
-{
+bool ThreadPool::RunOne() {
     auto task = Dequeue();
-    if (task.func)
-    {
-        if (task.status->status.load() == ThreadPoolTaskStatus::ThreadTaskCancelled)
-            return true;
+    if (task.func) {
+        if (task.status->status.load() == ThreadPoolTaskStatus::ThreadTaskCancelled) return true;
         task.status->status.exchange(ThreadPoolTaskStatus::ThreadTaskRunning);
         task.func();
         task.status->status.exchange(ThreadPoolTaskStatus::ThreadTaskDone);
@@ -81,29 +69,21 @@ bool ThreadPool::RunOne()
     return false;
 }
 
-ThreadPool::Task ThreadPool::Dequeue()
-{
+ThreadPool::Task ThreadPool::Dequeue() {
     std::unique_lock<std::mutex> lock(m_tasksMutex);
-    while (true)
-    {
-        if (!m_tasks.empty())
-        {
-            if (m_tasks.top().time <= clock_t::now())
-            {
+    while (true) {
+        if (!m_tasks.empty()) {
+            if (m_tasks.top().time <= clock_t::now()) {
                 ThreadPool::Task task = m_tasks.top();
                 m_tasks.pop();
                 return task;
             }
 
-            if (m_joining)
-                break;
+            if (m_joining) break;
 
             m_condition.wait_until(lock, m_tasks.top().time);
-        }
-        else
-        {
-            if (m_joining)
-                break;
+        } else {
+            if (m_joining) break;
 
             m_condition.wait(lock);
         }

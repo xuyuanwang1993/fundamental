@@ -7,11 +7,9 @@
 #include "fundamental/thread_pool/thread_pool.h"
 #include <atomic>
 #include <type_traits>
-namespace Fundamental
-{
+namespace Fundamental {
 
-struct ApplicationInterface
-{
+struct ApplicationInterface {
     constexpr ApplicationInterface() = default;
     virtual ~ApplicationInterface();
     virtual bool Load(int argc, char** argv);
@@ -20,8 +18,7 @@ struct ApplicationInterface
     virtual void Exit();
 };
 
-class Application : public EventsHandlerNormal, public Singleton<Application>
-{
+class Application : public EventsHandlerNormal, public Singleton<Application> {
 public:
     Signal<void(int, char**)> loadStarted;
     Signal<void(bool)> loadFinished;
@@ -34,41 +31,33 @@ public:
 
 public:
     void OverlayApplication(std::shared_ptr<ApplicationInterface>&& newImp);
-    bool Load(int argc, char** argv)
-    {
+    bool Load(int argc, char** argv) {
         loadStarted.Emit(argc, argv);
         bool ret = imp ? imp->Load(argc, argv) : true;
         loadFinished.Emit(ret);
         return ret;
     }
-    bool Init()
-    {
+    bool Init() {
         initStarted.Emit();
         bool ret = imp ? imp->Init() : true;
         initFinished.Emit(ret);
         return ret;
     }
-    void Loop()
-    {
+    void Loop() {
         Fundamental::Utils::SetThreadName("main_loop");
         loopStarted.Emit();
         bRunning.exchange(true);
-        while (bRunning)
-        {
-            if (imp)
-                imp->Tick();
+        while (bRunning) {
+            if (imp) imp->Tick();
             Tick();
         }
         loopFinished.Emit();
     }
-    void Exit()
-    {
+    void Exit() {
         bool expectedValue = true;
         exitStarted.Emit();
-        if (!bRunning.compare_exchange_strong(expectedValue, false))
-            return;
-        if (imp)
-            imp->Exit();
+        if (!bRunning.compare_exchange_strong(expectedValue, false)) return;
+        if (imp) imp->Exit();
         WakeUp();
         exitFinished.Emit();
     }

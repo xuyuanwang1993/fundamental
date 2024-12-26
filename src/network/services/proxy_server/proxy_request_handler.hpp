@@ -7,13 +7,10 @@
 #include <memory>
 
 #include "fundamental/basic/utils.hpp"
-namespace network
-{
-namespace proxy
-{
+namespace network {
+namespace proxy {
 class Connection;
-struct ProxeServiceBase : public Fundamental::NonCopyable
-{
+struct ProxeServiceBase : public Fundamental::NonCopyable {
     explicit ProxeServiceBase(asio::ip::tcp::socket&& socket, ProxyFrame&& frame);
     virtual ~ProxeServiceBase();
     // this function will be called in ProxyRequestHandler::UpgradeProtocal
@@ -23,10 +20,10 @@ struct ProxeServiceBase : public Fundamental::NonCopyable
     ProxyFrame frame;
 };
 
-class ProxyRequestHandler
-{
+class ProxyRequestHandler {
 public:
-    using ProtocalHandler = std::function<std::shared_ptr<ProxeServiceBase>(asio::ip::tcp::socket&& socket, ProxyFrame&& frame)>;
+    using ProtocalHandler =
+        std::function<std::shared_ptr<ProxeServiceBase>(asio::ip::tcp::socket&& socket, ProxyFrame&& frame)>;
     static bool DecodeHeader(const std::uint8_t* data, std::size_t len, ProxyFrame& dstFrame);
     static bool DecodePayload(ProxyFrame& dstFrame);
     static void EncodeFrame(ProxyFrame& dstFrame);
@@ -35,6 +32,7 @@ public:
     /// notice:opcode 0 and op code 1 were defined internal
     /// you should use other opcode otherwise an exception will be thrown
     void RegisterProtocal(std::uint8_t opCode, ProtocalHandler handler);
+
 private:
     std::map<std::uint8_t, ProxyRequestHandler::ProtocalHandler> handlers_;
 };
