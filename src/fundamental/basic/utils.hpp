@@ -1,9 +1,11 @@
 #ifndef _HEAD_BASIC_UTILS_
 #define _HEAD_BASIC_UTILS_
 #include <chrono>
+#include <cstddef>
 #include <functional>
 #include <string>
 #include <unordered_map>
+
 namespace Fundamental {
 
 struct NonCopyable {
@@ -33,16 +35,25 @@ struct ScopeGuard final : NonCopyable {
 template <typename T>
 struct Singleton : NonCopyable, NonMovable {
     static T& Instance() {
-        static T instance;
-        return instance;
+        // notice we can't use a value type here
+        // sometimes we will access another static instance to release some runtime resources
+        //  or access a logger instance
+        //  when we access another static instance in the desturct function,
+        // The memory access safety of this behavior cannot be guaranteed
+        static T* instance = new T();
+        return *instance;
     };
 
 protected:
     Singleton() {
     }
+    ~Singleton() {
+    }
 };
 
 namespace Utils {
+using fpid_t = std::uint32_t;
+fpid_t GetProcessId();
 void SetThreadName(const std::string& name);
 std::string BufferToHex(const void* buffer, std::size_t size);
 std::string BufferDumpAscii(const void* buffer, std::size_t size);

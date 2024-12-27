@@ -1,5 +1,7 @@
 #include "log.h"
+#include "filesystem_utils.hpp"
 #include "utils.hpp"
+
 #include <condition_variable>
 #include <filesystem>
 #include <future>
@@ -9,6 +11,7 @@
 #include <memory>
 #include <thread>
 #include <unordered_map>
+
 #if TARGET_PLATFORM_WINDOWS
     #include "spdlog/sinks/windebug_sink.h"
     #include <windows.h>
@@ -21,26 +24,10 @@
 namespace Fundamental {
 namespace details {
 struct CalcFileNameHelper;
-class NativeLogSink;
-static LogLevel s_minimumLevel                         = LogLevel::trace;
-static std::string s_customLoggerName                  = "logger";
-static std::string s_logOutputPath                     = "logs";
-static std::string s_logOutputProgramName              = "";
-static std::string s_logOutputFileExt                  = ".log";
-static std::string s_logFormat                         = "%^%Y-%m-%d %H:%M:%S.%e %l%$ [thread:%t]: %v ";
-static std::int32_t s_rotationHour                     = 23;
-static std::int32_t s_rotationMin                      = 0;
-static std::size_t s_logFileLimitSize                  = 10 * 1024 * 1024; // 10M
-static std::shared_ptr<NativeLogSink> s_nativeLogSink  = nullptr;
-static ErrorHandlerType s_errorHandler                 = nullptr;
-static LogMessageCatchFunc s_catchHandler              = nullptr;
-static std::shared_ptr<spdlog::logger> s_loggerStorage = spdlog::stdout_color_st("console");
-static std::shared_ptr<spdlog::pattern_formatter> s_formatterStorage =
-    std::make_shared<spdlog::pattern_formatter>("%v", spdlog::pattern_time_type::local, "");
 struct LogGuard {
     LogGuard() { // default init
-        spdlog::set_level(static_cast<spdlog::level::level_enum>(details::s_minimumLevel));
-        spdlog::set_pattern(details::s_logFormat);
+        spdlog::set_level(spdlog::level::level_enum::trace);
+        spdlog::set_pattern(Logger::LoggerInitOptions::kDefaultLogFormat);
     }
     ~LogGuard() {
         Logger::Release();
@@ -63,13 +50,17 @@ void PrepareLogdir(const std::string& logPath) {
 class NativeLogSink SPDLOG_FINAL : public spdlog::sinks::base_sink<spdlog::details::null_mutex> {
 public:
     // create daily file sink which rotates on given time
-    NativeLogSink(filename_t base_filename, int rotation_hour, int rotation_minute, std::size_t logFileLimitSize) :
-    m_baseFilename(std::move(base_filename)), m_logFileLimitSize(logFileLimitSize), m_rotationH(rotation_hour),
-    m_rotationM(rotation_minute) {
+    NativeLogSink(Logger* logger, filename_t base_filename, int rotation_hour, int rotation_minute,
+                  std::size_t logFileLimitSize, std::int64_t logFileMaxExistedSec) :
+    loggerRef(logger), m_baseFilename(std::move(base_filename)), m_logFileLimitSize(logFileLimitSize),
+    m_logFileMaxExistedSec(logFileMaxExistedSec), m_rotationH(rotation_hour), m_rotationM(rotation_minute) {
         if (rotation_hour < 0 || rotation_hour > 23 || rotation_minute < 0 || rotation_minute > 59) {
             m_rotationH = 0;
             m_rotationM = 0;
         }
+        auto path    = std::filesystem::path(m_baseFilename);
+        m_outputDir  = path.parent_path().string();
+        m_matchStr   = StringFormat("{}{}", R"((.*)_(\d{4})-(\d{2})-(\d{2})(.*))", path.extension().string());
         m_rotationTp = _next_rotation_tp();
         if (!m_baseFilename.empty()) ReOpenFile();
     }
@@ -179,11 +170,18 @@ private:
                 m_writtenSize     = 0;
                 m_lastLogFileName = newFileName;
             }
+            if (m_logFileMaxExistedSec > 0) {
+                DistcleanLogPath();
+            }
             m_fileHelper.open(newFileName);
         } catch (const std::exception& e) {
-            auto errorHandler = Logger::GetErrorHandler();
+            auto errorHandler = loggerRef->errorHandler;
             if (errorHandler) errorHandler(e.what());
         }
+    }
+
+    void DistcleanLogPath() {
+        Fundamental::fs::RemoveExpiredFiles(m_outputDir, m_matchStr, m_logFileMaxExistedSec, false);
     }
 
     void WriteMsg(const std::string& msg) {
@@ -191,7 +189,7 @@ private:
             m_fileHelper.write(msg);
             m_writtenSize += msg.size();
         } catch (const std::exception& e) {
-            auto errorHandler = Logger::GetErrorHandler();
+            auto errorHandler = loggerRef->errorHandler;
             if (errorHandler) errorHandler(e.what());
         }
     }
@@ -219,9 +217,14 @@ private:
         }
         return { rotation_time + std::chrono::hours(24) };
     }
+    Logger* const loggerRef;
 
     filename_t m_baseFilename;
-    std::size_t m_logFileLimitSize = 0;
+    std::string m_outputDir;
+    std::string m_matchStr;
+
+    std::size_t m_logFileLimitSize      = 0;
+    std::int64_t m_logFileMaxExistedSec = 0;
     int m_rotationH;
     int m_rotationM;
     std::chrono::system_clock::time_point m_rotationTp;
@@ -239,113 +242,68 @@ private:
     LogMessageCatchFunc m_catcher;
 };
 
-class NativeCatchSink SPDLOG_FINAL : public spdlog::sinks::base_sink<spdlog::details::null_mutex> {};
 } // namespace details
-
+// init static resource
+Logger* Logger::s_defaultLogger = new Logger();
+spdlog::pattern_formatter* Logger::s_formatter =
+    new spdlog::pattern_formatter("%v", spdlog::pattern_time_type::local, "");
 static details::LogGuard s_guard;
-spdlog::logger* Logger::s_logger               = details::s_loggerStorage.get();
-spdlog::pattern_formatter* Logger::s_formatter = details::s_formatterStorage.get();
-Logger::Logger() {
+
+Logger::Logger() : nativeLogSink(nullptr), loggerStorage(spdlog::stdout_color_st("console")) {
 }
 
 Logger::~Logger() {
 }
 
-void Logger::ConfigLogger(const std::string_view& itemName, const std::string_view& value) {
-    enum ConfigItemType : std::uint32_t {
-        OutputPathItem,
-        ProgramNameItem,
-        LogFormatItem,
-        RotationHourItem,
-        RotationMinItem,
-        FileExtItem,
-        MinimumLevelItem,
-        LogFileLimitSize
-    };
-    static std::unordered_map<std::string_view, ConfigItemType> s_configTypeMap = {
-        { "outputPath", OutputPathItem },   { "programName", ProgramNameItem },
-        { "logFormat", LogFormatItem },     { "rotationHour", RotationHourItem },
-        { "rotationMin", RotationMinItem }, { "logFileLimitSize", LogFileLimitSize },
-        { "fileExt", FileExtItem },         { "minimumLevel", MinimumLevelItem },
-    };
-    auto typeIter = s_configTypeMap.find(itemName);
-    if (typeIter == s_configTypeMap.end()) {
-        std::cerr << "unsupported log config item-> " << itemName << ":" << value << std::endl;
-        return;
-    }
-    switch (typeIter->second) {
-    case OutputPathItem: details::s_logOutputPath = value; break;
-    case ProgramNameItem: details::s_logOutputProgramName = value; break;
-    case LogFormatItem: details::s_logFormat = value; break;
-    case RotationHourItem: try { details::s_rotationHour = std::stoi(value.data());
-        } catch (const std::exception&) {
-            std::cerr << "invalid " << typeIter->first << " str " << value << std::endl;
-        }
-        break;
-    case RotationMinItem: try { details::s_rotationMin = std::stoi(value.data());
-        } catch (const std::exception&) {
-            std::cerr << "invalid " << typeIter->first << " str " << value << std::endl;
-        }
-        break;
-    case LogFileLimitSize: try { details::s_logFileLimitSize = std::stoull(value.data());
-        } catch (const std::exception&) {
-            std::cerr << "invalid " << typeIter->first << " str " << value << std::endl;
-        }
-        break;
-    case FileExtItem: details::s_logOutputFileExt = value; break;
-    case MinimumLevelItem: try { details::s_minimumLevel = static_cast<LogLevel>(std::stoi(value.data()));
-        } catch (const std::exception&) {
-            std::cerr << "invalid " << typeIter->first << " str " << value << std::endl;
-        }
-        break;
-    default: std::cerr << "unsupported log config item-> " << itemName << ":" << value << std::endl; break;
-    }
-}
-
-void Logger::Initialize(bool enableConsoleOutput) {
+void Logger::Initialize(LoggerInitOptions options, Logger* logger) {
     try {
         std::list<spdlog::sink_ptr> initList;
-        if (enableConsoleOutput) {
+        if (options.enableConsoleOutput) {
 #if TARGET_PLATFORM_WINDOWS
             initList.emplace_back(std::make_shared<spdlog::sinks::wincolor_stdout_sink_mt>());
             initList.emplace_back(std::make_shared<spdlog::sinks::windebug_sink_mt>());
 #elif TARGET_PLATFORM_LINUX
-            initList.emplace_back(std::make_shared<spdlog::sinks::ansicolor_stdout_sink_st>());
 #endif
+            initList.emplace_back(std::make_shared<spdlog::sinks::ansicolor_stdout_sink_st>());
         }
         std::string fileName;
-        if (!details::s_logOutputPath.empty() && !details::s_logOutputProgramName.empty()) {
-            details::PrepareLogdir(details::s_logOutputPath);
-            fileName = details::s_logOutputPath + "/" + details::s_logOutputProgramName + details::s_logOutputFileExt;
+        auto logOutputPath = options.logOutputPath.value_or(LoggerInitOptions::kDefaultLogOutputPath);
+        auto logOutputProgramName =
+            options.logOutputProgramName.value_or(LoggerInitOptions::kDefaultLogOutputProgramName);
+        if (!logOutputPath.empty() && !logOutputProgramName.empty()) {
+            details::PrepareLogdir(logOutputPath);
+            fileName = logOutputPath + "/" + logOutputProgramName + "_" + std::to_string(Utils::GetProcessId()) +
+                       options.logOutputFileExt.value_or(LoggerInitOptions::kDefaultLogOutputFileExt);
         }
         { // init file writer
-            details::s_nativeLogSink = std::make_shared<details::NativeLogSink>(
-                fileName, details::s_rotationHour, details::s_rotationMin, details::s_logFileLimitSize);
-            details::s_nativeLogSink->SetMsgCatcher(details::s_catchHandler);
-            details::s_nativeLogSink->StartFileOutputThread();
-            initList.emplace_back(details::s_nativeLogSink);
+            logger->nativeLogSink = std::make_shared<details::NativeLogSink>(
+                logger, fileName, options.rotationHour.value_or(LoggerInitOptions::kDefaultRotationHour),
+                options.rotationMin.value_or(LoggerInitOptions::kDefaultRotationMin),
+                options.logFileLimitSize.value_or(LoggerInitOptions::kDefaultLogFileLimitSize),
+                options.maxLogReserveTimeSec.value_or(LoggerInitOptions::kDefaultMaxLogReserveTimeSec));
+            logger->nativeLogSink->SetMsgCatcher(options.catchHandler);
+            logger->nativeLogSink->StartFileOutputThread();
+            initList.emplace_back(logger->nativeLogSink);
         }
 
-        details::s_loggerStorage = spdlog::create(details::s_customLoggerName, initList.begin(), initList.end());
-        Logger::s_logger         = details::s_loggerStorage.get();
-        spdlog::set_level(static_cast<spdlog::level::level_enum>(details::s_minimumLevel));
-        spdlog::set_pattern(details::s_logFormat);
-        if (details::s_errorHandler) {
-            spdlog::set_error_handler([](const std::string& msg) { details::s_errorHandler(msg); });
+        logger->loggerStorage =
+            spdlog::create(LoggerInitOptions::kDefaultCustomLoggerName, initList.begin(), initList.end());
+        spdlog::set_level(
+            static_cast<spdlog::level::level_enum>(options.minimumLevel.value_or(LoggerInitOptions::kDefaultLogLevel)));
+        spdlog::set_pattern(options.logFormat.value_or(LoggerInitOptions::kDefaultLogFormat));
+        if (options.errorHandler) {
+            spdlog::set_error_handler(options.errorHandler);
             ;
         }
+        logger->errorHandler = options.errorHandler;
     } catch (const std::exception& e) {
         std::cerr << " log initialize failed!" << e.what() << std::endl;
     }
 }
 
-void Logger::Release() {
-    if (details::s_nativeLogSink) details::s_nativeLogSink->StopFileOutputThread();
+void Logger::Release(Logger* logger) {
+    if (logger->nativeLogSink) logger->nativeLogSink->StopFileOutputThread();
     spdlog::drop_all();
-}
-
-ErrorHandlerType Logger::GetErrorHandler() {
-    return details::s_errorHandler;
 }
 
 bool Logger::IsDebuggerAttached() {
@@ -414,31 +372,23 @@ void Logger::PrintBackTrace() {
 }
 
 spdlog::pattern_formatter* Logger::GetStringFormatter() {
-    return Logger::s_formatter;
+    return s_formatter;
 }
 
 void Logger::TestLogInstance() {
-    std::cout << "internal log instance " << details::s_loggerStorage.get() << std::endl;
+    std::cout << "internal log instance " << s_defaultLogger->loggerStorage.get() << std::endl;
     std::cout << "spd log storage " << &spdlog::details::registry::instance() << std::endl;
 }
 
-void Logger::SetErrorHandler(const ErrorHandlerType& handler) {
-    details::s_errorHandler = handler;
+LoggerStream::LoggerStream(Logger* logger, LogLevel level) : loggerRef(logger), level_(level) {
 }
-
-void Logger::SetCatchHandler(const LogMessageCatchFunc& handler) {
-    details::s_catchHandler = handler;
-    if (details::s_nativeLogSink) details::s_nativeLogSink->SetMsgCatcher(details::s_catchHandler);
-}
-LoggerStream::LoggerStream(LogLevel level) : level_(level) {
-}
-LoggerStream::LoggerStream(LogLevel level, const char* fileName, const char* funcName, std::int32_t line) :
-level_(level) {
+LoggerStream::LoggerStream(Logger* logger, LogLevel level, const char* fileName, const char* funcName,
+                           std::int32_t line) : loggerRef(logger), level_(level) {
     ss_ << Fundamental::StringFormat("[{}:{}({})] ", fileName, funcName, line);
 }
 LoggerStream::~LoggerStream() {
 #ifndef DISABLE_FLOG
-    Logger::LogOutput(level_, ss_.str());
+    loggerRef->Logger::LogOutput(level_, ss_.str());
 #endif
 }
 } // namespace Fundamental
