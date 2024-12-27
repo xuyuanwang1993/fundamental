@@ -81,7 +81,7 @@ public:
     };
 
 public:
-    Logger();
+    Logger(const std::string_view& format_str = "%^[%L]%$ %v");
     ~Logger();
 
     template <typename T>
