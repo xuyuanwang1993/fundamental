@@ -249,7 +249,11 @@ spdlog::pattern_formatter* Logger::s_formatter =
     new spdlog::pattern_formatter("%v", spdlog::pattern_time_type::local, "");
 static details::LogGuard s_guard;
 
-Logger::Logger() : nativeLogSink(nullptr), loggerStorage(spdlog::stdout_color_st("console")) {
+Logger::Logger() :
+nativeLogSink(nullptr),
+loggerStorage(spdlog::stdout_color_st(std::to_string(reinterpret_cast<std::uint64_t>(this)) + ("console"))) {
+    loggerStorage->set_level(spdlog::level::level_enum::trace);
+    loggerStorage->set_pattern("%^[%L]%$ %v");
 }
 
 Logger::~Logger() {
@@ -285,15 +289,15 @@ void Logger::Initialize(LoggerInitOptions options, Logger* logger) {
             logger->nativeLogSink->StartFileOutputThread();
             initList.emplace_back(logger->nativeLogSink);
         }
-
-        logger->loggerStorage =
-            spdlog::create(LoggerInitOptions::kDefaultCustomLoggerName, initList.begin(), initList.end());
-        spdlog::set_level(
+        if (logger->loggerStorage) spdlog::drop(logger->loggerStorage->name());
+        logger->loggerStorage = spdlog::create(options.loggerName.empty() ? LoggerInitOptions::kDefaultCustomLoggerName
+                                                                          : options.loggerName,
+                                               initList.begin(), initList.end());
+        logger->loggerStorage->set_level(
             static_cast<spdlog::level::level_enum>(options.minimumLevel.value_or(LoggerInitOptions::kDefaultLogLevel)));
-        spdlog::set_pattern(options.logFormat.value_or(LoggerInitOptions::kDefaultLogFormat));
+        logger->loggerStorage->set_pattern(options.logFormat.value_or(LoggerInitOptions::kDefaultLogFormat));
         if (options.errorHandler) {
-            spdlog::set_error_handler(options.errorHandler);
-            ;
+            logger->loggerStorage->set_error_handler(options.errorHandler);
         }
         logger->errorHandler = options.errorHandler;
     } catch (const std::exception& e) {
@@ -303,7 +307,7 @@ void Logger::Initialize(LoggerInitOptions options, Logger* logger) {
 
 void Logger::Release(Logger* logger) {
     if (logger->nativeLogSink) logger->nativeLogSink->StopFileOutputThread();
-    spdlog::drop_all();
+    spdlog::drop(logger->loggerStorage->name());
 }
 
 bool Logger::IsDebuggerAttached() {
