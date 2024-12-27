@@ -42,12 +42,14 @@ public:
         static constexpr const char* kDefaultLogOutputPath        = "logs";
         static constexpr const char* kDefaultLogOutputProgramName = "";
         static constexpr const char* kDefaultLogOutputFileExt     = ".log";
-        static constexpr const char* kDefaultLogFormat            = "%^%Y-%m-%d %H:%M:%S.%e %l%$ [thread:%t]: %v ";
+        static constexpr const char* kDefaultLogFormat            = "%^%Y-%m-%d %H:%M:%S.%e %l%$ [thread:%t]: %v";
         static constexpr std::int32_t kDefaultRotationHour        = 23;
         static constexpr std::int32_t kDefaultRotationMin         = 0;
         static constexpr std::size_t kDefaultLogFileLimitSize     = 10 * 1024 * 1024; // 10M
+        // 2 month
         static constexpr std::int64_t kDefaultMaxLogReserveTimeSec =
-            60 /*min*/ * 60 /*hour*/ * 24 /*day*/ * 30 /*mon*/ * 2; // 2 month
+            60 /*min*/ * 60 /*hour*/ * 24 /*day*/ * 30 /*mon*/ * 2;
+        std::string loggerName = kDefaultCustomLoggerName;
         // minimum log level
         std::optional<LogLevel> minimumLevel;
         // log output path
@@ -146,13 +148,8 @@ public:
     explicit LoggerStream(Logger* logger, LogLevel level, const char* fileName, const char* funcName,
                           std::int32_t line);
     ~LoggerStream();
-    template <typename Value>
-    decltype(auto) operator<<(const Value& t) {
-
-#ifndef DISABLE_FLOG
-        ss_ << t;
-#endif
-        return *this;
+    std::stringstream& stream() {
+        return ss_;
     }
 
 private:
@@ -171,7 +168,7 @@ private:
             auto __debugInfo__ = Fundamental::StringFormat("[" __FILE__ ":{}"                                          \
                                                            "(" STR_HELPER(__LINE__) ")] ",                             \
                                                            __func__);                                                  \
-            (logger)->LogOutput(logLevel, __debugInfo__ + Fundamental::StringFormat(__VA_ARGS__));                       \
+            (logger)->LogOutput(logLevel, __debugInfo__ + Fundamental::StringFormat(__VA_ARGS__));                     \
         } while (0)
 #else
     #define FLOG(logger, logLevel, ...)           (void)0
@@ -206,17 +203,24 @@ private:
 #define FFAIL(...) FLOG_DEBUGINFO(Fundamental::Logger::s_defaultLogger, Fundamental::LogLevel::critical, ##__VA_ARGS__)
 #define FWARN(...) FLOG_DEBUGINFO(Fundamental::Logger::s_defaultLogger, Fundamental::LogLevel::warn, ##__VA_ARGS__)
 
-#define FDEBUGS Fundamental::LoggerStream(Fundamental::Logger::s_defaultLogger, Fundamental::LogLevel::debug)
-#define FINFOS  Fundamental::LoggerStream(Fundamental::Logger::s_defaultLogger, Fundamental::LogLevel::info)
+#define FDEBUGS Fundamental::LoggerStream(Fundamental::Logger::s_defaultLogger, Fundamental::LogLevel::debug).stream()
+#define FINFOS  Fundamental::LoggerStream(Fundamental::Logger::s_defaultLogger, Fundamental::LogLevel::info).stream()
 #define FERRS                                                                                                          \
     Fundamental::LoggerStream(Fundamental::Logger::s_defaultLogger, Fundamental::LogLevel::err, __FILE__, __func__,    \
-                              __LINE__)
+                              __LINE__)                                                                                \
+        .stream()
 #define FFAILS                                                                                                         \
     Fundamental::LoggerStream(Fundamental::Logger::s_defaultLogger, Fundamental::LogLevel::critical, __FILE__,         \
-                              __func__, __LINE__)
+                              __func__, __LINE__)                                                                      \
+        .stream()
 #define FWARNS                                                                                                         \
     Fundamental::LoggerStream(Fundamental::Logger::s_defaultLogger, Fundamental::LogLevel::warn, __FILE__, __func__,   \
-                              __LINE__)
+                              __LINE__)                                                                                \
+        .stream()
+#define FTRACES                                                                                                        \
+    Fundamental::LoggerStream(Fundamental::Logger::s_defaultLogger, Fundamental::LogLevel::trace, __FILE__, __func__,  \
+                              __LINE__)                                                                                \
+        .stream()
 
 #ifndef DISABLE_ASSERT
     #define FASSERT(_check, ...) FASSERT_THROWN(_check, ##__VA_ARGS__)
@@ -240,11 +244,13 @@ private:
 #define FFAIL_I(logger, ...) FLOG_DEBUGINFO(logger, Fundamental::LogLevel::critical, ##__VA_ARGS__)
 #define FWARN_I(logger, ...) FLOG_DEBUGINFO(logger, Fundamental::LogLevel::warn, ##__VA_ARGS__)
 
-#define FDEBUGS_I(logger) Fundamental::LoggerStream(logger, Fundamental::LogLevel::debug)
-#define FINFOS_I(logger)  Fundamental::LoggerStream(logger, Fundamental::LogLevel::info)
-#define FERRS_I(logger)   Fundamental::LoggerStream(logger, Fundamental::LogLevel::err, __FILE__, __func__, __LINE__)
+#define FDEBUGS_I(logger) Fundamental::LoggerStream(logger, Fundamental::LogLevel::debug).stream()
+#define FINFOS_I(logger)  Fundamental::LoggerStream(logger, Fundamental::LogLevel::info).stream()
+#define FERRS_I(logger)                                                                                                \
+    Fundamental::LoggerStream(logger, Fundamental::LogLevel::err, __FILE__, __func__, __LINE__).stream()
 #define FFAILS_I(logger)                                                                                               \
-    Fundamental::LoggerStream(logger, Fundamental::LogLevel::critical, __FILE__, __func__, __LINE__)
-#define FWARNS_I(logger) Fundamental::LoggerStream(logger, Fundamental::LogLevel::warn, __FILE__, __func__, __LINE__)
+    Fundamental::LoggerStream(logger, Fundamental::LogLevel::critical, __FILE__, __func__, __LINE__).stream()
+#define FWARNS_I(logger)                                                                                               \
+    Fundamental::LoggerStream(logger, Fundamental::LogLevel::warn, __FILE__, __func__, __LINE__).stream()
 
 /*end of file*/
