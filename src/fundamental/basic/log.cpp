@@ -253,6 +253,7 @@ Logger::Logger() :
 nativeLogSink(nullptr),
 loggerStorage(spdlog::stdout_color_st(std::to_string(reinterpret_cast<std::uint64_t>(this)) + ("console"))) {
     loggerStorage->set_level(spdlog::level::level_enum::trace);
+    loggerStorage->set_pattern("%^[%L]%$ %v");
 }
 
 Logger::~Logger() {
@@ -288,7 +289,7 @@ void Logger::Initialize(LoggerInitOptions options, Logger* logger) {
             logger->nativeLogSink->StartFileOutputThread();
             initList.emplace_back(logger->nativeLogSink);
         }
-
+        if (logger->loggerStorage) spdlog::drop(logger->loggerStorage->name());
         logger->loggerStorage = spdlog::create(options.loggerName.empty() ? LoggerInitOptions::kDefaultCustomLoggerName
                                                                           : options.loggerName,
                                                initList.begin(), initList.end());
@@ -306,7 +307,7 @@ void Logger::Initialize(LoggerInitOptions options, Logger* logger) {
 
 void Logger::Release(Logger* logger) {
     if (logger->nativeLogSink) logger->nativeLogSink->StopFileOutputThread();
-    spdlog::drop_all();
+    spdlog::drop(logger->loggerStorage->name());
 }
 
 bool Logger::IsDebuggerAttached() {
