@@ -24,10 +24,9 @@
 namespace Fundamental {
 namespace details {
 struct CalcFileNameHelper;
+// stop default logger thread
 struct LogGuard {
     LogGuard() { // default init
-        spdlog::set_level(spdlog::level::level_enum::trace);
-        spdlog::set_pattern(Logger::LoggerInitOptions::kDefaultLogFormat);
     }
     ~LogGuard() {
         Logger::Release();
@@ -249,14 +248,15 @@ spdlog::pattern_formatter* Logger::s_formatter =
     new spdlog::pattern_formatter("%v", spdlog::pattern_time_type::local, "");
 static details::LogGuard s_guard;
 
-Logger::Logger() :
+Logger::Logger(const std::string_view& format_str) :
 nativeLogSink(nullptr),
 loggerStorage(spdlog::stdout_color_st(std::to_string(reinterpret_cast<std::uint64_t>(this)) + ("console"))) {
     loggerStorage->set_level(spdlog::level::level_enum::trace);
-    loggerStorage->set_pattern("%^[%L]%$ %v");
+    if (!format_str.empty()) loggerStorage->set_pattern(std::string(format_str));
 }
 
 Logger::~Logger() {
+    spdlog::drop(loggerStorage->name());
 }
 
 void Logger::Initialize(LoggerInitOptions options, Logger* logger) {
@@ -307,7 +307,6 @@ void Logger::Initialize(LoggerInitOptions options, Logger* logger) {
 
 void Logger::Release(Logger* logger) {
     if (logger->nativeLogSink) logger->nativeLogSink->StopFileOutputThread();
-    spdlog::drop(logger->loggerStorage->name());
 }
 
 bool Logger::IsDebuggerAttached() {

@@ -5,10 +5,15 @@
 #include <iostream>
 void TestDefaultLogger();
 void TestMutiInstance(int index);
+void TestFormatter(const std::string& format_str);
 int main(int argc, char** argv) {
     TestDefaultLogger();
     TestMutiInstance(1);
     TestMutiInstance(2);
+    TestFormatter("%^[%L]%H:%M:%S.%e%$[%t] %v");
+    TestFormatter("%^[%L]%$[%t] %v");
+    TestFormatter("%v");
+    TestFormatter("%l %v");
     return 0;
 }
 void TestDefaultLogger() {
@@ -114,4 +119,9 @@ void TestMutiInstance(int index) {
         FERR_I(&newLogger, "aaaaa   {}", counts);
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
+}
+
+void TestFormatter(const std::string& format_str) {
+    Fundamental::Logger newLogger(format_str);
+    FINFOS_I(&newLogger) << "test_format " << format_str;
 }
