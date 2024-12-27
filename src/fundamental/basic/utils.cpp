@@ -15,6 +15,8 @@
     #include <unistd.h>
     #define INVALID_SOCKET (-1)
     #define SOCKET         int
+#elif TARGET_PLATFORM_WINDOWS
+    #include <windows.h>
 #endif
 
 #include <cstdlib>
@@ -26,6 +28,18 @@
 
 namespace Fundamental {
 namespace Utils {
+fpid_t GetProcessId() {
+    fpid_t ret = 0;
+#if TARGET_PLATFORM_LINUX
+    pid_t processID = getpid();
+    ret             = static_cast<fpid_t>(processID);
+#elif TARGET_PLATFORM_WINDOWS
+    DWORD processID = GetCurrentProcessId();
+    ret             = static_cast<fpid_t>(processID);
+#endif
+    return ret;
+}
+
 void SetThreadName(const std::string& name) {
 #if TARGET_PLATFORM_LINUX
     ::pthread_setname_np(pthread_self(), name.substr(0, 15).c_str());

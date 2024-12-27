@@ -10,8 +10,10 @@
 #include <cassert>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <sstream>
 #include <string_view>
+
 namespace Fundamental {
 
 enum LogLevel {
@@ -25,48 +27,89 @@ enum LogLevel {
 };
 using ErrorHandlerType    = std::function<void(const std::string&)>;
 using LogMessageCatchFunc = std::function<void(LogLevel level, const char* /*str*/, std::size_t /*size*/)>;
-;
+namespace details {
+class NativeLogSink;
+}
 class Logger {
+    friend class details::NativeLogSink;
+    template <typename Arg1, typename... Args>
+    friend std::string StringFormat(const char* fmt, const Arg1& arg1, const Args&... args);
+
+public:
+    struct LoggerInitOptions {
+        static constexpr LogLevel kDefaultLogLevel                = LogLevel::trace;
+        static constexpr const char* kDefaultCustomLoggerName     = "logger";
+        static constexpr const char* kDefaultLogOutputPath        = "logs";
+        static constexpr const char* kDefaultLogOutputProgramName = "";
+        static constexpr const char* kDefaultLogOutputFileExt     = ".log";
+        static constexpr const char* kDefaultLogFormat            = "%^%Y-%m-%d %H:%M:%S.%e %l%$ [thread:%t]: %v ";
+        static constexpr std::int32_t kDefaultRotationHour        = 23;
+        static constexpr std::int32_t kDefaultRotationMin         = 0;
+        static constexpr std::size_t kDefaultLogFileLimitSize     = 10 * 1024 * 1024; // 10M
+        static constexpr std::int64_t kDefaultMaxLogReserveTimeSec =
+            60 /*min*/ * 60 /*hour*/ * 24 /*day*/ * 30 /*mon*/ * 2; // 2 month
+        // minimum log level
+        std::optional<LogLevel> minimumLevel;
+        // log output path
+        std::optional<std::string> logOutputPath;
+        // log output filebasename
+        std::optional<std::string> logOutputProgramName;
+        // log file's ext
+        std::optional<std::string> logOutputFileExt;
+        // control logs' head format
+        std::optional<std::string> logFormat;
+
+        // eg: if the rotationHour=17 rotationMin=0
+        // when the day's time come to 17:00
+        // new file destination will be used
+        //  log file's rotation hour in a day
+        std::optional<std::int32_t> rotationHour;
+        // log file's rotation minute in a day
+        std::optional<std::int32_t> rotationMin;
+        // single log file's limit size
+        std::optional<std::size_t> logFileLimitSize;
+        // llean up log files that have existed for more than maxLogReserveTimeSec
+        std::optional<std::int64_t> maxLogReserveTimeSec;
+        // control log to console
+        bool enableConsoleOutput = true;
+        //
+        ErrorHandlerType errorHandler = nullptr;
+        // catch all log msg
+        LogMessageCatchFunc catchHandler = nullptr;
+    };
+
 public:
     Logger();
     ~Logger();
 
     template <typename T>
-    static inline void LogOutput(LogLevel level, const T& data) {
-        s_logger->log(static_cast<spdlog::level::level_enum>(level), data);
+    inline void LogOutput(LogLevel level, const T& data) {
+        loggerStorage->log(static_cast<spdlog::level::level_enum>(level), data);
     }
 
     template <typename Arg1, typename... Args>
-    static inline void LogOutput(LogLevel level, const char* fmt, const Arg1& arg1, const Args&... args) {
-        s_logger->log(static_cast<spdlog::level::level_enum>(level), fmt, arg1, std::forward<const Args&>(args)...);
+    inline void LogOutput(LogLevel level, const char* fmt, const Arg1& arg1, const Args&... args) {
+        loggerStorage->log(static_cast<spdlog::level::level_enum>(level), fmt, arg1,
+                           std::forward<const Args&>(args)...);
     }
-
-    /*
-     * outputPath[string] logoutput path
-     * programName[string] logoutput filebasename
-     * logminLevel[int] logoutput minimum level
-     * logFormat[string] control logs' head format
-     * fileExt[string] log file's ext
-     * rotationHour[int] log file's rotation hour in a day
-     * rotationMin[int] log file's rotation minute in a day
-     * logFileLimitSize[size_t] single log file's limit size
-     *
-     */
-    static void ConfigLogger(const std::string_view& itemName, const std::string_view& value);
-
-    static void Initialize(bool enableConsoleOutput = true);
-    static void Release();
-    static void SetErrorHandler(const ErrorHandlerType& handler);
-    static void SetCatchHandler(const LogMessageCatchFunc& handler);
-    static ErrorHandlerType GetErrorHandler();
+    static void Initialize(LoggerInitOptions options, Logger* logger = s_defaultLogger);
+    static void Release(Logger* logger = s_defaultLogger);
     static bool IsDebuggerAttached();
     static void PrintBackTrace();
     static spdlog::pattern_formatter* GetStringFormatter();
     static void TestLogInstance();
 
+public:
+    static Logger* s_defaultLogger;
+
 private:
+    // for raw string format
     static spdlog::pattern_formatter* s_formatter;
-    static spdlog::logger* s_logger;
+
+    ErrorHandlerType errorHandler;
+    // log output
+    std::shared_ptr<details::NativeLogSink> nativeLogSink = nullptr;
+    std::shared_ptr<spdlog::logger> loggerStorage         = nullptr;
 };
 
 inline std::string StringFormat() {
@@ -86,22 +129,22 @@ inline std::string StringFormat(const char* data) {
 
 template <typename Arg1, typename... Args>
 inline std::string StringFormat(const char* fmt, const Arg1& arg1, const Args&... args) {
-    spdlog::details::log_msg msg;
     try {
+        spdlog::details::log_msg msg;
         msg.raw.write(fmt, arg1, args...);
         Logger::GetStringFormatter()->format(msg);
         return std::string(msg.formatted.data(), msg.formatted.size());
     } catch (const std::exception& e) {
-        auto errorHandler = Logger::GetErrorHandler();
-        if (errorHandler) errorHandler(e.what());
+        if (Logger::s_defaultLogger->errorHandler) Logger::s_defaultLogger->errorHandler(e.what());
         return "";
     }
 }
 
 class LoggerStream final {
 public:
-    LoggerStream(LogLevel level);
-    LoggerStream(LogLevel level, const char* fileName, const char* funcName, std::int32_t line);
+    explicit LoggerStream(Logger* logger, LogLevel level);
+    explicit LoggerStream(Logger* logger, LogLevel level, const char* fileName, const char* funcName,
+                          std::int32_t line);
     ~LoggerStream();
     template <typename Value>
     decltype(auto) operator<<(const Value& t) {
@@ -113,6 +156,7 @@ public:
     }
 
 private:
+    Logger* const loggerRef = nullptr;
     const LogLevel level_;
     std::stringstream ss_;
 };
@@ -120,37 +164,23 @@ private:
 #define STR_H(x)      #x
 #define STR_HELPER(x) STR_H(x)
 
-#ifndef DISABLE_TRACE
-
-    #ifdef _MSC_VER
-        #define FTRACE(...)                                                                                            \
-            Fundamental::Logger::LogOutput(Fundamental::LogLevel::trace,                                               \
-                                           "[ " __FILE__ "(" STR_HELPER(__LINE__) ") ] " __VA_ARGS__)
-    #else
-        #define FTRACE(...)                                                                                            \
-            Fundamental::Logger::LogOutput(Fundamental::LogLevel::trace,                                               \
-                                           "[ " __FILE__ ":" STR_HELPER(__LINE__) " ] " __VA_ARGS__)
-    #endif
-#else
-    #define FTRACE(...) (void)0
-#endif
-
 #ifndef DISABLE_FLOG
-    #define FLOG(logLevel, ...) Fundamental::Logger::LogOutput(logLevel, __VA_ARGS__)
-    #define FLOG_DEBUGINFO(logLevel, ...)                                                                              \
+    #define FLOG(logger, logLevel, ...) (logger)->LogOutput(logLevel, __VA_ARGS__)
+    #define FLOG_DEBUGINFO(logger, logLevel, ...)                                                                      \
         do {                                                                                                           \
             auto __debugInfo__ = Fundamental::StringFormat("[" __FILE__ ":{}"                                          \
                                                            "(" STR_HELPER(__LINE__) ")] ",                             \
                                                            __func__);                                                  \
-            Fundamental::Logger::LogOutput(logLevel, __debugInfo__ + Fundamental::StringFormat(__VA_ARGS__));          \
+            (logger)->LogOutput(logLevel, __debugInfo__ + Fundamental::StringFormat(__VA_ARGS__));                       \
         } while (0)
 #else
-    #define FLOG(logLevel, ...)           (void)0
-    #define FLOG_DEBUGINFO(logLevel, ...) (void)0
+    #define FLOG(logger, logLevel, ...)           (void)0
+    #define FLOG_DEBUGINFO(logger, logLevel, ...) (void)0
 #endif // !DISABLE_FLOG
 
 #ifndef NDEBUG
-    #define FDEBUG(...) FLOG(Fundamental::LogLevel::debug, __VA_ARGS__)
+    #define FDEBUG(...)           FLOG(Fundamental::Logger::s_defaultLogger, Fundamental::LogLevel::debug, __VA_ARGS__)
+    #define FDEBUG_I(logger, ...) FLOG(logger, Fundamental::LogLevel::debug, __VA_ARGS__)
     #define FASSERT_THROWN(_check, ...)                                                                                \
         if (!(_check)) {                                                                                               \
             auto __debugInfo__ = Fundamental::StringFormat("[" __FILE__ ":{}"                                          \
@@ -160,32 +190,61 @@ private:
         }
 #else
     #define FDEBUG(...)                 (void)0
+    #define FDEBUG_I(logger, ...)       (void)0
     #define FASSERT_THROWN(_check, ...) (void)0
 #endif
-#define FINFO(...) FLOG(Fundamental::LogLevel::info, ##__VA_ARGS__)
-#define FERR(...)  FLOG_DEBUGINFO(Fundamental::LogLevel::err, ##__VA_ARGS__)
-#define FFAIL(...) FLOG_DEBUGINFO(Fundamental::LogLevel::critical, ##__VA_ARGS__)
-#define FWARN(...) FLOG_DEBUGINFO(Fundamental::LogLevel::warn, ##__VA_ARGS__)
 
-#define FDEBUGS Fundamental::LoggerStream(Fundamental::LogLevel::debug)
-#define FINFOS  Fundamental::LoggerStream(Fundamental::LogLevel::info)
-#define FERRS   Fundamental::LoggerStream(Fundamental::LogLevel::err, __FILE__, __func__, __LINE__)
-#define FFAILS  Fundamental::LoggerStream(Fundamental::LogLevel::critical, __FILE__, __func__, __LINE__)
-#define FWARNS  Fundamental::LoggerStream(Fundamental::LogLevel::warn, __FILE__, __func__, __LINE__)
+#ifndef DISABLE_TRACE
+    #define FTRACE(...)                                                                                                \
+        FLOG_DEBUGINFO(Fundamental::Logger::s_defaultLogger, Fundamental::LogLevel::trace, ##__VA_ARGS__)
+#else
+    #define FTRACE(...) (void)0
+#endif
+
+#define FINFO(...) FLOG(Fundamental::Logger::s_defaultLogger, Fundamental::LogLevel::info, ##__VA_ARGS__)
+#define FERR(...)  FLOG_DEBUGINFO(Fundamental::Logger::s_defaultLogger, Fundamental::LogLevel::err, ##__VA_ARGS__)
+#define FFAIL(...) FLOG_DEBUGINFO(Fundamental::Logger::s_defaultLogger, Fundamental::LogLevel::critical, ##__VA_ARGS__)
+#define FWARN(...) FLOG_DEBUGINFO(Fundamental::Logger::s_defaultLogger, Fundamental::LogLevel::warn, ##__VA_ARGS__)
+
+#define FDEBUGS Fundamental::LoggerStream(Fundamental::Logger::s_defaultLogger, Fundamental::LogLevel::debug)
+#define FINFOS  Fundamental::LoggerStream(Fundamental::Logger::s_defaultLogger, Fundamental::LogLevel::info)
+#define FERRS                                                                                                          \
+    Fundamental::LoggerStream(Fundamental::Logger::s_defaultLogger, Fundamental::LogLevel::err, __FILE__, __func__,    \
+                              __LINE__)
+#define FFAILS                                                                                                         \
+    Fundamental::LoggerStream(Fundamental::Logger::s_defaultLogger, Fundamental::LogLevel::critical, __FILE__,         \
+                              __func__, __LINE__)
+#define FWARNS                                                                                                         \
+    Fundamental::LoggerStream(Fundamental::Logger::s_defaultLogger, Fundamental::LogLevel::warn, __FILE__, __func__,   \
+                              __LINE__)
 
 #ifndef DISABLE_ASSERT
     #define FASSERT(_check, ...) FASSERT_THROWN(_check, ##__VA_ARGS__)
 
     #define FASSERT_ACTION(_check, _action, ...)                                                                       \
         if (!(_check)) {                                                                                               \
-            Fundamental::Logger::LogOutput(Fundamental::LogLevel::critical,                                            \
-                                           "[" __FILE__ ":"                                                            \
-                                           "(" STR_HELPER(__LINE__) ")] [####check####:" #_check "] " __VA_ARGS__);    \
+            Fundamental::Logger::s_defaultLogger->LogOutput(Fundamental::LogLevel::critical,                           \
+                                                            "[" __FILE__ ":"                                           \
+                                                            "(" STR_HELPER(__LINE__) ")] [####check####:" #_check      \
+                                                                                     "] " __VA_ARGS__);                \
             _action;                                                                                                   \
         }
 #else
     #define FASSERT(_check, ...)                 (void)0
     #define FASSERT_ACTION(_check, _action, ...) (void)0
 #endif
+
+// add  more logger instance
+#define FINFO_I(logger, ...) FLOG(logger, Fundamental::LogLevel::info, ##__VA_ARGS__)
+#define FERR_I(logger, ...)  FLOG_DEBUGINFO(logger, Fundamental::LogLevel::err, ##__VA_ARGS__)
+#define FFAIL_I(logger, ...) FLOG_DEBUGINFO(logger, Fundamental::LogLevel::critical, ##__VA_ARGS__)
+#define FWARN_I(logger, ...) FLOG_DEBUGINFO(logger, Fundamental::LogLevel::warn, ##__VA_ARGS__)
+
+#define FDEBUGS_I(logger) Fundamental::LoggerStream(logger, Fundamental::LogLevel::debug)
+#define FINFOS_I(logger)  Fundamental::LoggerStream(logger, Fundamental::LogLevel::info)
+#define FERRS_I(logger)   Fundamental::LoggerStream(logger, Fundamental::LogLevel::err, __FILE__, __func__, __LINE__)
+#define FFAILS_I(logger)                                                                                               \
+    Fundamental::LoggerStream(logger, Fundamental::LogLevel::critical, __FILE__, __func__, __LINE__)
+#define FWARNS_I(logger) Fundamental::LoggerStream(logger, Fundamental::LogLevel::warn, __FILE__, __func__, __LINE__)
 
 /*end of file*/
