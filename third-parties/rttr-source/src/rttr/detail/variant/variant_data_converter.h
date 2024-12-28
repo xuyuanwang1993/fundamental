@@ -102,7 +102,7 @@ struct default_type_converter
 template<typename T>
 struct empty_type_converter
 {
-    static RTTR_INLINE bool convert_to(const T& value, argument& arg)
+    static RTTR_INLINE bool convert_to(const T& , argument& )
     {
         return false;
     }

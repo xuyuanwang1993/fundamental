@@ -274,7 +274,7 @@ namespace detail
 class invalid_enum_flag
 {
     public:
-        RTTR_CONSTEXPR RTTR_INLINE explicit invalid_enum_flag(int v){}
+        RTTR_CONSTEXPR RTTR_INLINE explicit invalid_enum_flag(int ){}
 };
 
 } // end namespace detail

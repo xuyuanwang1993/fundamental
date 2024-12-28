@@ -48,7 +48,7 @@ create_variant_sequential_view(T&& value)
 
 template<typename T>
 enable_if_t<!can_create_sequential_view<T>::value, variant_sequential_view_private>
-create_variant_sequential_view(T&& value)
+create_variant_sequential_view(T&& )
 {
     return variant_sequential_view_private();
 }

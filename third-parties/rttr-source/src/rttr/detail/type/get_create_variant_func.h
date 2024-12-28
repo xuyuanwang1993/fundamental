@@ -61,7 +61,7 @@ struct RTTR_LOCAL create_variant_policy
 
 struct RTTR_LOCAL create_invalid_variant_policy
 {
-    static variant create_variant(const argument& data)
+    static variant create_variant(const argument& )
     {
         return variant();
     }

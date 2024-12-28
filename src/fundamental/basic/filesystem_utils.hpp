@@ -1,6 +1,7 @@
 #pragma once
 #include <chrono>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <regex>
 #include <string>
@@ -10,7 +11,7 @@
 namespace Fundamental::fs {
 
 inline void RemoveExpiredFiles(std::string_view dir_path, std::string_view pattern, std::int64_t expiredSec,
-                        bool recursive = false) {
+                               bool recursive = false) {
     std::regex filePattern(pattern.data(), pattern.length());
     auto now = std::chrono::system_clock::now();
     std::filesystem::path directory(dir_path);
@@ -43,5 +44,46 @@ inline void RemoveExpiredFiles(std::string_view dir_path, std::string_view patte
     for (auto& item : subdirPaths)
         RemoveExpiredFiles(item, pattern, expiredSec, true);
 }
+template <typename T, typename = typename std::enable_if_t<
+                          std::disjunction_v<std::is_same<T, std::vector<std::uint8_t>>, std::is_same<T, std::string>>>>
+inline bool ReadFile(std::string_view path, T& output) {
+    // Always read as binary.
+    std::ifstream file(std::string(path), std::ios::binary);
+    if (file) {
+        // Get the lengthInBytes in bytes
+        file.seekg(0, file.end);
+        auto lengthInBytes = file.tellg();
+        file.seekg(0, file.beg);
 
+        output.resize(lengthInBytes);
+        file.read(reinterpret_cast<char*>(output.data()), lengthInBytes);
+        file.close();
+        return true;
+    } else {
+        std::cerr << "can't read from " << path << std::endl;
+    }
+
+    return false;
+}
+
+inline bool WriteFile(std::string_view path, const void* data, std::size_t len, bool override = true) {
+    if (path.empty()) return false;
+    // App mode means append mode, trunc mode means overwrite
+    std::ios_base::openmode mode = override ? std::ios::trunc : std::ios::app;
+    mode |= (std::ios::binary | std::ios::out);
+
+    std::ofstream file(std::string(path), mode);
+    if (file) {
+        file.write(reinterpret_cast<const char*>(data), len);
+        file.flush();
+        file.close();
+        return true;
+    } else {
+#ifdef DEBUG
+        std::cerr << "can't write to " << path << std::endl;
+#endif
+    }
+
+    return false;
+}
 } // namespace Fundamental::fs

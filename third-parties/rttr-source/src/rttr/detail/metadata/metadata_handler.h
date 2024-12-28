@@ -75,9 +75,9 @@ class metadata_handler<0>
     public:
         RTTR_FORCE_INLINE metadata_handler(std::array<metadata, 0>) {}
 
-        RTTR_FORCE_INLINE void set_metadata(std::array<metadata, 0> new_data) { }
+        RTTR_FORCE_INLINE void set_metadata(std::array<metadata, 0> ) { }
 
-        RTTR_INLINE variant get_metadata(const variant& key) const  { return variant(); }
+        RTTR_INLINE variant get_metadata(const variant& ) const  { return variant(); }
 };
 
 } // end namespace detail
