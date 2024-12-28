@@ -48,7 +48,7 @@ create_variant_associative_view(T&& value)
 
 template<typename T>
 enable_if_t<!can_create_associative_view<T>::value, variant_associative_view_private>
-create_variant_associative_view(T&& value)
+create_variant_associative_view(T&& )
 {
     return variant_associative_view_private();
 }

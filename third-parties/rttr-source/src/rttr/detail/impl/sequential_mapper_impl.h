@@ -831,33 +831,33 @@ namespace detail
 
 struct sequential_container_empty
 {
-    static void create(iterator_data& itr_tgt, const iterator_data& src)
+    static void create(iterator_data& , const iterator_data& )
     {
     }
 
-    static void advance(iterator_data& itr, std::ptrdiff_t idx)
+    static void advance(iterator_data& , std::ptrdiff_t )
     {
     }
 
-    static void destroy(iterator_data& itr)
+    static void destroy(iterator_data& )
     {
     }
 
-    static bool equal(const iterator_data& lhs_itr, const iterator_data& rhs_itr) RTTR_NOEXCEPT
+    static bool equal(const iterator_data& , const iterator_data& ) RTTR_NOEXCEPT
     {
         return true;
     }
 
-    static variant get_data(const iterator_data& itr)
+    static variant get_data(const iterator_data& )
     {
         return variant();
     }
 
-    static void begin(void* container, iterator_data& itr)
+    static void begin(void* , iterator_data& )
     {
     }
 
-    static bool is_empty(void* container)
+    static bool is_empty(void* )
     {
         return true;
     }
@@ -872,39 +872,39 @@ struct sequential_container_empty
         return 0;
     }
 
-    static type get_rank_type(std::size_t index)
+    static type get_rank_type(std::size_t )
     {
         return get_invalid_type();
     }
 
-    static std::size_t get_size(void* container)
+    static std::size_t get_size(void* )
     {
         return 0;
     }
 
-    static bool set_size(void* container, std::size_t size)
+    static bool set_size(void* , std::size_t )
     {
         return false;
     }
 
-    static void erase(void* container, const iterator_data& itr_pos, iterator_data& itr)
+    static void erase(void* , const iterator_data& , iterator_data& )
     {
     }
 
-    static void clear(void* container)
+    static void clear(void* )
     {
     }
 
-    static void insert(void* container, argument& value, const iterator_data& itr, iterator_data& pos)
+    static void insert(void* , argument& , const iterator_data& , iterator_data& )
     {
     }
 
-    static bool set_value(void* container, std::size_t index, argument& value)
+    static bool set_value(void* , std::size_t , argument& )
     {
         return false;
     }
 
-    static variant get_value(void* container, std::size_t index)
+    static variant get_value(void* , std::size_t )
     {
         return variant();
     }

@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.16)
 
 set(project_name fh-fundamental)
 project(${project_name} VERSION 0.1 LANGUAGES CXX)
+
+option(FUNDAMENTAL_ENABLE_TESTING "Enable testing of the fundamental library." ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Enbale code IDE to use folders, this will enable source_group(TREE,...)
@@ -26,8 +28,10 @@ include(cmake/import_benchmark_config.cmake)
 include(cmake/reflect-helper.cmake)
 add_subdirectory(third-parties)
 add_subdirectory(src)
-add_subdirectory(samples)
 
+if(FUNDAMENTAL_ENABLE_TESTING)
+    add_subdirectory(samples)
+endif()
 
 
 

@@ -164,7 +164,7 @@ static RTTR_INLINE is_nullptr(T& val)
 
 template<typename T>
 enable_if_t<!std::is_pointer<T>::value, bool>
-static RTTR_INLINE is_nullptr(T& to)
+static RTTR_INLINE is_nullptr(T& )
 {
     return false;
 }
@@ -186,7 +186,7 @@ enable_if_t<is_copyable<Tp>::value &&
 
 template<typename T, typename Tp = decay_except_array_t<wrapper_mapper_t<T>>>
 enable_if_t<!is_copyable<Tp>::value ||
-            !is_wrapper<T>::value, variant> get_wrapped_value(T& value)
+            !is_wrapper<T>::value, variant> get_wrapped_value(T& )
 {
     return variant();
 }
@@ -471,7 +471,7 @@ struct variant_data_policy_array_small : variant_data_base_policy<T, variant_dat
         return reinterpret_cast<const T&>(data);
     }
 
-    static RTTR_INLINE void destroy(T& value)
+    static RTTR_INLINE void destroy(T& )
     {
     }
 
@@ -551,7 +551,7 @@ struct variant_data_policy_arithmetic : variant_data_base_policy<T, variant_data
         return reinterpret_cast<const T&>(data);
     }
 
-    static RTTR_INLINE void destroy(T& value)
+    static RTTR_INLINE void destroy(T& )
     {
     }
 
@@ -603,7 +603,7 @@ struct RTTR_API variant_data_policy_string : variant_data_policy_big<std::string
  */
 struct RTTR_API variant_data_policy_empty
 {
-    static bool invoke(variant_policy_operation op, const variant_data& src_data, argument_wrapper arg)
+    static bool invoke(variant_policy_operation op, const variant_data& , argument_wrapper arg)
     {
         switch (op)
         {
@@ -711,7 +711,7 @@ struct RTTR_API variant_data_policy_empty
  */
 struct RTTR_API variant_data_policy_void
 {
-    static bool invoke(variant_policy_operation op, const variant_data& src_data, argument_wrapper arg)
+    static bool invoke(variant_policy_operation op, const variant_data& , argument_wrapper arg)
     {
         switch (op)
         {

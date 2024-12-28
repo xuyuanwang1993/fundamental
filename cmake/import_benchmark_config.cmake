@@ -1,4 +1,5 @@
 option(IMPORT_BENCHMARK "import benchmark" ON)
+option(BENCHMARK_ENABLE_TESTING "Enable testing of the benchmark library." OFF)
 if(IMPORT_BENCHMARK)
   include(FetchContent)
   FetchContent_Declare(
