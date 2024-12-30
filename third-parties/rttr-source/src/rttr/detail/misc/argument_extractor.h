@@ -68,14 +68,14 @@ struct argument_extractor
 
 private:
     template<typename container_type>
-    static void extract_types_recursively(container_type& container) { }
+    static void extract_types_recursively(container_type& ) { }
 
     /////////////////////////////////////////////////////////////////////////////////////
 
     template<typename container_type, typename U, typename... Args>
     static
     enable_if_t< !std::is_same<T, raw_type_t<U>>::value, void >
-    extract_types_recursively(container_type& container, U&& value, Args &&... tail)
+    extract_types_recursively(container_type& container, U&& , Args &&... tail)
     {
         extract_types_recursively(container, std::forward< Args >(tail)...);
     }

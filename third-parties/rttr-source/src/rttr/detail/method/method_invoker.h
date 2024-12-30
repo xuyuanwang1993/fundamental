@@ -100,7 +100,7 @@ template<typename F, std::size_t... ArgCount>
 struct method_invoker<F, default_invoke, return_func, index_sequence<ArgCount...>>
 {
     template<typename... TArgs>
-    RTTR_INLINE static variant invoke(const F& func, const instance& obj, const TArgs&...args)
+    RTTR_INLINE static variant invoke(const F& func, const instance& , const TArgs&...args)
     {
         if (check_all_true(args.template is_type< param_types_t<F, ArgCount> >()...))
             return func(args.template get_value< param_types_t<F, ArgCount> >()...);

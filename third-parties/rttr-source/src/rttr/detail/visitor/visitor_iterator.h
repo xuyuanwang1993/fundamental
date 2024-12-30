@@ -68,7 +68,7 @@ template<>
 struct RTTR_LOCAL visitor_iterator<>
 {
     template<typename Invoker>
-    static void visit(visitor& visitor, const Invoker& invoker)
+    static void visit(visitor& , const Invoker& )
     {
     }
 };

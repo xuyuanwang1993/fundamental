@@ -125,7 +125,7 @@ class registration::bind<detail::ctor, Class_Type, acc_level, Visitor_List, Ctor
         template<typename Policy, std::size_t Metadata_Count, typename...Param_Args>
         static RTTR_INLINE std::unique_ptr<detail::constructor_wrapper_base>
         create_constructor_wrapper(std::array<detail::metadata, Metadata_Count> metadata_list,
-                                   detail::default_args<> def_args,
+                                   detail::default_args<> /*def_args*/,
                                    detail::parameter_infos<Param_Args...> param_infos)
         {
             using namespace detail;

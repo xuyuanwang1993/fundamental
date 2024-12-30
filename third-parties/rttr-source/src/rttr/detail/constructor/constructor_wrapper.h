@@ -273,7 +273,7 @@ class constructor_wrapper<Class_Type, class_ctor, Acc_Level, Policy,
 
     public:
         constructor_wrapper(std::array<metadata, Metadata_Count> metadata_list,
-                            parameter_infos<> param_infos) RTTR_NOEXCEPT
+                            parameter_infos<> ) RTTR_NOEXCEPT
         :   metadata_handler<Metadata_Count>(std::move(metadata_list))
         {
             init();
@@ -307,7 +307,7 @@ class constructor_wrapper<Class_Type, class_ctor, Acc_Level, Policy,
         template<typename... TArgs>
         static RTTR_INLINE
         enable_if_t< !are_args_in_valid_range<type_list<Ctor_Args...>, type_list<TArgs...>>::value, variant>
-        invoke_impl(const TArgs&...args)
+        invoke_impl(const TArgs&...)
         {
             return variant();
         }

@@ -174,7 +174,7 @@ struct method_accessor
     template<typename... TArgs>
     static RTTR_INLINE
     enable_if_t< !does_argument_count_match<F, TArgs...>::value, variant>
-    invoke(const F& func_ptr, const instance& obj, const TArgs&...args)
+    invoke(const F& , const instance& , const TArgs&...)
     {
         return variant();
     }
