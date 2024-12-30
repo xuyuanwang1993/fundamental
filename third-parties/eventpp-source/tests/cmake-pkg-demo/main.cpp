@@ -16,30 +16,28 @@
 
 #include <iostream>
 
-int main()
-{
-	eventpp::EventQueue<int, void (const std::string &, std::unique_ptr<int> &)> queue;
+int main() {
+    eventpp::EventQueue<int, void(const std::string&, std::unique_ptr<int>&)> queue;
 
-	queue.appendListener(3, [](const std::string & s, std::unique_ptr<int> & n) {
-		std::cout << "Got event 3, s is " << s << " n is " << *n << std::endl;
-	});
-	// The listener prototype doesn't need to be exactly same as the dispatcher.
-	// It would be find as long as the arguments is compatible with the dispatcher.
-	queue.appendListener(5, [](std::string s, const std::unique_ptr<int> & n) {
-		std::cout << "Got event 5, s is " << s << " n is " << *n << std::endl;
-	});
-	queue.appendListener(5, [](const std::string & s, std::unique_ptr<int> & n) {
-		std::cout << "Got another event 5, s is " << s << " n is " << *n << std::endl;
-	});
+    queue.appendListener(3, [](const std::string& s, std::unique_ptr<int>& n) {
+        std::cout << "Got event 3, s is " << s << " n is " << *n << std::endl;
+    });
+    // The listener prototype doesn't need to be exactly same as the dispatcher.
+    // It would be find as long as the arguments is compatible with the dispatcher.
+    queue.appendListener(5, [](std::string s, const std::unique_ptr<int>& n) {
+        std::cout << "Got event 5, s is " << s << " n is " << *n << std::endl;
+    });
+    queue.appendListener(5, [](const std::string& s, std::unique_ptr<int>& n) {
+        std::cout << "Got another event 5, s is " << s << " n is " << *n << std::endl;
+    });
 
-	// Enqueue the events, the first argument is always the event type.
-	// The listeners are not triggered during enqueue.
-	queue.enqueue(3, "Hello", std::unique_ptr<int>(new int(38)));
-	queue.enqueue(5, "World", std::unique_ptr<int>(new int(58)));
+    // Enqueue the events, the first argument is always the event type.
+    // The listeners are not triggered during enqueue.
+    queue.enqueue(3, "Hello", std::unique_ptr<int>(new int(38)));
+    queue.enqueue(5, "World", std::unique_ptr<int>(new int(58)));
 
-	// Process the event queue, dispatch all queued events.
-	queue.process();
+    // Process the event queue, dispatch all queued events.
+    queue.process();
 
-	return 0;
+    return 0;
 }
-

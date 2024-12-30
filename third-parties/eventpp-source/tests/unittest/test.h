@@ -17,92 +17,90 @@
 #include "../catch.hpp"
 
 template <typename Callable, typename ReturnType = void>
-struct EraseArgs1
-{
-	template <typename C>
-	explicit EraseArgs1(const C & callable) : callable(callable)
-	{
-	}
+struct EraseArgs1 {
+    template <typename C>
+    explicit EraseArgs1(const C& callable) : callable(callable) {
+    }
 
-	template <typename First, typename ...Args>
-	ReturnType operator() (First &&, Args && ...args)
-	{
-		callable(std::forward(args)...);
-	}
+    template <typename First, typename... Args>
+    ReturnType operator()(First&&, Args&&... args) {
+        callable(std::forward(args)...);
+    }
 
-	Callable callable;
+    Callable callable;
 };
 
 template <typename Callable>
-EraseArgs1<Callable> eraseArgs1(const Callable & callable)
-{
-	return EraseArgs1<Callable>(callable);
+EraseArgs1<Callable> eraseArgs1(const Callable& callable) {
+    return EraseArgs1<Callable>(callable);
 }
 
 template <typename T>
-bool checkAllWeakPtrAreFreed(const T & nodeList)
-{
-	for(const auto & node : nodeList) {
-		if(node.lock()) {
-			return false;
-		}
-	}
+bool checkAllWeakPtrAreFreed(const T& nodeList) {
+    for (const auto& node : nodeList) {
+        if (node.lock()) {
+            return false;
+        }
+    }
 
-	return true;
+    return true;
 }
 
 // Can be converted from int implicitly
-struct FromInt
-{
-	FromInt() : value(0) {}
-	FromInt(const int value) : value(value) {}
+struct FromInt {
+    FromInt() : value(0) {
+    }
+    FromInt(const int value) : value(value) {
+    }
 
-	int value;
+    int value;
 };
 
 // Can convert to int implicitly
-struct ToInt
-{
-	ToInt() : value(0) {}
-	explicit ToInt(const int value) : value(value) {}
+struct ToInt {
+    ToInt() : value(0) {
+    }
+    explicit ToInt(const int value) : value(value) {
+    }
 
-	operator int() const { return value; }
+    operator int() const {
+        return value;
+    }
 
-	int value;
+    int value;
 };
 
 // return 0 -- no order, 1 -- ascend -1 -- descend
 template <typename Iterator>
-int detectDataListOrder(Iterator from, Iterator to)
-{
-	if(from == to) {
-		return 0;
-	}
-	auto previous = *from;
-	++from;
-	bool ascend = false;
-	bool descend = false;
-	while(from != to) {
-		auto current = *from;
-		++from;
-		if(current > previous) {
-			ascend = true;
-		}
-		if(current < previous) {
-			descend = true;
-		}
-		if(ascend && descend) {
-			return 0;
-		}
-		previous = current;
-	}
-	if(ascend) {
-		return 1;
-	}
-	if(descend) {
-		return -1;
-	}
-	return 0;
+int detectDataListOrder(Iterator from, Iterator to) {
+    if (from == to) {
+        return 0;
+    }
+    auto previous = *from;
+    ++from;
+    bool ascend  = false;
+    bool descend = false;
+    while (from != to) {
+        auto current = *from;
+        ++from;
+        if (current > previous) {
+            ascend = true;
+        }
+        if (current < previous) {
+            descend = true;
+        }
+        if (ascend && descend) {
+            return 0;
+        }
+        previous = current;
+    }
+    if (ascend) {
+        return 1;
+    }
+    if (descend) {
+        return -1;
+    }
+    return 0;
 }
 
 #endif

@@ -8,39 +8,32 @@
 #define CHAISCRIPT_TRACER_HPP_
 
 namespace chaiscript {
-  namespace eval {
+namespace eval {
 
+struct Noop_Tracer_Detail {
+    template <typename T>
+    void trace(const chaiscript::detail::Dispatch_State&, const AST_Node_Impl<T>*) {
+    }
+};
 
-    struct Noop_Tracer_Detail
-    {
-      template<typename T>
-        void trace(const chaiscript::detail::Dispatch_State &, const AST_Node_Impl<T> *)
-        {
-        }
-    };
+template <typename... T>
+struct Tracer : T... {
+    Tracer() = default;
+    explicit Tracer(T... t) : T(std::move(t))... {
+    }
 
-    template<typename ... T>
-      struct Tracer : T...
-    {
-      Tracer() = default;
-      explicit Tracer(T ... t)
-        : T(std::move(t))...
-      {
-      }
+    void do_trace(const chaiscript::detail::Dispatch_State& ds, const AST_Node_Impl<Tracer<T...>>* node) {
+        (void)std::initializer_list<int> { (static_cast<T&>(*this).trace(ds, node), 0)... };
+    }
 
-      void do_trace(const chaiscript::detail::Dispatch_State &ds, const AST_Node_Impl<Tracer<T...>> *node) {
-        (void)std::initializer_list<int>{ (static_cast<T&>(*this).trace(ds, node), 0)... };
-      }
-
-      static void trace(const chaiscript::detail::Dispatch_State &ds, const AST_Node_Impl<Tracer<T...>> *node) {
+    static void trace(const chaiscript::detail::Dispatch_State& ds, const AST_Node_Impl<Tracer<T...>>* node) {
         ds->get_parser().get_tracer<Tracer<T...>>().do_trace(ds, node);
-      }
-    };
+    }
+};
 
-    typedef Tracer<Noop_Tracer_Detail> Noop_Tracer;
+typedef Tracer<Noop_Tracer_Detail> Noop_Tracer;
 
-  }
-}
+} // namespace eval
+} // namespace chaiscript
 
 #endif
-

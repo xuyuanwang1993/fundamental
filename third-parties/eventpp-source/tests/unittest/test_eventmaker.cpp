@@ -11,98 +11,96 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "test.h"
 #include "eventpp/utilities/eventmaker.h"
+#include "test.h"
 
-enum class EventType
-{
-	draw,
-	update,
-	message,
-	keyDown,
-	keyUp
+enum class EventType {
+    draw,
+    update,
+    message,
+    keyDown,
+    keyUp
 };
 
-class Event
-{
+class Event {
 public:
-	explicit Event(const EventType type) : type(type) {}
-	virtual ~Event() {}
+    explicit Event(const EventType type) : type(type) {
+    }
+    virtual ~Event() {
+    }
 
-	EventType getType() const {
-		return type;
-	}
+    EventType getType() const {
+        return type;
+    }
 
 private:
-	EventType type;
+    EventType type;
 };
 
 EVENTPP_MAKE_EVENT(EventDraw, Event, EventType::draw, (std::string, getText, setText), (int, getX), (double, getSize));
 
-TEST_CASE("eventmake, simple EventDraw")
-{
-	EventDraw e("Hello", 98, 3.5);
-	REQUIRE(e.getType() == EventType::draw);
-	REQUIRE(e.getText() == "Hello");
-	REQUIRE(e.getX() == 98);
-	REQUIRE(e.getSize() == 3.5);
+TEST_CASE("eventmake, simple EventDraw") {
+    EventDraw e("Hello", 98, 3.5);
+    REQUIRE(e.getType() == EventType::draw);
+    REQUIRE(e.getText() == "Hello");
+    REQUIRE(e.getX() == 98);
+    REQUIRE(e.getSize() == 3.5);
 
-	e.setText("world");
-	REQUIRE(e.getText() == "world");
+    e.setText("world");
+    REQUIRE(e.getText() == "world");
 }
 
 template <EventType eventType>
 EVENTPP_MAKE_EVENT(EventKey, Event, eventType, (int, getKey));
 
-TEST_CASE("eventmake, templated EventKey")
-{
-	EventKey<EventType::keyUp> eventKeyUp(0);
-	REQUIRE(eventKeyUp.getType() == EventType::keyUp);
+TEST_CASE("eventmake, templated EventKey") {
+    EventKey<EventType::keyUp> eventKeyUp(0);
+    REQUIRE(eventKeyUp.getType() == EventType::keyUp);
 }
 
 template <int A, int B>
-class TemplatedEvent
-{
+class TemplatedEvent {
 public:
-	TemplatedEvent(const EventType type, const int c) : type(type), c(c) {}
-	virtual ~TemplatedEvent() {}
+    TemplatedEvent(const EventType type, const int c) : type(type), c(c) {
+    }
+    virtual ~TemplatedEvent() {
+    }
 
-	EventType getType() const {
-		return type;
-	}
+    EventType getType() const {
+        return type;
+    }
 
-	int getA() const {
-		return A;
-	}
+    int getA() const {
+        return A;
+    }
 
-	int getB() const {
-		return B;
-	}
+    int getB() const {
+        return B;
+    }
 
-	int getC() const {
-		return c;
-	}
+    int getC() const {
+        return c;
+    }
 
 private:
-	EventType type;
-	int c;
+    EventType type;
+    int c;
 };
 
-EVENTPP_MAKE_EVENT(EventTemplatedDraw, (TemplatedEvent<3, 8>), (EventType::draw, 9), (std::string, getText, setText), (int, getX), (double, getSize));
-TEST_CASE("eventmake, TemplatedEvent")
-{
-	EventTemplatedDraw e("Hello", 98, 3.5);
-	
-	REQUIRE(e.getA() == 3);
-	REQUIRE(e.getB() == 8);
-	REQUIRE(e.getC() == 9);
+EVENTPP_MAKE_EVENT(EventTemplatedDraw, (TemplatedEvent<3, 8>), (EventType::draw, 9), (std::string, getText, setText),
+                   (int, getX), (double, getSize));
+TEST_CASE("eventmake, TemplatedEvent") {
+    EventTemplatedDraw e("Hello", 98, 3.5);
 
-	REQUIRE(e.getType() == EventType::draw);
-	REQUIRE(e.getText() == "Hello");
-	REQUIRE(e.getX() == 98);
-	REQUIRE(e.getSize() == 3.5);
+    REQUIRE(e.getA() == 3);
+    REQUIRE(e.getB() == 8);
+    REQUIRE(e.getC() == 9);
 
-	e.setText("world");
-	REQUIRE(e.getText() == "world");
+    REQUIRE(e.getType() == EventType::draw);
+    REQUIRE(e.getText() == "Hello");
+    REQUIRE(e.getX() == 98);
+    REQUIRE(e.getSize() == 3.5);
+
+    e.setText("world");
+    REQUIRE(e.getText() == "world");
 }
-

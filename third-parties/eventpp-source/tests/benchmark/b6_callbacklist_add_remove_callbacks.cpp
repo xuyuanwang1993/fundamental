@@ -11,33 +11,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "test.h"
 #include "eventpp/callbacklist.h"
+#include "test.h"
 
-TEST_CASE("b6, CallbackList add/remove callbacks")
-{
-	using CL = eventpp::CallbackList<void ()>;
-	constexpr size_t callbackCount = 1000;
-	constexpr size_t iterateCount = 1000 * 100;
-	CL callbackList;
-	std::vector<CL::Handle> handleList(callbackCount);
-	const uint64_t time = measureElapsedTime(
-		[callbackCount, iterateCount, &callbackList, &handleList]() {
-		for(size_t iterate = 0; iterate < iterateCount; ++iterate) {
-			for(size_t i = 0; i < callbackCount; ++i) {
-				handleList[i] = callbackList.append([]() {});
-			}
-			for(size_t i = 0; i < callbackCount; ++i) {
-				callbackList.remove(handleList[i]);
-			}
-		}
-	});
+TEST_CASE("b6, CallbackList add/remove callbacks") {
+    using CL                       = eventpp::CallbackList<void()>;
+    constexpr size_t callbackCount = 1000;
+    constexpr size_t iterateCount  = 1000 * 100;
+    CL callbackList;
+    std::vector<CL::Handle> handleList(callbackCount);
+    const uint64_t time = measureElapsedTime([callbackCount, iterateCount, &callbackList, &handleList]() {
+        for (size_t iterate = 0; iterate < iterateCount; ++iterate) {
+            for (size_t i = 0; i < callbackCount; ++i) {
+                handleList[i] = callbackList.append([]() {});
+            }
+            for (size_t i = 0; i < callbackCount; ++i) {
+                callbackList.remove(handleList[i]);
+            }
+        }
+    });
 
-	std::cout
-		<< "CallbackList add/remove callbacks,"
-		<< " callbackCount: " << callbackCount
-		<< " iterateCount: " << iterateCount
-		<< " time: " << time
-		<< std::endl;
+    std::cout << "CallbackList add/remove callbacks,"
+              << " callbackCount: " << callbackCount << " iterateCount: " << iterateCount << " time: " << time
+              << std::endl;
 }
-

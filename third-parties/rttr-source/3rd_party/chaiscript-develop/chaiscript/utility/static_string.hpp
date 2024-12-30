@@ -7,31 +7,26 @@
 #ifndef CHAISCRIPT_UTILITY_STATIC_STRING_HPP_
 #define CHAISCRIPT_UTILITY_STATIC_STRING_HPP_
 
-namespace chaiscript
-{
-  namespace utility
-  {
+namespace chaiscript {
+namespace utility {
 
-    struct Static_String
-    {
-      template<size_t N>
-        constexpr Static_String(const char (&str)[N])
-        : m_size(N-1), data(&str[0])
-        {
-        }
+struct Static_String {
+    template <size_t N>
+    constexpr Static_String(const char (&str)[N]) : m_size(N - 1), data(&str[0]) {
+    }
 
-      constexpr size_t size() const {
+    constexpr size_t size() const {
         return m_size;
-      }
+    }
 
-      constexpr const char *c_str() const {
+    constexpr const char* c_str() const {
         return data;
-      }
+    }
 
-      const size_t m_size;
-      const char *data = nullptr;
-    };
-  }
-}
+    const size_t m_size;
+    const char* data = nullptr;
+};
+} // namespace utility
+} // namespace chaiscript
 
 #endif

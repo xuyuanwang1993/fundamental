@@ -20,309 +20,232 @@ namespace eventpp {
 
 namespace internal_ {
 
-template <
-	typename EventType_,
-	typename Prototype_,
-	typename Policies_,
-	typename MixinRoot_
->
+template <typename EventType_, typename Prototype_, typename Policies_, typename MixinRoot_>
 class EventDispatcherBase;
 
-template <
-	typename EventType_,
-	typename Policies_,
-	typename MixinRoot_,
-	typename ReturnType, typename ...Args
->
-class EventDispatcherBase <
-	EventType_,
-	ReturnType (Args...),
-	Policies_,
-	MixinRoot_
->
-{
+template <typename EventType_, typename Policies_, typename MixinRoot_, typename ReturnType, typename... Args>
+class EventDispatcherBase<EventType_, ReturnType(Args...), Policies_, MixinRoot_> {
 protected:
-	using ThisType = EventDispatcherBase<
-		EventType_,
-		ReturnType (Args...),
-		Policies_,
-		MixinRoot_
-	>;
-	using MixinRoot = typename std::conditional<
-		std::is_same<MixinRoot_, void>::value,
-		ThisType,
-		MixinRoot_
-	>::type;
-	using Policies = Policies_;
+    using ThisType  = EventDispatcherBase<EventType_, ReturnType(Args...), Policies_, MixinRoot_>;
+    using MixinRoot = typename std::conditional<std::is_same<MixinRoot_, void>::value, ThisType, MixinRoot_>::type;
+    using Policies  = Policies_;
 
-	using Threading = typename SelectThreading<Policies_, HasTypeThreading<Policies_>::value>::Type;
+    using Threading = typename SelectThreading<Policies_, HasTypeThreading<Policies_>::value>::Type;
 
-	using ArgumentPassingMode = typename SelectArgumentPassingMode<
-		Policies_,
-		HasTypeArgumentPassingMode<Policies_>::value,
-		ArgumentPassingAutoDetect
-	>::Type;
+    using ArgumentPassingMode =
+        typename SelectArgumentPassingMode<Policies_, HasTypeArgumentPassingMode<Policies_>::value,
+                                           ArgumentPassingAutoDetect>::Type;
 
-	using Callback_ = typename SelectCallback<
-		Policies_,
-		HasTypeCallback<Policies_>::value,
-		std::function<ReturnType (Args...)>
-	>::Type;
-	using CallbackList_ = CallbackList<ReturnType (Args...), Policies_>;
+    using Callback_ =
+        typename SelectCallback<Policies_, HasTypeCallback<Policies_>::value, std::function<ReturnType(Args...)>>::Type;
+    using CallbackList_ = CallbackList<ReturnType(Args...), Policies_>;
 
-	using Prototype = ReturnType (Args...);
+    using Prototype = ReturnType(Args...);
 
-	using Map = typename SelectMap<
-		EventType_,
-		CallbackList_,
-		Policies_,
-		HasTemplateMap<Policies_>::value
-	>::Type;
+    using Map = typename SelectMap<EventType_, CallbackList_, Policies_, HasTemplateMap<Policies_>::value>::Type;
 
-	using Mixins = typename internal_::SelectMixins<
-		Policies_,
-		internal_::HasTypeMixins<Policies_>::value
-	>::Type;
+    using Mixins = typename internal_::SelectMixins<Policies_, internal_::HasTypeMixins<Policies_>::value>::Type;
 
 public:
-	using Handle = typename CallbackList_::Handle;
-	using Callback = Callback_;
-	using Event = EventType_;
-	using Mutex = typename Threading::Mutex;
+    using Handle   = typename CallbackList_::Handle;
+    using Callback = Callback_;
+    using Event    = EventType_;
+    using Mutex    = typename Threading::Mutex;
 
 public:
-	EventDispatcherBase()
-		:
-			eventCallbackListMap(),
-			listenerMutex()
-	{
-	}
+    EventDispatcherBase() : eventCallbackListMap(), listenerMutex() {
+    }
 
-	EventDispatcherBase(const EventDispatcherBase & other)
-		:
-			eventCallbackListMap(other.eventCallbackListMap),
-			listenerMutex()
-	{
-	}
+    EventDispatcherBase(const EventDispatcherBase& other) :
+    eventCallbackListMap(other.eventCallbackListMap), listenerMutex() {
+    }
 
-	EventDispatcherBase(EventDispatcherBase && other) noexcept
-		:
-			eventCallbackListMap(std::move(other.eventCallbackListMap)),
-			listenerMutex()
-	{
-	}
+    EventDispatcherBase(EventDispatcherBase&& other) noexcept :
+    eventCallbackListMap(std::move(other.eventCallbackListMap)), listenerMutex() {
+    }
 
-	EventDispatcherBase & operator = (const EventDispatcherBase & other)
-	{
-		eventCallbackListMap = other.eventCallbackListMap;
-		return *this;
-	}
+    EventDispatcherBase& operator=(const EventDispatcherBase& other) {
+        eventCallbackListMap = other.eventCallbackListMap;
+        return *this;
+    }
 
-	EventDispatcherBase & operator = (EventDispatcherBase && other) noexcept
-	{
-		eventCallbackListMap = std::move(other.eventCallbackListMap);
-		return *this;
-	}
+    EventDispatcherBase& operator=(EventDispatcherBase&& other) noexcept {
+        eventCallbackListMap = std::move(other.eventCallbackListMap);
+        return *this;
+    }
 
-	void swap(EventDispatcherBase & other) noexcept {
-		using std::swap;
-		
-		swap(eventCallbackListMap, other.eventCallbackListMap);
-	}
+    void swap(EventDispatcherBase& other) noexcept {
+        using std::swap;
 
-	Handle appendListener(const Event & event, const Callback & callback)
-	{
-		std::lock_guard<Mutex> lockGuard(listenerMutex);
+        swap(eventCallbackListMap, other.eventCallbackListMap);
+    }
 
-		return eventCallbackListMap[event].append(callback);
-	}
+    Handle appendListener(const Event& event, const Callback& callback) {
+        std::lock_guard<Mutex> lockGuard(listenerMutex);
 
-	Handle prependListener(const Event & event, const Callback & callback)
-	{
-		std::lock_guard<Mutex> lockGuard(listenerMutex);
+        return eventCallbackListMap[event].append(callback);
+    }
 
-		return eventCallbackListMap[event].prepend(callback);
-	}
+    Handle prependListener(const Event& event, const Callback& callback) {
+        std::lock_guard<Mutex> lockGuard(listenerMutex);
 
-	Handle insertListener(const Event & event, const Callback & callback, const Handle & before)
-	{
-		std::lock_guard<Mutex> lockGuard(listenerMutex);
+        return eventCallbackListMap[event].prepend(callback);
+    }
 
-		return eventCallbackListMap[event].insert(callback, before);
-	}
+    Handle insertListener(const Event& event, const Callback& callback, const Handle& before) {
+        std::lock_guard<Mutex> lockGuard(listenerMutex);
 
-	bool removeListener(const Event & event, const Handle handle)
-	{
-		CallbackList_ * callableList = doFindCallableList(event);
-		if(callableList) {
-			return callableList->remove(handle);
-		}
+        return eventCallbackListMap[event].insert(callback, before);
+    }
 
-		return false;
-	}
+    bool removeListener(const Event& event, const Handle handle) {
+        CallbackList_* callableList = doFindCallableList(event);
+        if (callableList) {
+            return callableList->remove(handle);
+        }
 
-	bool hasAnyListener(const Event & event) const
-	{
-		const CallbackList_ * callableList = doFindCallableList(event);
-		if(callableList) {
-			return ! callableList->empty();
-		}
+        return false;
+    }
 
-		return false;
-	}
+    bool hasAnyListener(const Event& event) const {
+        const CallbackList_* callableList = doFindCallableList(event);
+        if (callableList) {
+            return !callableList->empty();
+        }
 
-	bool ownsHandle(const Event & event, const Handle & handle) const
-	{
-		const CallbackList_ * callableList = doFindCallableList(event);
-		if(callableList) {
-			return callableList->ownsHandle(handle);
-		}
+        return false;
+    }
 
-		return false;
-	}
+    bool ownsHandle(const Event& event, const Handle& handle) const {
+        const CallbackList_* callableList = doFindCallableList(event);
+        if (callableList) {
+            return callableList->ownsHandle(handle);
+        }
 
-	template <typename Func>
-	void forEach(const Event & event, Func && func) const
-	{
-		const CallbackList_ * callableList = doFindCallableList(event);
-		if(callableList) {
-			callableList->forEach(std::forward<Func>(func));
-		}
-	}
+        return false;
+    }
 
-	template <typename Func>
-	bool forEachIf(const Event & event, Func && func) const
-	{
-		const CallbackList_ * callableList = doFindCallableList(event);
-		if (callableList) {
-			return callableList->forEachIf(std::forward<Func>(func));
-		}
+    template <typename Func>
+    void forEach(const Event& event, Func&& func) const {
+        const CallbackList_* callableList = doFindCallableList(event);
+        if (callableList) {
+            callableList->forEach(std::forward<Func>(func));
+        }
+    }
 
-		return true;
-	}
+    template <typename Func>
+    bool forEachIf(const Event& event, Func&& func) const {
+        const CallbackList_* callableList = doFindCallableList(event);
+        if (callableList) {
+            return callableList->forEachIf(std::forward<Func>(func));
+        }
 
-	void dispatch(Args ...args) const
-	{
-		static_assert(ArgumentPassingMode::canIncludeEventType, "Dispatching arguments count doesn't match required (Event type should be included).");
+        return true;
+    }
 
-		using GetEvent = typename SelectGetEvent<Policies_, EventType_, HasFunctionGetEvent<Policies_, Args...>::value>::Type;
+    void dispatch(Args... args) const {
+        static_assert(ArgumentPassingMode::canIncludeEventType,
+                      "Dispatching arguments count doesn't match required (Event type should be included).");
 
-		// can't std::forward<Args>(args) in GetEvent::getEvent because the pass by value arguments will be moved to getEvent
-		// then the other std::forward<Args>(args) to directDispatch will get empty values.
-		directDispatch(
-			GetEvent::getEvent(args...),
-			std::forward<Args>(args)...
-		);
-	}
+        using GetEvent =
+            typename SelectGetEvent<Policies_, EventType_, HasFunctionGetEvent<Policies_, Args...>::value>::Type;
 
-	template <typename T>
-	void dispatch(T && first, Args ...args) const
-	{
-		static_assert(ArgumentPassingMode::canExcludeEventType, "Dispatching arguments count doesn't match required (Event type should NOT be included).");
+        // can't std::forward<Args>(args) in GetEvent::getEvent because the pass by value arguments will be moved to
+        // getEvent then the other std::forward<Args>(args) to directDispatch will get empty values.
+        directDispatch(GetEvent::getEvent(args...), std::forward<Args>(args)...);
+    }
 
-		using GetEvent = typename SelectGetEvent<Policies_, EventType_, HasFunctionGetEvent<Policies_, T &&, Args...>::value>::Type;
+    template <typename T>
+    void dispatch(T&& first, Args... args) const {
+        static_assert(ArgumentPassingMode::canExcludeEventType,
+                      "Dispatching arguments count doesn't match required (Event type should NOT be included).");
 
-		directDispatch(
-			GetEvent::getEvent(std::forward<T>(first), args...),
-			std::forward<Args>(args)...
-		);
-	}
+        using GetEvent =
+            typename SelectGetEvent<Policies_, EventType_, HasFunctionGetEvent<Policies_, T&&, Args...>::value>::Type;
 
-	// Bypass any getEvent policy. The first argument is the event type.
-	// Most used for internal purpose.
-	void directDispatch(const Event & e, Args ...args) const
-	{
-		if(! internal_::ForEachMixins<MixinRoot, Mixins, DoMixinBeforeDispatch>::forEach(
-			this, typename std::add_lvalue_reference<Args>::type(args)...)) {
-			return;
-		}
+        directDispatch(GetEvent::getEvent(std::forward<T>(first), args...), std::forward<Args>(args)...);
+    }
 
-		const CallbackList_ * callableList = doFindCallableList(e);
-		if(callableList) {
-			(*callableList)(std::forward<Args>(args)...);
-		}
-	}
+    // Bypass any getEvent policy. The first argument is the event type.
+    // Most used for internal purpose.
+    void directDispatch(const Event& e, Args... args) const {
+        if (!internal_::ForEachMixins<MixinRoot, Mixins, DoMixinBeforeDispatch>::forEach(
+                this, typename std::add_lvalue_reference<Args>::type(args)...)) {
+            return;
+        }
+
+        const CallbackList_* callableList = doFindCallableList(e);
+        if (callableList) {
+            (*callableList)(std::forward<Args>(args)...);
+        }
+    }
 
 protected:
-	const CallbackList_ * doFindCallableList(const Event & e) const
-	{
-		return doFindCallableListHelper(this, e);
-	}
+    const CallbackList_* doFindCallableList(const Event& e) const {
+        return doFindCallableListHelper(this, e);
+    }
 
-	CallbackList_ * doFindCallableList(const Event & e)
-	{
-		return doFindCallableListHelper(this, e);
-	}
+    CallbackList_* doFindCallableList(const Event& e) {
+        return doFindCallableListHelper(this, e);
+    }
 
 private:
-	// template helper to avoid code duplication in doFindCallableList
-	template <typename T>
-	static auto doFindCallableListHelper(T * self, const Event & e)
-		-> typename std::conditional<std::is_const<T>::value, const CallbackList_ *, CallbackList_ *>::type
-	{
-		std::lock_guard<Mutex> lockGuard(self->listenerMutex);
+    // template helper to avoid code duplication in doFindCallableList
+    template <typename T>
+    static auto doFindCallableListHelper(T* self, const Event& e) ->
+        typename std::conditional<std::is_const<T>::value, const CallbackList_*, CallbackList_*>::type {
+        std::lock_guard<Mutex> lockGuard(self->listenerMutex);
 
-		auto it = self->eventCallbackListMap.find(e);
-		if(it != self->eventCallbackListMap.end()) {
-			return &it->second;
-		}
-		else {
-			return nullptr;
-		}
-	}
+        auto it = self->eventCallbackListMap.find(e);
+        if (it != self->eventCallbackListMap.end()) {
+            return &it->second;
+        } else {
+            return nullptr;
+        }
+    }
 
 private:
-	// Mixin related
-	struct DoMixinBeforeDispatch
-	{
-		template <typename T, typename Self, typename ...A>
-		static auto forEach(const Self * self, A && ...args)
-			-> typename std::enable_if<HasFunctionMixinBeforeDispatch<T, A...>::value, bool>::type {
-			return static_cast<const T *>(self)->mixinBeforeDispatch(std::forward<A>(args)...);
-		}
+    // Mixin related
+    struct DoMixinBeforeDispatch {
+        template <typename T, typename Self, typename... A>
+        static auto forEach(const Self* self, A&&... args) ->
+            typename std::enable_if<HasFunctionMixinBeforeDispatch<T, A...>::value, bool>::type {
+            return static_cast<const T*>(self)->mixinBeforeDispatch(std::forward<A>(args)...);
+        }
 
-		template <typename T, typename Self, typename ...A>
-		static auto forEach(const Self * /*self*/, A && ... /*args*/)
-			-> typename std::enable_if<! HasFunctionMixinBeforeDispatch<T, A...>::value, bool>::type {
-			return true;
-		}
-	};
+        template <typename T, typename Self, typename... A>
+        static auto forEach(const Self* /*self*/, A&&... /*args*/) ->
+            typename std::enable_if<!HasFunctionMixinBeforeDispatch<T, A...>::value, bool>::type {
+            return true;
+        }
+    };
 
 private:
-	Map eventCallbackListMap;
-	mutable Mutex listenerMutex;
+    Map eventCallbackListMap;
+    mutable Mutex listenerMutex;
 };
 
+} // namespace internal_
 
-} //namespace internal_
-
-template <
-	typename Event_,
-	typename Prototype_,
-	typename Policies_ = DefaultPolicies
->
-class EventDispatcher : public internal_::InheritMixins<
-		internal_::EventDispatcherBase<Event_, Prototype_, Policies_, void>,
-		typename internal_::SelectMixins<Policies_, internal_::HasTypeMixins<Policies_>::value >::Type
-	>::Type, public TagEventDispatcher
-{
+template <typename Event_, typename Prototype_, typename Policies_ = DefaultPolicies>
+class EventDispatcher
+: public internal_::InheritMixins<
+      internal_::EventDispatcherBase<Event_, Prototype_, Policies_, void>,
+      typename internal_::SelectMixins<Policies_, internal_::HasTypeMixins<Policies_>::value>::Type>::Type,
+  public TagEventDispatcher {
 private:
-	using super = typename internal_::InheritMixins<
-		internal_::EventDispatcherBase<Event_, Prototype_, Policies_, void>,
-		typename internal_::SelectMixins<Policies_, internal_::HasTypeMixins<Policies_>::value >::Type
-	>::Type;
+    using super = typename internal_::InheritMixins<
+        internal_::EventDispatcherBase<Event_, Prototype_, Policies_, void>,
+        typename internal_::SelectMixins<Policies_, internal_::HasTypeMixins<Policies_>::value>::Type>::Type;
 
 public:
-	using super::super;
-	
-	friend void swap(EventDispatcher & first, EventDispatcher & second) noexcept {
-		first.swap(second);
-	}
+    using super::super;
+
+    friend void swap(EventDispatcher& first, EventDispatcher& second) noexcept {
+        first.swap(second);
+    }
 };
 
-
-} //namespace eventpp
-
+} // namespace eventpp
 
 #endif
-

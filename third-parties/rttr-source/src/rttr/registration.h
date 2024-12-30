@@ -1,55 +1,53 @@
 /************************************************************************************
-*                                                                                   *
-*   Copyright (c) 2014 - 2018 Axel Menzel <info@rttr.org>                           *
-*                                                                                   *
-*   This file is part of RTTR (Run Time Type Reflection)                            *
-*   License: MIT License                                                            *
-*                                                                                   *
-*   Permission is hereby granted, free of charge, to any person obtaining           *
-*   a copy of this software and associated documentation files (the "Software"),    *
-*   to deal in the Software without restriction, including without limitation       *
-*   the rights to use, copy, modify, merge, publish, distribute, sublicense,        *
-*   and/or sell copies of the Software, and to permit persons to whom the           *
-*   Software is furnished to do so, subject to the following conditions:            *
-*                                                                                   *
-*   The above copyright notice and this permission notice shall be included in      *
-*   all copies or substantial portions of the Software.                             *
-*                                                                                   *
-*   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR      *
-*   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,        *
-*   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE     *
-*   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER          *
-*   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,   *
-*   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE   *
-*   SOFTWARE.                                                                       *
-*                                                                                   *
-*************************************************************************************/
+ *                                                                                   *
+ *   Copyright (c) 2014 - 2018 Axel Menzel <info@rttr.org>                           *
+ *                                                                                   *
+ *   This file is part of RTTR (Run Time Type Reflection)                            *
+ *   License: MIT License                                                            *
+ *                                                                                   *
+ *   Permission is hereby granted, free of charge, to any person obtaining           *
+ *   a copy of this software and associated documentation files (the "Software"),    *
+ *   to deal in the Software without restriction, including without limitation       *
+ *   the rights to use, copy, modify, merge, publish, distribute, sublicense,        *
+ *   and/or sell copies of the Software, and to permit persons to whom the           *
+ *   Software is furnished to do so, subject to the following conditions:            *
+ *                                                                                   *
+ *   The above copyright notice and this permission notice shall be included in      *
+ *   all copies or substantial portions of the Software.                             *
+ *                                                                                   *
+ *   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR      *
+ *   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,        *
+ *   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE     *
+ *   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER          *
+ *   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,   *
+ *   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE   *
+ *   SOFTWARE.                                                                       *
+ *                                                                                   *
+ *************************************************************************************/
 
 #ifndef RTTR_REGISTRATION_H_
 #define RTTR_REGISTRATION_H_
 
-#include "rttr/detail/base/core_prerequisites.h"
-#include "rttr/policy.h"
 #include "rttr/access_levels.h"
-#include "rttr/detail/registration/bind_types.h"
-#include "rttr/detail/registration/registration_executer.h"
+#include "rttr/detail/base/core_prerequisites.h"
 #include "rttr/detail/default_arguments/default_arguments.h"
 #include "rttr/detail/parameter_info/parameter_names.h"
-#include "rttr/variant.h"
+#include "rttr/detail/registration/bind_types.h"
+#include "rttr/detail/registration/registration_executer.h"
 #include "rttr/detail/visitor/visitor_registration.h"
-namespace rttr
-{
+#include "rttr/policy.h"
+#include "rttr/variant.h"
+namespace rttr {
 
-namespace detail
-{
-    class metadata;
-    template<typename Enum_Type>
-    class enum_data;
-    struct public_access    {};
-    struct protected_access {};
-    struct private_access   {};
-    using access_levels_list = type_list<public_access, protected_access, private_access>;
-}
+namespace detail {
+class metadata;
+template <typename Enum_Type>
+class enum_data;
+struct public_access {};
+struct protected_access {};
+struct private_access {};
+using access_levels_list = type_list<public_access, protected_access, private_access>;
+} // namespace detail
 
 /*!
  * The \ref registration class is the entry point for the manual registration of reflection information
@@ -112,165 +110,173 @@ namespace detail
  *  }
  * \endcode
  *
- * \remark See the usage of `()` operator to add additional \ref rttr::metadata(variant, variant) "meta data", \ref policy "policies" or
- *         \ref rttr::value "enum values".
+ * \remark See the usage of `()` operator to add additional \ref rttr::metadata(variant, variant) "meta data", \ref
+ * policy "policies" or \ref rttr::value "enum values".
  *
  */
-class RTTR_API registration
-{
+class RTTR_API registration {
 public:
-    template<typename...T>
+    template <typename... T>
     class bind;
 
     /*!
      * The \ref class_ is used to register classes to RTTR.
      */
-    template<typename Class_Type, typename Visitor_List = READ_TL(rttr_visitor_list)>
-    class class_
-    {
-        public:
-            /*!
-             * \brief Construct a class_ object with the given name \p name.
-             *
-             * \param name The name of the class as string literal. Can be retrieved later via type::get_name().
-             *
-             */
-            class_(string_view name);
-            ~class_();
+    template <typename Class_Type, typename Visitor_List = READ_TL(rttr_visitor_list)>
+    class class_ {
+    public:
+        /*!
+         * \brief Construct a class_ object with the given name \p name.
+         *
+         * \param name The name of the class as string literal. Can be retrieved later via type::get_name().
+         *
+         */
+        class_(string_view name);
+        ~class_();
 
+        /*!
+         * \brief The bracket operator can be used to add additional meta data to the class type.
+         *
+         */
+        template <typename... Args>
+        class_<Class_Type, Visitor_List>& operator()(Args&&... args);
 
-            /*!
-             * \brief The bracket operator can be used to add additional meta data to the class type.
-             *
-             */
-            template<typename...Args>
-            class_<Class_Type, Visitor_List>& operator()(Args&&...args);
+        /*!
+         * \brief Register a constructor for this class type with or without arguments.
+         *
+         * \param level  The access level of the constructor; default is: registration::public_access.<br>
+         *               (can be also: registration::protected_access or registration::private_access)
+         *
+         * \remark The default constructor create policy is: \ref policy::ctor::as_std_shared_ptr.
+         *
+         * \see constructor, type::get_constructor(), type::create()
+         *
+         * \return A \ref bind object, in order to chain more calls.
+         */
+        template <
+            typename... Args, typename acc_level = detail::public_access,
+            typename Tp = typename std::enable_if<detail::contains<acc_level, detail::access_levels_list>::value>::type>
+        bind<detail::ctor, Class_Type, acc_level, Visitor_List, Args...> constructor(acc_level level = acc_level());
 
+        /*!
+         * \brief Register a constructor for this class type which uses a function \p F.
+         *
+         * \param func   A function which creates an instance of \p Class_Type;
+         *               This can be a pointer to a function or a std::function.
+         * \param level  The access level of the constructor; default is: registration::public_access.<br>
+         *               (can be also: registration::protected_access or registration::private_access)
+         *
+         * \see constructor, type::get_constructor(), type::create()
+         *
+         * \return A \ref bind object, in order to chain more calls.
+         */
+        template <typename F, typename acc_level = detail::public_access,
+                  typename Tp = typename std::enable_if<!detail::contains<F, detail::access_levels_list>::value>::type>
+        bind<detail::ctor_func, Class_Type, F, acc_level, Visitor_List> constructor(F func,
+                                                                                    acc_level level = acc_level());
 
-            /*!
-             * \brief Register a constructor for this class type with or without arguments.
-             *
-             * \param level  The access level of the constructor; default is: registration::public_access.<br>
-             *               (can be also: registration::protected_access or registration::private_access)
-             *
-             * \remark The default constructor create policy is: \ref policy::ctor::as_std_shared_ptr.
-             *
-             * \see constructor, type::get_constructor(), type::create()
-             *
-             * \return A \ref bind object, in order to chain more calls.
-             */
-            template<typename... Args, typename acc_level = detail::public_access, typename Tp = typename std::enable_if<detail::contains<acc_level, detail::access_levels_list>::value>::type>
-            bind<detail::ctor, Class_Type, acc_level, Visitor_List, Args...> constructor(acc_level level = acc_level());
+        /*!
+         * \brief Register a property to this class.
+         *
+         * \param name  The name of the property.
+         * \param acc   The accessor to the property; this can be a pointer to a member or a pointer to a variable.
+         * \param level  The access level of the property; default is: registration::public_access.<br>
+         *               (can be also: registration::protected_access or registration::private_access)
+         *
+         * \remark The name of the property has to be unique for this class, otherwise it will not be registered.
+         *
+         * \see property, type::get_property(), type::get_property_value(), type::set_property_value()
+         *
+         * \return A \ref bind object, in order to chain more calls.
+         */
+        template <
+            typename A, typename acc_level = detail::public_access,
+            typename Tp = typename std::enable_if<detail::contains<acc_level, detail::access_levels_list>::value>::type>
+        bind<detail::prop, Class_Type, A, acc_level, Visitor_List> property(string_view name, A acc,
+                                                                            acc_level level = acc_level());
 
-            /*!
-             * \brief Register a constructor for this class type which uses a function \p F.
-             *
-             * \param func   A function which creates an instance of \p Class_Type;
-             *               This can be a pointer to a function or a std::function.
-             * \param level  The access level of the constructor; default is: registration::public_access.<br>
-             *               (can be also: registration::protected_access or registration::private_access)
-             *
-             * \see constructor, type::get_constructor(), type::create()
-             *
-             * \return A \ref bind object, in order to chain more calls.
-             */
-            template<typename F, typename acc_level = detail::public_access, typename Tp = typename std::enable_if<!detail::contains<F, detail::access_levels_list>::value>::type>
-            bind<detail::ctor_func, Class_Type, F, acc_level, Visitor_List> constructor(F func, acc_level level = acc_level());
+        /*!
+         * \brief Register a read only property to this class.
+         *
+         * \param name  The name of the property.
+         * \param acc   The accessor to the property; this can be a pointer to a member, a pointer to a variable,
+         *              a pointer to a member function, a pointer to a function or a std::function.
+         * \param level  The access level of the read only property; default is: registration::public_access.<br>
+         *               (can be: registration::protected_access or registration::private_access)
+         *
+         * \remark The name of the property has to be unique for this class, otherwise it will not be registered.
+         *
+         * \see property, type::get_property(), type::get_property_value(), type::set_property_value()
+         *
+         * \return A \ref bind object, in order to chain more calls.
+         */
+        template <
+            typename A, typename acc_level = detail::public_access,
+            typename Tp = typename std::enable_if<detail::contains<acc_level, detail::access_levels_list>::value>::type>
+        bind<detail::prop_readonly, Class_Type, A, acc_level, Visitor_List> property_readonly(
+            string_view name, A acc, acc_level level = acc_level());
 
+        /*!
+         * \brief Register a property to this class.
+         *
+         * \param name   The name of the property.
+         * \param getter The getter accessor to the property; this can be a pointer to a member function,
+         *               a pointer to a function or a std::function.
+         * \param setter The setter accessor to the property; this can be a pointer to a member function,
+         *               a pointer to a function or a std::function.
+         * \param level  The access level of the property; default is: registration::public_access.<br>
+         *               (can be also: registration::protected_access or registration::private_access)
+         *
+         * \remark The name of the property has to be unique for this class, otherwise it will not be registered.
+         *
+         * \see property, type::get_property(), type::get_property_value(), type::set_property_value()
+         *
+         * \return A \ref bind object, in order to chain more calls.
+         */
+        template <typename A1, typename A2, typename acc_level = detail::public_access,
+                  typename Tp = typename std::enable_if<!detail::contains<A2, detail::access_levels_list>::value>::type>
+        bind<detail::prop, Class_Type, A1, A2, acc_level, Visitor_List> property(string_view name, A1 getter, A2 setter,
+                                                                                 acc_level level = acc_level());
 
-            /*!
-             * \brief Register a property to this class.
-             *
-             * \param name  The name of the property.
-             * \param acc   The accessor to the property; this can be a pointer to a member or a pointer to a variable.
-             * \param level  The access level of the property; default is: registration::public_access.<br>
-             *               (can be also: registration::protected_access or registration::private_access)
-             *
-             * \remark The name of the property has to be unique for this class, otherwise it will not be registered.
-             *
-             * \see property, type::get_property(), type::get_property_value(), type::set_property_value()
-             *
-             * \return A \ref bind object, in order to chain more calls.
-             */
-            template<typename A, typename acc_level = detail::public_access, typename Tp = typename std::enable_if<detail::contains<acc_level, detail::access_levels_list>::value>::type>
-            bind<detail::prop, Class_Type, A, acc_level, Visitor_List> property(string_view name, A acc, acc_level level = acc_level());
+        /*!
+         * \brief Register a method to this class.
+         *
+         * \param name      The name of the method.
+         * \param function  The function accessor to this method; this can be a member function, a function or an
+         * std::function. \param level     The access level of the method; default is: registration::public_access.<br>
+         *                  (can be also: registration::protected_access or registration::private_access)
+         *
+         * \remark The method name does not have to be unique for this class.
+         *
+         * \see method, type::get_method(), type::invoke()
+         *
+         * \return A \ref bind object, in order to chain more calls.
+         */
+        template <typename F, typename acc_level = detail::public_access>
+        bind<detail::meth, Class_Type, F, acc_level, Visitor_List> method(string_view name, F f,
+                                                                          acc_level level = acc_level());
 
-            /*!
-             * \brief Register a read only property to this class.
-             *
-             * \param name  The name of the property.
-             * \param acc   The accessor to the property; this can be a pointer to a member, a pointer to a variable,
-             *              a pointer to a member function, a pointer to a function or a std::function.
-             * \param level  The access level of the read only property; default is: registration::public_access.<br>
-             *               (can be: registration::protected_access or registration::private_access)
-             *
-             * \remark The name of the property has to be unique for this class, otherwise it will not be registered.
-             *
-             * \see property, type::get_property(), type::get_property_value(), type::set_property_value()
-             *
-             * \return A \ref bind object, in order to chain more calls.
-             */
-            template<typename A, typename acc_level = detail::public_access, typename Tp = typename std::enable_if<detail::contains<acc_level, detail::access_levels_list>::value>::type>
-            bind<detail::prop_readonly, Class_Type, A, acc_level, Visitor_List> property_readonly(string_view name, A acc, acc_level level = acc_level());
+        /*!
+         * \brief Register a nested enumeration of type \p Enum_Type
+         *
+         * \param name      The name of the enumeration.
+         *
+         * \see enumeration, type::get_enumeration()
+         *
+         * \return A \ref bind object, in order to chain more calls.
+         */
+        template <typename Enum_Type>
+        bind<detail::enum_, Class_Type, Enum_Type> enumeration(string_view name);
 
-            /*!
-             * \brief Register a property to this class.
-             *
-             * \param name   The name of the property.
-             * \param getter The getter accessor to the property; this can be a pointer to a member function,
-             *               a pointer to a function or a std::function.
-             * \param setter The setter accessor to the property; this can be a pointer to a member function,
-             *               a pointer to a function or a std::function.
-             * \param level  The access level of the property; default is: registration::public_access.<br>
-             *               (can be also: registration::protected_access or registration::private_access)
-             *
-             * \remark The name of the property has to be unique for this class, otherwise it will not be registered.
-             *
-             * \see property, type::get_property(), type::get_property_value(), type::set_property_value()
-             *
-             * \return A \ref bind object, in order to chain more calls.
-             */
-            template<typename A1, typename A2, typename acc_level = detail::public_access, typename Tp = typename std::enable_if<!detail::contains<A2, detail::access_levels_list>::value>::type>
-            bind<detail::prop, Class_Type, A1, A2, acc_level, Visitor_List> property(string_view name, A1 getter, A2 setter, acc_level level = acc_level());
+    private:
+        class_(const std::shared_ptr<detail::registration_executer>& reg_exec);
+        class_(const class_& other);
+        class_& operator=(const class_& other);
 
-
-            /*!
-             * \brief Register a method to this class.
-             *
-             * \param name      The name of the method.
-             * \param function  The function accessor to this method; this can be a member function, a function or an std::function.
-             * \param level     The access level of the method; default is: registration::public_access.<br>
-             *                  (can be also: registration::protected_access or registration::private_access)
-             *
-             * \remark The method name does not have to be unique for this class.
-             *
-             * \see method, type::get_method(), type::invoke()
-             *
-             * \return A \ref bind object, in order to chain more calls.
-             */
-            template<typename F, typename acc_level = detail::public_access>
-            bind<detail::meth, Class_Type, F, acc_level, Visitor_List> method(string_view name, F f, acc_level level = acc_level());
-
-
-            /*!
-             * \brief Register a nested enumeration of type \p Enum_Type
-             *
-             * \param name      The name of the enumeration.
-             *
-             * \see enumeration, type::get_enumeration()
-             *
-             * \return A \ref bind object, in order to chain more calls.
-             */
-            template<typename Enum_Type>
-            bind<detail::enum_, Class_Type, Enum_Type> enumeration(string_view name);
-        private:
-            class_(const std::shared_ptr<detail::registration_executer>& reg_exec);
-            class_(const class_& other);
-            class_& operator=(const class_& other);
-        private:
-            std::shared_ptr<detail::registration_executer> m_reg_exec;
-            template<typename...T>
-            friend class bind;
+    private:
+        std::shared_ptr<detail::registration_executer> m_reg_exec;
+        template <typename... T>
+        friend class bind;
     };
 
     /*!
@@ -287,8 +293,9 @@ public:
      *
      * \return A \ref bind object, in order to chain more calls.
      */
-    template<typename A, typename Visitor_List = READ_TL(rttr_visitor_list)>
-    static bind<detail::prop, detail::invalid_type, A, detail::public_access, Visitor_List> property(string_view name, A acc);
+    template <typename A, typename Visitor_List = READ_TL(rttr_visitor_list)>
+    static bind<detail::prop, detail::invalid_type, A, detail::public_access, Visitor_List> property(string_view name,
+                                                                                                     A acc);
 
     /*!
      * \brief Register a global read only property.
@@ -305,8 +312,9 @@ public:
      *
      * \return A \ref bind object, in order to chain more calls.
      */
-    template<typename A, typename Visitor_List = READ_TL(rttr_visitor_list)>
-    static bind<detail::prop_readonly, detail::invalid_type, A, detail::public_access, Visitor_List> property_readonly(string_view name, A acc);
+    template <typename A, typename Visitor_List = READ_TL(rttr_visitor_list)>
+    static bind<detail::prop_readonly, detail::invalid_type, A, detail::public_access, Visitor_List> property_readonly(
+        string_view name, A acc);
 
     /*!
      * \brief Register a property to this class.
@@ -323,14 +331,16 @@ public:
      *
      * \return A \ref bind object, in order to chain more calls.
      */
-    template<typename A1, typename A2, typename Visitor_List = READ_TL(rttr_visitor_list)>
-    static bind<detail::prop, detail::invalid_type, A1, A2, detail::public_access, Visitor_List> property(string_view name, A1 getter, A2 setter);
+    template <typename A1, typename A2, typename Visitor_List = READ_TL(rttr_visitor_list)>
+    static bind<detail::prop, detail::invalid_type, A1, A2, detail::public_access, Visitor_List> property(
+        string_view name, A1 getter, A2 setter);
 
     /*!
      * \brief Register a method to this class.
      *
      * \param name      The name of the method.
-     * \param function  The function accessor to this method; this can be a member function, a function or a std::function.
+     * \param function  The function accessor to this method; this can be a member function, a function or a
+     * std::function.
      *
      * \remark The method name does *not* have to be unique.
      *
@@ -339,8 +349,9 @@ public:
      *
      * \return A \ref bind object, in order to chain more calls.
      */
-    template<typename F, typename Visitor_List = READ_TL(rttr_visitor_list)>
-    static bind<detail::meth, detail::invalid_type, F, detail::public_access, Visitor_List> method(string_view name, F f);
+    template <typename F, typename Visitor_List = READ_TL(rttr_visitor_list)>
+    static bind<detail::meth, detail::invalid_type, F, detail::public_access, Visitor_List> method(string_view name,
+                                                                                                   F f);
 
     /*!
      * \brief Register a global enumeration of type \p Enum_Type
@@ -353,7 +364,7 @@ public:
      *
      * \return A \ref bind object, in order to chain more calls.
      */
-    template<typename Enum_Type>
+    template <typename Enum_Type>
     static bind<detail::enum_, detail::invalid_type, Enum_Type> enumeration(string_view name);
 
     /////////////////////////////////////////////////////////////////////////////////////
@@ -379,7 +390,7 @@ public:
      *
      * \see access_levels
      */
-    static const detail::public_access      public_access;
+    static const detail::public_access public_access;
 
     /*!
      * This variable can be used to specify during registration of a class member
@@ -405,7 +416,7 @@ public:
      *
      * \see access_levels
      */
-    static const detail::protected_access   protected_access;
+    static const detail::protected_access protected_access;
 
     /*!
      * This variable can be used to specify during registration of a class member
@@ -431,17 +442,19 @@ public:
      *
      * \see access_levels
      */
-    static const detail::private_access     private_access;
+    static const detail::private_access private_access;
 
 private:
-    registration() {}
-    registration(const std::shared_ptr<detail::registration_executer>& reg_exec) : m_reg_exec(reg_exec) { }
+    registration() {
+    }
+    registration(const std::shared_ptr<detail::registration_executer>& reg_exec) : m_reg_exec(reg_exec) {
+    }
     registration(const registration& other);
     registration& operator=(const registration& other);
 
 private:
     std::shared_ptr<detail::registration_executer> m_reg_exec;
-    template<typename...T>
+    template <typename... T>
     friend class bind;
 };
 
@@ -465,8 +478,8 @@ private:
  * }
  * \endcode
  *
- * \remark The method **cannot** be used with *MSVC x86* compiler, because of the different calling convention for global- and member-functions.
- * As workaround you have to explicitly cast to the function pointer:
+ * \remark The method **cannot** be used with *MSVC x86* compiler, because of the different calling convention for
+ * global- and member-functions. As workaround you have to explicitly cast to the function pointer:
  *
  * \code{.cpp}
  *
@@ -477,12 +490,10 @@ private:
  * \endcode
  *
  */
-template<typename Signature>
-Signature* select_overload(Signature* func)
-{
-  return func;
+template <typename Signature>
+Signature* select_overload(Signature* func) {
+    return func;
 }
-
 
 /*!
  * \brief This is a helper function to register overloaded member functions.
@@ -508,8 +519,8 @@ Signature* select_overload(Signature* func)
  * }
  * \endcode
  *
- * \remark The method **cannot** be used with *MSVC x86* compiler, because of the different calling convention for global- and member-functions.
- * As workaround you have to explicitly cast to the member function pointer:
+ * \remark The method **cannot** be used with *MSVC x86* compiler, because of the different calling convention for
+ * global- and member-functions. As workaround you have to explicitly cast to the member function pointer:
  *
  * \code{.cpp}
  *
@@ -521,12 +532,10 @@ Signature* select_overload(Signature* func)
  * }
  * \endcode
  */
-template<typename Signature, typename ClassType>
-auto select_overload(Signature (ClassType::*func)) -> decltype(func)
-{
+template <typename Signature, typename ClassType>
+auto select_overload(Signature(ClassType::*func)) -> decltype(func) {
     return func;
 }
-
 
 /*!
  * \brief This is a helper function to register overloaded const member functions.
@@ -550,8 +559,8 @@ auto select_overload(Signature (ClassType::*func)) -> decltype(func)
  * }
  * \endcode
  *
- * \remark The method **cannot** be used with *MSVC x86* compiler, because of the different calling convention for global- and member-functions.
- * As workaround you have to explicitly cast to the member function pointer:
+ * \remark The method **cannot** be used with *MSVC x86* compiler, because of the different calling convention for
+ * global- and member-functions. As workaround you have to explicitly cast to the member function pointer:
  *
  * \code{.cpp}
  *
@@ -563,9 +572,8 @@ auto select_overload(Signature (ClassType::*func)) -> decltype(func)
  * }
  * \endcode
  */
-template<typename ClassType, typename ReturnType, typename... Args>
-auto select_const(ReturnType (ClassType::*func)(Args...) const) -> decltype(func)
-{
+template <typename ClassType, typename ReturnType, typename... Args>
+auto select_const(ReturnType (ClassType::*func)(Args...) const) -> decltype(func) {
     return func;
 }
 
@@ -575,9 +583,8 @@ auto select_const(ReturnType (ClassType::*func)(Args...) const) -> decltype(func
  *
  * \see select_const
  */
-template<typename ClassType, typename ReturnType, typename... Args>
-auto select_const(ReturnType (ClassType::*func)(Args...) const noexcept) -> decltype(func)
-{
+template <typename ClassType, typename ReturnType, typename... Args>
+auto select_const(ReturnType (ClassType::*func)(Args...) const noexcept) -> decltype(func) {
     return func;
 }
 #endif
@@ -604,8 +611,8 @@ auto select_const(ReturnType (ClassType::*func)(Args...) const noexcept) -> decl
  * }
  * \endcode
  *
- * \remark The method **cannot** be used with *MSVC x86* compiler, because of the different calling convention for global- and member-functions.
- * As workaround you have to explicitly cast to the member function pointer:
+ * \remark The method **cannot** be used with *MSVC x86* compiler, because of the different calling convention for
+ * global- and member-functions. As workaround you have to explicitly cast to the member function pointer:
  *
  * \code{.cpp}
  *
@@ -618,9 +625,8 @@ auto select_const(ReturnType (ClassType::*func)(Args...) const noexcept) -> decl
  * \endcode
  *
  */
-template<typename ClassType, typename ReturnType, typename... Args>
-auto select_non_const(ReturnType(ClassType::*func)(Args...)) -> decltype(func)
-{
+template <typename ClassType, typename ReturnType, typename... Args>
+auto select_non_const(ReturnType (ClassType::*func)(Args...)) -> decltype(func) {
     return func;
 }
 
@@ -631,9 +637,8 @@ auto select_non_const(ReturnType(ClassType::*func)(Args...)) -> decltype(func)
  *
  * \see select_const
  */
-template<typename ClassType, typename ReturnType, typename... Args>
-auto select_non_const(ReturnType(ClassType::*func)(Args...) noexcept) -> decltype(func)
-{
+template <typename ClassType, typename ReturnType, typename... Args>
+auto select_non_const(ReturnType (ClassType::*func)(Args...) noexcept) -> decltype(func) {
     return func;
 }
 #endif
@@ -645,7 +650,6 @@ auto select_non_const(ReturnType(ClassType::*func)(Args...) noexcept) -> decltyp
  */
 RTTR_INLINE detail::metadata metadata(variant key, variant value);
 
-
 /*!
  * The \ref value function should be used to add a mapping from enum `name` to `value`
  * during the registration process of reflection information. Use it in the `()` operator of the returned
@@ -653,13 +657,13 @@ RTTR_INLINE detail::metadata metadata(variant key, variant value);
  *
  * \see \ref registration::enumeration
  */
-template<typename Enum_Type>
+template <typename Enum_Type>
 RTTR_INLINE detail::enum_data<Enum_Type> value(string_view, Enum_Type value);
 
 /*!
  * The \ref default_arguments function should be used add default arguments,
- * for \ref constructor "constructors" or a \ref method "methods" during the registration process of reflection information.
- * Use it in the `()` operator of the returned \ref bind object.
+ * for \ref constructor "constructors" or a \ref method "methods" during the registration process of reflection
+ * information. Use it in the `()` operator of the returned \ref bind object.
  *
  * The given arguments must match the signature from the starting position to the right most argument.
  *
@@ -687,13 +691,13 @@ RTTR_INLINE detail::enum_data<Enum_Type> value(string_view, Enum_Type value);
  * \endcode
  *
  */
-template<typename...TArgs>
-RTTR_INLINE detail::default_args<TArgs...> default_arguments(TArgs&&...args);
+template <typename... TArgs>
+RTTR_INLINE detail::default_args<TArgs...> default_arguments(TArgs&&... args);
 
 /*!
  * The \ref parameter_names function should be used add human-readable names of the parameters,
- * for \ref constructor "constructors" or a \ref method "methods" during the registration process of reflection information.
- * Use it in the `()` operator of the returned \ref bind object.
+ * for \ref constructor "constructors" or a \ref method "methods" during the registration process of reflection
+ * information. Use it in the `()` operator of the returned \ref bind object.
  *
  * The names must be provided as string literals (i.e. const char*) arguments.
  *
@@ -715,9 +719,8 @@ RTTR_INLINE detail::default_args<TArgs...> default_arguments(TArgs&&...args);
  * \see \ref parameter_info
  *
  */
-template<typename...TArgs>
-RTTR_INLINE detail::parameter_names<detail::decay_t<TArgs>...> parameter_names(TArgs&&...args);
-
+template <typename... TArgs>
+RTTR_INLINE detail::parameter_names<detail::decay_t<TArgs>...> parameter_names(TArgs&&... args);
 
 /////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -725,72 +728,71 @@ RTTR_INLINE detail::parameter_names<detail::decay_t<TArgs>...> parameter_names(T
 
 #ifdef DOXYGEN
 
+    /*!
+     * \brief Use this macro to automatically register your reflection information to RTTR before `main` is called.
+     *
+     * Use it in following way:
+     * \code{.cpp}
+     * RTTR_REGISTRATION
+     * {
+     *      rttr::registration::method("foo", &foo);
+     * }
+     * \endcode
+     *
+     * Just place the macro in global scope in a cpp file.
+     *
+     * \remark It is not possible to place the macro multiple times in one cpp file.
+     *
+     */
+    #define RTTR_REGISTRATION
 
-/*!
- * \brief Use this macro to automatically register your reflection information to RTTR before `main` is called.
- *
- * Use it in following way:
- * \code{.cpp}
- * RTTR_REGISTRATION
- * {
- *      rttr::registration::method("foo", &foo);
- * }
- * \endcode
- *
- * Just place the macro in global scope in a cpp file.
- *
- * \remark It is not possible to place the macro multiple times in one cpp file.
- *
- */
-#define RTTR_REGISTRATION
+    /*!
+     * \brief Use this macro to automatically register your reflection information inside a plugin to RTTR.
+     *
+     * Use it in following way:
+     * \code{.cpp}
+     *
+     *   int some_method() { return 42; }
+     *
+     *   RTTR_PLUGIN_REGISTRATION
+     *   {
+     *       rttr::registration::method("some_method", &some_method);
+     *   }
+     * \endcode
+     *
+     * Just place the macro in global scope in a cpp file.
+     *
+     * \remark It is not possible to place the macro multiple times in one cpp file.
+     *         When you compile your plugin with the `gcc` toolchain, make sure you use the compiler option:
+     * `-fno-gnu-unique`. otherwise the unregistration will not work properly.
+     *
+     * \see library
+     */
+    #define RTTR_PLUGIN_REGISTRATION
 
-/*!
- * \brief Use this macro to automatically register your reflection information inside a plugin to RTTR.
- *
- * Use it in following way:
- * \code{.cpp}
- *
- *   int some_method() { return 42; }
- *
- *   RTTR_PLUGIN_REGISTRATION
- *   {
- *       rttr::registration::method("some_method", &some_method);
- *   }
- * \endcode
- *
- * Just place the macro in global scope in a cpp file.
- *
- * \remark It is not possible to place the macro multiple times in one cpp file.
- *         When you compile your plugin with the `gcc` toolchain, make sure you use the compiler option: `-fno-gnu-unique`.
- *         otherwise the unregistration will not work properly.
- *
- * \see library
- */
-#define RTTR_PLUGIN_REGISTRATION
+    /*!
+     * \brief Place this macro inside a class, when you need to reflect properties,
+     *        methods or constructors which are declared in `protected` or `private` scope of the class.
+     *
+    \code{.cpp}
+    class Foo
+    {
+        private:
+            int m_value;
 
-/*!
- * \brief Place this macro inside a class, when you need to reflect properties,
- *        methods or constructors which are declared in `protected` or `private` scope of the class.
- *
-\code{.cpp}
-class Foo
-{
-    private:
-        int m_value;
+        RTTR_REGISTRATION_FRIEND
+    };
+    \endcode
 
-    RTTR_REGISTRATION_FRIEND
-};
-\endcode
-
-\code{.cpp}
-RTTR_REGISTRATION
-{
-    rttr::registration::class_<Foo>()
-        .property("value", &Foo::m_value);
-}
-\endcode
- */
-#define RTTR_REGISTRATION_FRIEND
+    \code{.cpp}
+    RTTR_REGISTRATION
+    {
+        rttr::registration::class_<Foo>()
+            .property("value", &Foo::m_value);
+    }
+    \endcode
+     */
+    #define RTTR_REGISTRATION_FRIEND
 
 /*!
  * The \ref bind class is used to chain registration calls.
@@ -802,16 +804,15 @@ RTTR_REGISTRATION
  * Use it to forward \ref rttr::metadata() "metadata()" or \ref policy "policies" to the previous registered item.
  *
  * \remark Do not instantiate this class directly!
-*/
-template<typename...T>
-class registration::bind : public detail::base_class
-{
-    public:
-        /*!
-         * \brief The bracket operator can be used to add additional meta data or policies.
-         */
-        template<typename... Args>
-        base_class operator()(Args&&... arg);
+ */
+template <typename... T>
+class registration::bind : public detail::base_class {
+public:
+    /*!
+     * \brief The bracket operator can be used to add additional meta data or policies.
+     */
+    template <typename... Args>
+    base_class operator()(Args&&... arg);
 };
 
 #endif

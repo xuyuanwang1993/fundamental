@@ -11,119 +11,71 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "test.h"
-#include "eventpp/utilities/conditionalfunctor.h"
 #include "eventpp/callbacklist.h"
+#include "eventpp/utilities/conditionalfunctor.h"
+#include "test.h"
 
-TEST_CASE("ConditionalFunctor, lambda")
-{
-	eventpp::CallbackList<void(int)> callbackList;
+TEST_CASE("ConditionalFunctor, lambda") {
+    eventpp::CallbackList<void(int)> callbackList;
 
-	std::vector<int> dataList(3);
+    std::vector<int> dataList(3);
 
-	callbackList.append(
-		eventpp::conditionalFunctor(
-			[&dataList](const int index) {
-				++dataList[index];
-			},
-			[](const int index) {
-				return index == 0;
-			}
-				)
-	);
-	callbackList.append(
-		eventpp::conditionalFunctor(
-			[&dataList](const int index) {
-				++dataList[index];
-			},
-			[](const int index) {
-				return index == 1;
-			}
-				)
-	);
-	callbackList.append(
-		eventpp::conditionalFunctor(
-			[&dataList](const int index) {
-				++dataList[index];
-			},
-			[](const int index) {
-				return index == 2;
-			}
-				)
-	);
+    callbackList.append(eventpp::conditionalFunctor([&dataList](const int index) { ++dataList[index]; },
+                                                    [](const int index) { return index == 0; }));
+    callbackList.append(eventpp::conditionalFunctor([&dataList](const int index) { ++dataList[index]; },
+                                                    [](const int index) { return index == 1; }));
+    callbackList.append(eventpp::conditionalFunctor([&dataList](const int index) { ++dataList[index]; },
+                                                    [](const int index) { return index == 2; }));
 
-	REQUIRE(dataList == std::vector<int>{ 0, 0, 0 });
+    REQUIRE(dataList == std::vector<int> { 0, 0, 0 });
 
-	callbackList(2);
-	REQUIRE(dataList == std::vector<int>{ 0, 0, 1 });
+    callbackList(2);
+    REQUIRE(dataList == std::vector<int> { 0, 0, 1 });
 
-	callbackList(0);
-	REQUIRE(dataList == std::vector<int>{ 1, 0, 1 });
+    callbackList(0);
+    REQUIRE(dataList == std::vector<int> { 1, 0, 1 });
 
-	callbackList(1);
-	REQUIRE(dataList == std::vector<int>{ 1, 1, 1 });
+    callbackList(1);
+    REQUIRE(dataList == std::vector<int> { 1, 1, 1 });
 }
 
-void conditionalFunctorIncreaseOne(std::vector<int> & dataList, const int index)
-{
-	++dataList[index];
+void conditionalFunctorIncreaseOne(std::vector<int>& dataList, const int index) {
+    ++dataList[index];
 }
 
-TEST_CASE("ConditionalFunctor, free function")
-{
-	eventpp::CallbackList<void(std::vector<int> &, int)> callbackList;
+TEST_CASE("ConditionalFunctor, free function") {
+    eventpp::CallbackList<void(std::vector<int>&, int)> callbackList;
 
-	std::vector<int> dataList(3);
+    std::vector<int> dataList(3);
 
-	callbackList.append(
-		eventpp::conditionalFunctor(&conditionalFunctorIncreaseOne,
-			[](std::vector<int> &, const int index) {
-				return index == 0;
-			}
-		)
-	);
-	callbackList.append(
-		eventpp::conditionalFunctor(&conditionalFunctorIncreaseOne,
-			[](std::vector<int> &, const int index) {
-				return index == 1;
-			}
-		)
-	);
-	callbackList.append(
-		eventpp::conditionalFunctor(&conditionalFunctorIncreaseOne,
-			[](std::vector<int> &, const int index) {
-				return index == 2;
-			}
-		)
-	);
+    callbackList.append(eventpp::conditionalFunctor(&conditionalFunctorIncreaseOne,
+                                                    [](std::vector<int>&, const int index) { return index == 0; }));
+    callbackList.append(eventpp::conditionalFunctor(&conditionalFunctorIncreaseOne,
+                                                    [](std::vector<int>&, const int index) { return index == 1; }));
+    callbackList.append(eventpp::conditionalFunctor(&conditionalFunctorIncreaseOne,
+                                                    [](std::vector<int>&, const int index) { return index == 2; }));
 
-	REQUIRE(dataList == std::vector<int>{ 0, 0, 0 });
+    REQUIRE(dataList == std::vector<int> { 0, 0, 0 });
 
-	callbackList(dataList, 2);
-	REQUIRE(dataList == std::vector<int>{ 0, 0, 1 });
+    callbackList(dataList, 2);
+    REQUIRE(dataList == std::vector<int> { 0, 0, 1 });
 
-	callbackList(dataList, 0);
-	REQUIRE(dataList == std::vector<int>{ 1, 0, 1 });
+    callbackList(dataList, 0);
+    REQUIRE(dataList == std::vector<int> { 1, 0, 1 });
 
-	callbackList(dataList, 1);
-	REQUIRE(dataList == std::vector<int>{ 1, 1, 1 });
+    callbackList(dataList, 1);
+    REQUIRE(dataList == std::vector<int> { 1, 1, 1 });
 }
 
-TEST_CASE("ConditionalFunctor, std::shared_ptr")
-{
-	using Ptr = std::shared_ptr<int>;
-	eventpp::CallbackList<void(Ptr ptr)> callbackList;
-	callbackList.append(
-		eventpp::conditionalFunctor(
-			[](Ptr ptr) {
-				REQUIRE(ptr); // Be sure ptr is not moved
-				REQUIRE(*ptr == 5);
-			},
-			[](Ptr ptr) {
-				return *ptr == 5;
-			}
-		)
-	);
-	callbackList(std::make_shared<int>(2));
-	callbackList(std::make_shared<int>(5));
+TEST_CASE("ConditionalFunctor, std::shared_ptr") {
+    using Ptr = std::shared_ptr<int>;
+    eventpp::CallbackList<void(Ptr ptr)> callbackList;
+    callbackList.append(eventpp::conditionalFunctor(
+        [](Ptr ptr) {
+            REQUIRE(ptr); // Be sure ptr is not moved
+            REQUIRE(*ptr == 5);
+        },
+        [](Ptr ptr) { return *ptr == 5; }));
+    callbackList(std::make_shared<int>(2));
+    callbackList(std::make_shared<int>(5));
 }
