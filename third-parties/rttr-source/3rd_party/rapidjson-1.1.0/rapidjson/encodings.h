@@ -1,5 +1,5 @@
 // Tencent is pleased to support the open source community by making RapidJSON available.
-// 
+//
 // Copyright (C) 2015 THL A29 Limited, a Tencent company, and Milo Yip. All rights reserved.
 //
 // Licensed under the MIT License (the "License"); you may not use this file except
@@ -7,9 +7,9 @@
 //
 // http://opensource.org/licenses/MIT
 //
-// Unless required by applicable law or agreed to in writing, software distributed 
-// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR 
-// CONDITIONS OF ANY KIND, either express or implied. See the License for the 
+// Unless required by applicable law or agreed to in writing, software distributed
+// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+// CONDITIONS OF ANY KIND, either express or implied. See the License for the
 // specific language governing permissions and limitations under the License.
 
 #ifndef RAPIDJSON_ENCODINGS_H_
@@ -20,7 +20,7 @@
 #ifdef _MSC_VER
 RAPIDJSON_DIAG_PUSH
 RAPIDJSON_DIAG_OFF(4244) // conversion from 'type1' to 'type2', possible loss of data
-RAPIDJSON_DIAG_OFF(4702)  // unreachable code
+RAPIDJSON_DIAG_OFF(4702) // unreachable code
 #elif defined(__GNUC__)
 RAPIDJSON_DIAG_PUSH
 RAPIDJSON_DIAG_OFF(effc++)
@@ -92,26 +92,26 @@ concept Encoding {
     \tparam CharType Code unit for storing 8-bit UTF-8 data. Default is char.
     \note implements Encoding concept
 */
-template<typename CharType = char>
+template <typename CharType = char>
 struct UTF8 {
     typedef CharType Ch;
 
-    enum { supportUnicode = 1 };
+    enum {
+        supportUnicode = 1
+    };
 
-    template<typename OutputStream>
+    template <typename OutputStream>
     static void Encode(OutputStream& os, unsigned codepoint) {
-        if (codepoint <= 0x7F) 
+        if (codepoint <= 0x7F)
             os.Put(static_cast<Ch>(codepoint & 0xFF));
         else if (codepoint <= 0x7FF) {
             os.Put(static_cast<Ch>(0xC0 | ((codepoint >> 6) & 0xFF)));
             os.Put(static_cast<Ch>(0x80 | ((codepoint & 0x3F))));
-        }
-        else if (codepoint <= 0xFFFF) {
+        } else if (codepoint <= 0xFFFF) {
             os.Put(static_cast<Ch>(0xE0 | ((codepoint >> 12) & 0xFF)));
             os.Put(static_cast<Ch>(0x80 | ((codepoint >> 6) & 0x3F)));
             os.Put(static_cast<Ch>(0x80 | (codepoint & 0x3F)));
-        }
-        else {
+        } else {
             RAPIDJSON_ASSERT(codepoint <= 0x10FFFF);
             os.Put(static_cast<Ch>(0xF0 | ((codepoint >> 18) & 0xFF)));
             os.Put(static_cast<Ch>(0x80 | ((codepoint >> 12) & 0x3F)));
@@ -120,20 +120,18 @@ struct UTF8 {
         }
     }
 
-    template<typename OutputStream>
+    template <typename OutputStream>
     static void EncodeUnsafe(OutputStream& os, unsigned codepoint) {
-        if (codepoint <= 0x7F) 
+        if (codepoint <= 0x7F)
             PutUnsafe(os, static_cast<Ch>(codepoint & 0xFF));
         else if (codepoint <= 0x7FF) {
             PutUnsafe(os, static_cast<Ch>(0xC0 | ((codepoint >> 6) & 0xFF)));
             PutUnsafe(os, static_cast<Ch>(0x80 | ((codepoint & 0x3F))));
-        }
-        else if (codepoint <= 0xFFFF) {
+        } else if (codepoint <= 0xFFFF) {
             PutUnsafe(os, static_cast<Ch>(0xE0 | ((codepoint >> 12) & 0xFF)));
             PutUnsafe(os, static_cast<Ch>(0x80 | ((codepoint >> 6) & 0x3F)));
             PutUnsafe(os, static_cast<Ch>(0x80 | (codepoint & 0x3F)));
-        }
-        else {
+        } else {
             RAPIDJSON_ASSERT(codepoint <= 0x10FFFF);
             PutUnsafe(os, static_cast<Ch>(0xF0 | ((codepoint >> 18) & 0xFF)));
             PutUnsafe(os, static_cast<Ch>(0x80 | ((codepoint >> 12) & 0x3F)));
@@ -144,9 +142,13 @@ struct UTF8 {
 
     template <typename InputStream>
     static bool Decode(InputStream& is, unsigned* codepoint) {
-#define COPY() c = is.Take(); *codepoint = (*codepoint << 6) | (static_cast<unsigned char>(c) & 0x3Fu)
+#define COPY()                                                                                                         \
+    c          = is.Take();                                                                                            \
+    *codepoint = (*codepoint << 6) | (static_cast<unsigned char>(c) & 0x3Fu)
 #define TRANS(mask) result &= ((GetRange(static_cast<unsigned char>(c)) & mask) != 0)
-#define TAIL() COPY(); TRANS(0x70)
+#define TAIL()                                                                                                         \
+    COPY();                                                                                                            \
+    TRANS(0x70)
         typename InputStream::Ch c = is.Take();
         if (!(c & 0x80)) {
             *codepoint = static_cast<unsigned char>(c);
@@ -162,12 +164,37 @@ struct UTF8 {
         bool result = true;
         switch (type) {
         case 2: TAIL(); return result;
-        case 3: TAIL(); TAIL(); return result;
-        case 4: COPY(); TRANS(0x50); TAIL(); return result;
-        case 5: COPY(); TRANS(0x10); TAIL(); TAIL(); return result;
-        case 6: TAIL(); TAIL(); TAIL(); return result;
-        case 10: COPY(); TRANS(0x20); TAIL(); return result;
-        case 11: COPY(); TRANS(0x60); TAIL(); TAIL(); return result;
+        case 3:
+            TAIL();
+            TAIL();
+            return result;
+        case 4:
+            COPY();
+            TRANS(0x50);
+            TAIL();
+            return result;
+        case 5:
+            COPY();
+            TRANS(0x10);
+            TAIL();
+            TAIL();
+            return result;
+        case 6:
+            TAIL();
+            TAIL();
+            TAIL();
+            return result;
+        case 10:
+            COPY();
+            TRANS(0x20);
+            TAIL();
+            return result;
+        case 11:
+            COPY();
+            TRANS(0x60);
+            TAIL();
+            TAIL();
+            return result;
         default: return false;
         }
 #undef COPY
@@ -177,23 +204,49 @@ struct UTF8 {
 
     template <typename InputStream, typename OutputStream>
     static bool Validate(InputStream& is, OutputStream& os) {
-#define COPY() os.Put(c = is.Take())
+#define COPY()      os.Put(c = is.Take())
 #define TRANS(mask) result &= ((GetRange(static_cast<unsigned char>(c)) & mask) != 0)
-#define TAIL() COPY(); TRANS(0x70)
+#define TAIL()                                                                                                         \
+    COPY();                                                                                                            \
+    TRANS(0x70)
         Ch c;
         COPY();
-        if (!(c & 0x80))
-            return true;
+        if (!(c & 0x80)) return true;
 
         bool result = true;
         switch (GetRange(static_cast<unsigned char>(c))) {
         case 2: TAIL(); return result;
-        case 3: TAIL(); TAIL(); return result;
-        case 4: COPY(); TRANS(0x50); TAIL(); return result;
-        case 5: COPY(); TRANS(0x10); TAIL(); TAIL(); return result;
-        case 6: TAIL(); TAIL(); TAIL(); return result;
-        case 10: COPY(); TRANS(0x20); TAIL(); return result;
-        case 11: COPY(); TRANS(0x60); TAIL(); TAIL(); return result;
+        case 3:
+            TAIL();
+            TAIL();
+            return result;
+        case 4:
+            COPY();
+            TRANS(0x50);
+            TAIL();
+            return result;
+        case 5:
+            COPY();
+            TRANS(0x10);
+            TAIL();
+            TAIL();
+            return result;
+        case 6:
+            TAIL();
+            TAIL();
+            TAIL();
+            return result;
+        case 10:
+            COPY();
+            TRANS(0x20);
+            TAIL();
+            return result;
+        case 11:
+            COPY();
+            TRANS(0x60);
+            TAIL();
+            TAIL();
+            return result;
         default: return false;
         }
 #undef COPY
@@ -205,16 +258,21 @@ struct UTF8 {
         // Referring to DFA of http://bjoern.hoehrmann.de/utf-8/decoder/dfa/
         // With new mapping 1 -> 0x10, 7 -> 0x20, 9 -> 0x40, such that AND operation can test multiple types.
         static const unsigned char type[] = {
-            0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-            0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-            0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-            0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-            0x10,0x10,0x10,0x10,0x10,0x10,0x10,0x10,0x10,0x10,0x10,0x10,0x10,0x10,0x10,0x10,
-            0x40,0x40,0x40,0x40,0x40,0x40,0x40,0x40,0x40,0x40,0x40,0x40,0x40,0x40,0x40,0x40,
-            0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,
-            0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,0x20,
-            8,8,2,2,2,2,2,2,2,2,2,2,2,2,2,2,  2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-            10,3,3,3,3,3,3,3,3,3,3,3,3,4,3,3, 11,6,6,6,5,8,8,8,8,8,8,8,8,8,8,8,
+            0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,
+            0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,
+            0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,
+            0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,
+            0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,
+            0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,
+            0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,
+            0,    0,    0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10,
+            0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x20, 0x20,
+            0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
+            0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 8,    8,    2,    2,    2,    2,
+            2,    2,    2,    2,    2,    2,    2,    2,    2,    2,    2,    2,    2,    2,    2,    2,    2,    2,
+            2,    2,    2,    2,    2,    2,    2,    2,    10,   3,    3,    3,    3,    3,    3,    3,    3,    3,
+            3,    3,    3,    4,    3,    3,    11,   6,    6,    6,    5,    8,    8,    8,    8,    8,    8,    8,
+            8,    8,    8,    8,
         };
         return type[c];
     }
@@ -262,24 +320,25 @@ struct UTF8 {
     \tparam CharType Type for storing 16-bit UTF-16 data. Default is wchar_t. C++11 may use char16_t instead.
     \note implements Encoding concept
 
-    \note For in-memory access, no need to concern endianness. The code units and code points are represented by CPU's endianness.
-    For streaming, use UTF16LE and UTF16BE, which handle endianness.
+    \note For in-memory access, no need to concern endianness. The code units and code points are represented by CPU's
+   endianness. For streaming, use UTF16LE and UTF16BE, which handle endianness.
 */
-template<typename CharType = wchar_t>
+template <typename CharType = wchar_t>
 struct UTF16 {
     typedef CharType Ch;
     RAPIDJSON_STATIC_ASSERT(sizeof(Ch) >= 2);
 
-    enum { supportUnicode = 1 };
+    enum {
+        supportUnicode = 1
+    };
 
-    template<typename OutputStream>
+    template <typename OutputStream>
     static void Encode(OutputStream& os, unsigned codepoint) {
         RAPIDJSON_STATIC_ASSERT(sizeof(typename OutputStream::Ch) >= 2);
         if (codepoint <= 0xFFFF) {
-            RAPIDJSON_ASSERT(codepoint < 0xD800 || codepoint > 0xDFFF); // Code point itself cannot be surrogate pair 
+            RAPIDJSON_ASSERT(codepoint < 0xD800 || codepoint > 0xDFFF); // Code point itself cannot be surrogate pair
             os.Put(static_cast<typename OutputStream::Ch>(codepoint));
-        }
-        else {
+        } else {
             RAPIDJSON_ASSERT(codepoint <= 0x10FFFF);
             unsigned v = codepoint - 0x10000;
             os.Put(static_cast<typename OutputStream::Ch>((v >> 10) | 0xD800));
@@ -287,15 +346,13 @@ struct UTF16 {
         }
     }
 
-
-    template<typename OutputStream>
+    template <typename OutputStream>
     static void EncodeUnsafe(OutputStream& os, unsigned codepoint) {
         RAPIDJSON_STATIC_ASSERT(sizeof(typename OutputStream::Ch) >= 2);
         if (codepoint <= 0xFFFF) {
-            RAPIDJSON_ASSERT(codepoint < 0xD800 || codepoint > 0xDFFF); // Code point itself cannot be surrogate pair 
+            RAPIDJSON_ASSERT(codepoint < 0xD800 || codepoint > 0xDFFF); // Code point itself cannot be surrogate pair
             PutUnsafe(os, static_cast<typename OutputStream::Ch>(codepoint));
-        }
-        else {
+        } else {
             RAPIDJSON_ASSERT(codepoint <= 0x10FFFF);
             unsigned v = codepoint - 0x10000;
             PutUnsafe(os, static_cast<typename OutputStream::Ch>((v >> 10) | 0xD800));
@@ -310,10 +367,9 @@ struct UTF16 {
         if (c < 0xD800 || c > 0xDFFF) {
             *codepoint = static_cast<unsigned>(c);
             return true;
-        }
-        else if (c <= 0xDBFF) {
+        } else if (c <= 0xDBFF) {
             *codepoint = (static_cast<unsigned>(c) & 0x3FF) << 10;
-            c = is.Take();
+            c          = is.Take();
             *codepoint |= (static_cast<unsigned>(c) & 0x3FF);
             *codepoint += 0x10000;
             return c >= 0xDC00 && c <= 0xDFFF;
@@ -338,7 +394,7 @@ struct UTF16 {
 };
 
 //! UTF-16 little endian encoding.
-template<typename CharType = wchar_t>
+template <typename CharType = wchar_t>
 struct UTF16LE : UTF16<CharType> {
     template <typename InputByteStream>
     static CharType TakeBOM(InputByteStream& is) {
@@ -371,7 +427,7 @@ struct UTF16LE : UTF16<CharType> {
 };
 
 //! UTF-16 big endian encoding.
-template<typename CharType = wchar_t>
+template <typename CharType = wchar_t>
 struct UTF16BE : UTF16<CharType> {
     template <typename InputByteStream>
     static CharType TakeBOM(InputByteStream& is) {
@@ -406,29 +462,31 @@ struct UTF16BE : UTF16<CharType> {
 ///////////////////////////////////////////////////////////////////////////////
 // UTF32
 
-//! UTF-32 encoding. 
+//! UTF-32 encoding.
 /*! http://en.wikipedia.org/wiki/UTF-32
     \tparam CharType Type for storing 32-bit UTF-32 data. Default is unsigned. C++11 may use char32_t instead.
     \note implements Encoding concept
 
-    \note For in-memory access, no need to concern endianness. The code units and code points are represented by CPU's endianness.
-    For streaming, use UTF32LE and UTF32BE, which handle endianness.
+    \note For in-memory access, no need to concern endianness. The code units and code points are represented by CPU's
+   endianness. For streaming, use UTF32LE and UTF32BE, which handle endianness.
 */
-template<typename CharType = unsigned>
+template <typename CharType = unsigned>
 struct UTF32 {
     typedef CharType Ch;
     RAPIDJSON_STATIC_ASSERT(sizeof(Ch) >= 4);
 
-    enum { supportUnicode = 1 };
+    enum {
+        supportUnicode = 1
+    };
 
-    template<typename OutputStream>
+    template <typename OutputStream>
     static void Encode(OutputStream& os, unsigned codepoint) {
         RAPIDJSON_STATIC_ASSERT(sizeof(typename OutputStream::Ch) >= 4);
         RAPIDJSON_ASSERT(codepoint <= 0x10FFFF);
         os.Put(codepoint);
     }
 
-    template<typename OutputStream>
+    template <typename OutputStream>
     static void EncodeUnsafe(OutputStream& os, unsigned codepoint) {
         RAPIDJSON_STATIC_ASSERT(sizeof(typename OutputStream::Ch) >= 4);
         RAPIDJSON_ASSERT(codepoint <= 0x10FFFF);
@@ -438,7 +496,7 @@ struct UTF32 {
     template <typename InputStream>
     static bool Decode(InputStream& is, unsigned* codepoint) {
         RAPIDJSON_STATIC_ASSERT(sizeof(typename InputStream::Ch) >= 4);
-        Ch c = is.Take();
+        Ch c       = is.Take();
         *codepoint = c;
         return c <= 0x10FFFF;
     }
@@ -453,7 +511,7 @@ struct UTF32 {
 };
 
 //! UTF-32 little endian enocoding.
-template<typename CharType = unsigned>
+template <typename CharType = unsigned>
 struct UTF32LE : UTF32<CharType> {
     template <typename InputByteStream>
     static CharType TakeBOM(InputByteStream& is) {
@@ -492,13 +550,13 @@ struct UTF32LE : UTF32<CharType> {
 };
 
 //! UTF-32 big endian encoding.
-template<typename CharType = unsigned>
+template <typename CharType = unsigned>
 struct UTF32BE : UTF32<CharType> {
     template <typename InputByteStream>
     static CharType TakeBOM(InputByteStream& is) {
         RAPIDJSON_STATIC_ASSERT(sizeof(typename InputByteStream::Ch) == 1);
         CharType c = Take(is);
-        return static_cast<uint32_t>(c) == 0x0000FEFFu ? Take(is) : c; 
+        return static_cast<uint32_t>(c) == 0x0000FEFFu ? Take(is) : c;
     }
 
     template <typename InputByteStream>
@@ -538,19 +596,21 @@ struct UTF32BE : UTF32<CharType> {
     \tparam CharType Code unit for storing 7-bit ASCII data. Default is char.
     \note implements Encoding concept
 */
-template<typename CharType = char>
+template <typename CharType = char>
 struct ASCII {
     typedef CharType Ch;
 
-    enum { supportUnicode = 0 };
+    enum {
+        supportUnicode = 0
+    };
 
-    template<typename OutputStream>
+    template <typename OutputStream>
     static void Encode(OutputStream& os, unsigned codepoint) {
         RAPIDJSON_ASSERT(codepoint <= 0x7F);
         os.Put(static_cast<Ch>(codepoint & 0xFF));
     }
 
-    template<typename OutputStream>
+    template <typename OutputStream>
     static void EncodeUnsafe(OutputStream& os, unsigned codepoint) {
         RAPIDJSON_ASSERT(codepoint <= 0x7F);
         PutUnsafe(os, static_cast<Ch>(codepoint & 0xFF));
@@ -558,7 +618,7 @@ struct ASCII {
 
     template <typename InputStream>
     static bool Decode(InputStream& is, unsigned* codepoint) {
-        uint8_t c = static_cast<uint8_t>(is.Take());
+        uint8_t c  = static_cast<uint8_t>(is.Take());
         *codepoint = c;
         return c <= 0X7F;
     }
@@ -601,32 +661,34 @@ struct ASCII {
 
 //! Runtime-specified UTF encoding type of a stream.
 enum UTFType {
-    kUTF8 = 0,      //!< UTF-8.
-    kUTF16LE = 1,   //!< UTF-16 little endian.
-    kUTF16BE = 2,   //!< UTF-16 big endian.
-    kUTF32LE = 3,   //!< UTF-32 little endian.
-    kUTF32BE = 4    //!< UTF-32 big endian.
+    kUTF8    = 0, //!< UTF-8.
+    kUTF16LE = 1, //!< UTF-16 little endian.
+    kUTF16BE = 2, //!< UTF-16 big endian.
+    kUTF32LE = 3, //!< UTF-32 little endian.
+    kUTF32BE = 4  //!< UTF-32 big endian.
 };
 
 //! Dynamically select encoding according to stream's runtime-specified UTF encoding type.
 /*! \note This class can be used with AutoUTFInputtStream and AutoUTFOutputStream, which provides GetType().
-*/
-template<typename CharType>
+ */
+template <typename CharType>
 struct AutoUTF {
     typedef CharType Ch;
 
-    enum { supportUnicode = 1 };
+    enum {
+        supportUnicode = 1
+    };
 
 #define RAPIDJSON_ENCODINGS_FUNC(x) UTF8<Ch>::x, UTF16LE<Ch>::x, UTF16BE<Ch>::x, UTF32LE<Ch>::x, UTF32BE<Ch>::x
 
-    template<typename OutputStream>
+    template <typename OutputStream>
     RAPIDJSON_FORCEINLINE static void Encode(OutputStream& os, unsigned codepoint) {
         typedef void (*EncodeFunc)(OutputStream&, unsigned);
         static const EncodeFunc f[] = { RAPIDJSON_ENCODINGS_FUNC(Encode) };
         (*f[os.GetType()])(os, codepoint);
     }
 
-    template<typename OutputStream>
+    template <typename OutputStream>
     RAPIDJSON_FORCEINLINE static void EncodeUnsafe(OutputStream& os, unsigned codepoint) {
         typedef void (*EncodeFunc)(OutputStream&, unsigned);
         static const EncodeFunc f[] = { RAPIDJSON_ENCODINGS_FUNC(EncodeUnsafe) };
@@ -654,56 +716,54 @@ struct AutoUTF {
 // Transcoder
 
 //! Encoding conversion.
-template<typename SourceEncoding, typename TargetEncoding>
+template <typename SourceEncoding, typename TargetEncoding>
 struct Transcoder {
     //! Take one Unicode codepoint from source encoding, convert it to target encoding and put it to the output stream.
-    template<typename InputStream, typename OutputStream>
+    template <typename InputStream, typename OutputStream>
     RAPIDJSON_FORCEINLINE static bool Transcode(InputStream& is, OutputStream& os) {
         unsigned codepoint;
-        if (!SourceEncoding::Decode(is, &codepoint))
-            return false;
+        if (!SourceEncoding::Decode(is, &codepoint)) return false;
         TargetEncoding::Encode(os, codepoint);
         return true;
     }
 
-    template<typename InputStream, typename OutputStream>
+    template <typename InputStream, typename OutputStream>
     RAPIDJSON_FORCEINLINE static bool TranscodeUnsafe(InputStream& is, OutputStream& os) {
         unsigned codepoint;
-        if (!SourceEncoding::Decode(is, &codepoint))
-            return false;
+        if (!SourceEncoding::Decode(is, &codepoint)) return false;
         TargetEncoding::EncodeUnsafe(os, codepoint);
         return true;
     }
 
     //! Validate one Unicode codepoint from an encoded stream.
-    template<typename InputStream, typename OutputStream>
+    template <typename InputStream, typename OutputStream>
     RAPIDJSON_FORCEINLINE static bool Validate(InputStream& is, OutputStream& os) {
-        return Transcode(is, os);   // Since source/target encoding is different, must transcode.
+        return Transcode(is, os); // Since source/target encoding is different, must transcode.
     }
 };
 
 // Forward declaration.
-template<typename Stream>
+template <typename Stream>
 inline void PutUnsafe(Stream& stream, typename Stream::Ch c);
 
 //! Specialization of Transcoder with same source and target encoding.
-template<typename Encoding>
+template <typename Encoding>
 struct Transcoder<Encoding, Encoding> {
-    template<typename InputStream, typename OutputStream>
+    template <typename InputStream, typename OutputStream>
     RAPIDJSON_FORCEINLINE static bool Transcode(InputStream& is, OutputStream& os) {
-        os.Put(is.Take());  // Just copy one code unit. This semantic is different from primary template class.
+        os.Put(is.Take()); // Just copy one code unit. This semantic is different from primary template class.
         return true;
     }
-    
-    template<typename InputStream, typename OutputStream>
+
+    template <typename InputStream, typename OutputStream>
     RAPIDJSON_FORCEINLINE static bool TranscodeUnsafe(InputStream& is, OutputStream& os) {
-        PutUnsafe(os, is.Take());  // Just copy one code unit. This semantic is different from primary template class.
+        PutUnsafe(os, is.Take()); // Just copy one code unit. This semantic is different from primary template class.
         return true;
     }
-    
-    template<typename InputStream, typename OutputStream>
+
+    template <typename InputStream, typename OutputStream>
     RAPIDJSON_FORCEINLINE static bool Validate(InputStream& is, OutputStream& os) {
-        return Encoding::Validate(is, os);  // source/target encoding are the same
+        return Encoding::Validate(is, os); // source/target encoding are the same
     }
 };
 

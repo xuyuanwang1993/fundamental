@@ -16,5 +16,4 @@
 
 #include "../catch.hpp"
 
-
 #endif

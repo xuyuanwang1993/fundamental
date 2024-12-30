@@ -1,29 +1,29 @@
 /************************************************************************************
-*                                                                                   *
-*   Copyright (c) 2014 - 2018 Axel Menzel <info@rttr.org>                           *
-*                                                                                   *
-*   This file is part of RTTR (Run Time Type Reflection)                            *
-*   License: MIT License                                                            *
-*                                                                                   *
-*   Permission is hereby granted, free of charge, to any person obtaining           *
-*   a copy of this software and associated documentation files (the "Software"),    *
-*   to deal in the Software without restriction, including without limitation       *
-*   the rights to use, copy, modify, merge, publish, distribute, sublicense,        *
-*   and/or sell copies of the Software, and to permit persons to whom the           *
-*   Software is furnished to do so, subject to the following conditions:            *
-*                                                                                   *
-*   The above copyright notice and this permission notice shall be included in      *
-*   all copies or substantial portions of the Software.                             *
-*                                                                                   *
-*   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR      *
-*   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,        *
-*   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE     *
-*   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER          *
-*   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,   *
-*   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE   *
-*   SOFTWARE.                                                                       *
-*                                                                                   *
-*************************************************************************************/
+ *                                                                                   *
+ *   Copyright (c) 2014 - 2018 Axel Menzel <info@rttr.org>                           *
+ *                                                                                   *
+ *   This file is part of RTTR (Run Time Type Reflection)                            *
+ *   License: MIT License                                                            *
+ *                                                                                   *
+ *   Permission is hereby granted, free of charge, to any person obtaining           *
+ *   a copy of this software and associated documentation files (the "Software"),    *
+ *   to deal in the Software without restriction, including without limitation       *
+ *   the rights to use, copy, modify, merge, publish, distribute, sublicense,        *
+ *   and/or sell copies of the Software, and to permit persons to whom the           *
+ *   Software is furnished to do so, subject to the following conditions:            *
+ *                                                                                   *
+ *   The above copyright notice and this permission notice shall be included in      *
+ *   all copies or substantial portions of the Software.                             *
+ *                                                                                   *
+ *   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR      *
+ *   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,        *
+ *   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE     *
+ *   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER          *
+ *   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,   *
+ *   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE   *
+ *   SOFTWARE.                                                                       *
+ *                                                                                   *
+ *************************************************************************************/
 
 #ifndef RTTR_POLICY_H_
 #define RTTR_POLICY_H_
@@ -34,8 +34,7 @@
 #include "rttr/detail/policies/meth_policies.h"
 #include "rttr/detail/policies/prop_policies.h"
 
-namespace rttr
-{
+namespace rttr {
 
 /*!
  * The \ref policy class contains all policies that can be used during the registration of reflection information.
@@ -46,15 +45,13 @@ namespace rttr
  * - for constructors: \ref policy::ctor
  *
  */
-struct RTTR_API policy
-{
+struct RTTR_API policy {
     /*!
      * The \ref meth class groups all policies that can be used during registration of methods.
      *
      * \endcode
      */
-    struct RTTR_API meth
-    {
+    struct RTTR_API meth {
         /*!
          * This policy can be used when a method return a reference to an object
          * and the caller should be able to access this object via the returned variant.
@@ -83,9 +80,9 @@ struct RTTR_API policy
          * }
          * \endcode
          */
-        static const detail::return_as_ptr      return_ref_as_ptr;
+        static const detail::return_as_ptr return_ref_as_ptr;
 
-       /*!
+        /*!
          * This policy should be used when the return value of a method should not be forwarded to the caller.
          * For the caller it looks like the method has no return value, the return type will be *void*.
          *
@@ -113,15 +110,14 @@ struct RTTR_API policy
          * }
          * \endcode
          */
-        static const detail::discard_return     discard_return;
+        static const detail::discard_return discard_return;
     };
 
     /*!
      * The \ref prop class groups all policies that can be used during registration of properties.
      *
      */
-    struct RTTR_API prop
-    {
+    struct RTTR_API prop {
         /*!
          * The \ref bind_as_ptr policy will bind a member object as *pointer* type.
          *
@@ -150,12 +146,12 @@ struct RTTR_API policy
          *   property prop = type::get<Foo>().get_property("vec");
          *   variant var = prop.get_value(obj);
          *   std::cout << var.is_type<std::vector<int>*>(); // prints "true"
-         *   prop.set_value(obj, var);                      // not really necessary, but remark that now a std::vector<int>* is expected
-         *   return 0;
+         *   prop.set_value(obj, var);                      // not really necessary, but remark that now a
+         * std::vector<int>* is expected return 0;
          * }
          * \endcode
          */
-        static const detail::bind_as_ptr        bind_as_ptr;
+        static const detail::bind_as_ptr bind_as_ptr;
 
         /*!
          * The \ref as_reference_wrapper policy will bind a member object as *std::reference_wrapper* type.
@@ -185,20 +181,19 @@ struct RTTR_API policy
          *   property prop = type::get<Foo>().get_property("vec");
          *   variant var = prop.get_value(obj);
          *   std::cout << var.is_type<std::reference_wrapper<std::vector<int>>>(); // prints "true"
-         *   prop.set_value(obj, var);      // not really necessary, but remark that now a std::reference_wrapper<std::vector<int>> is expected
-         *   return 0;
+         *   prop.set_value(obj, var);      // not really necessary, but remark that now a
+         * std::reference_wrapper<std::vector<int>> is expected return 0;
          * }
          * \endcode
          */
-        static const detail::as_reference_wrapper        as_reference_wrapper;
+        static const detail::as_reference_wrapper as_reference_wrapper;
     };
 
     /*!
      * The \ref ctor class groups all policies that can be used during registration of constructors.
      *
      */
-    struct RTTR_API ctor
-    {
+    struct RTTR_API ctor {
         /*!
          * The \ref as_raw_ptr policy will create an instance of a class as raw pointer.
          *
@@ -232,9 +227,9 @@ struct RTTR_API policy
          * }
          * \endcode
          */
-        static const detail::as_raw_pointer         as_raw_ptr;
+        static const detail::as_raw_pointer as_raw_ptr;
 
-         /*!
+        /*!
          * The \ref as_std_shared_ptr policy will create an instance of a class through *std::make_shared<T>*.
          *
          * That means the object is \ref type::is_wrapper() "wrapped" into a *std::shared_ptr<T>*.
@@ -264,19 +259,18 @@ struct RTTR_API policy
          * {
          *   variant var = type::get<Foo>().create();
          *   std::cout << var.is_type<std::shared_ptr<Foo>>();  // prints "true"
-         *   return 0;                                          // the memory for contained 'Foo' instance is freed automatically,
-         * }                                                    // because the var object is gone out of scope
-         * \endcode
+         *   return 0;                                          // the memory for contained 'Foo' instance is freed
+         * automatically, }                                                    // because the var object is gone out of
+         * scope \endcode
          */
-        static const detail::as_std_shared_ptr      as_std_shared_ptr;
+        static const detail::as_std_shared_ptr as_std_shared_ptr;
 
         /*!
          * The \ref as_object policy will create an instance of a class with automatic storage.
          *
-         * Objects with automatic storage duration are automatically destroyed when the block in which they are created exits.
-         * Which is in our case the \ref variant.
-         * However, that means also you don't have to deal with pointers or wrappers. In order to use this creation policy,
-         * the object must be *copy constructible*.
+         * Objects with automatic storage duration are automatically destroyed when the block in which they are created
+         * exits. Which is in our case the \ref variant. However, that means also you don't have to deal with pointers
+         * or wrappers. In order to use this creation policy, the object must be *copy constructible*.
          *
          * See following example code:
          * \code{.cpp}
@@ -296,14 +290,14 @@ struct RTTR_API policy
          *
          * int main()
          * {
-         *   variant var = type::get<Foo>().create();   // creates a new instance of 'Foo' and moves the content into variant 'var'
-         *   std::cout << var.is_type<Foo>();           // prints "true"
-         *   variant var2 = var;                        // creates a new instance of 'Foo', through copy construction
-         *   return 0;                                  // the memory of the two 'Foo' instances is freed automatically
+         *   variant var = type::get<Foo>().create();   // creates a new instance of 'Foo' and moves the content into
+         * variant 'var' std::cout << var.is_type<Foo>();           // prints "true" variant var2 = var; // creates a
+         * new instance of 'Foo', through copy construction return 0;                                  // the memory of
+         * the two 'Foo' instances is freed automatically
          * }
          * \endcode
          */
-        static const detail::as_object              as_object;
+        static const detail::as_object as_object;
     };
 };
 

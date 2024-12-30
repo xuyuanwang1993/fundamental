@@ -33,9 +33,38 @@ endif()
 
 target_precompile_headers(BuildSettings INTERFACE "${CMAKE_CURRENT_LIST_DIR}/platform.h.in")
 
+include(CheckCXXSourceCompiles)
+
+## 
+macro(CHECK_COMPILE_DEFINITIONS definition_name)
+    check_cxx_source_compiles("
+        #ifndef ${definition_name}
+        #error ${definition_name} not defined
+        #endif
+        int main() { return 0; }
+    "        ${definition_name}_DEFINED_)
+endmacro(CHECK_COMPILE_DEFINITIONS)
+
+macro(ADD_COMPILE_DEFINITION config_type definition_name)
+    if(CMAKE_BUILD_TYPE STREQUAL "${config_type}")
+        CHECK_COMPILE_DEFINITIONS(${definition_name})
+        if(${definition_name}_DEFINED_)
+            message(STATUS "${definition_name} is already defined in ${config_type} configuration.")
+        else()
+            message(STATUS "Adding ${definition_name}=1 for ${config_type} configuration")
+            target_compile_definitions(BuildSettings INTERFACE
+                $<$<CONFIG:${config_type}>:${definition_name}=1>
+            )
+        endif()
+    endif()
+endmacro(ADD_COMPILE_DEFINITION)
+
+#add compile macro
+ADD_COMPILE_DEFINITION(Debug DEBUG)
+ADD_COMPILE_DEFINITION(Release NDEBUG)
 target_compile_options(BuildSettings INTERFACE
-    "$<$<CONFIG:Debug>:-DDEBUG_MODE -O0 -Wall -g2 -ggdb -fsanitize=address -fno-omit-frame-pointer>"
-    "$<$<CONFIG:Release>:-DNDEBUG -O3 -Wall>"
+    "$<$<CONFIG:Debug>:-O0;-Wall;-g2;-ggdb;-fsanitize=address;-fno-omit-frame-pointer>"
+    "$<$<CONFIG:Release>:-O3;-Wall>"
 )
 
 target_compile_features(BuildSettings INTERFACE
@@ -43,9 +72,8 @@ target_compile_features(BuildSettings INTERFACE
 )
 
 target_compile_definitions(BuildSettings INTERFACE
-    "$<$<CONFIG:Debug>:VERBOSE_LOGGING>"
-    "$<$<CONFIG:Release>:NDEBUG>"
-    "$<$<CONFIG:Release>:OPTIMIZED>"
+    "$<$<CONFIG:Debug>:VERBOSE_LOGGING=1>"
+    "$<$<CONFIG:Release>:OPTIMIZED=1>"
 )
 
 if(ENABLE_DEBUG_MEMORY_TRACE)
@@ -53,6 +81,11 @@ if(ENABLE_DEBUG_MEMORY_TRACE)
         "$<$<CONFIG:Debug>:WITH_MEMORY_TRACK>"
     )
 endif()
+
+
+target_link_options(BuildSettings INTERFACE
+    "$<$<CONFIG:Debug>:-fsanitize=address>"
+)
 
 set_target_properties(BuildSettings PROPERTIES POSITION_INDEPENDENT_CODE ON)
 

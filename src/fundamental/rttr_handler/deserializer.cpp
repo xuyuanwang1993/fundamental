@@ -225,7 +225,6 @@ static bool DfsSetProperties(rttr::variant& var, std::list<std::string>& propert
             std::size_t index = std::stoul(properties.front());
             if (index >= view.get_size()) return false;
             rttr::variant nextVal = view.get_value(index).extract_wrapped_value();
-            auto type             = nextVal.get_type();
             properties.pop_front();
             bool ret = DfsSetProperties(nextVal, properties, value, option);
             if (ret) {

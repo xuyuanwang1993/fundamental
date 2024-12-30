@@ -11,385 +11,414 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "test.h"
 #include "eventpp/callbacklist.h"
+#include "test.h"
 
 #if defined(_MSC_VER)
-#define NON_INLINE __declspec(noinline)
+    #define NON_INLINE __declspec(noinline)
 #else
-// gcc
-#define NON_INLINE __attribute__((noinline))
+    // gcc
+    #define NON_INLINE __attribute__((noinline))
 #endif
 
 volatile int globalValue = 0;
 
-void globalFunction(int a, const int b)
-{
-	globalValue += a + b;
+void globalFunction(int a, const int b) {
+    globalValue += a + b;
 }
 
-NON_INLINE void nonInlineGlobalFunction(int a, const int b)
-{
-	globalValue += a + b;
+NON_INLINE void nonInlineGlobalFunction(int a, const int b) {
+    globalValue += a + b;
 }
 
-struct FunctionObject
-{
-	void operator() (int a, const int b)
-	{
-		globalValue += a + b;
-	}
+struct FunctionObject {
+    void operator()(int a, const int b) {
+        globalValue += a + b;
+    }
 
-	virtual void virFunc(int a, const int b)
-	{
-		globalValue += a + b;
-	}
+    virtual void virFunc(int a, const int b) {
+        globalValue += a + b;
+    }
 
-	void nonVirFunc(int a, const int b)
-	{
-		globalValue += a + b;
-	}
+    void nonVirFunc(int a, const int b) {
+        globalValue += a + b;
+    }
 
-	NON_INLINE virtual void nonInlineVirFunc(int a, const int b)
-	{
-		globalValue += a + b;
-	}
+    NON_INLINE virtual void nonInlineVirFunc(int a, const int b) {
+        globalValue += a + b;
+    }
 
-	NON_INLINE void nonInlineNonVirFunc(int a, const int b)
-	{
-		globalValue += a + b;
-	}
+    NON_INLINE void nonInlineNonVirFunc(int a, const int b) {
+        globalValue += a + b;
+    }
 };
 #undef NON_INLINE
 
+TEST_CASE("b1, CallbackList invoking vs C++ invoking") {
+    constexpr int iterateCount  = 1000 * 1000 * 10;
+    constexpr int callbackCount = 10;
 
-TEST_CASE("b1, CallbackList invoking vs C++ invoking")
-{
-	constexpr int iterateCount = 1000 * 1000 * 10;
-	constexpr int callbackCount = 10;
+    {
+        FunctionObject funcObject;
+        const uint64_t cppTime = measureElapsedTime([iterateCount, callbackCount, &funcObject]() {
+            for (int i = 0; i < iterateCount; ++i) {
+                for (int c = 0; c < callbackCount; ++c) {
+                    globalFunction(i, i);
+                }
+            }
+        });
 
-	{
-		FunctionObject funcObject;
-		const uint64_t cppTime = measureElapsedTime([iterateCount, callbackCount, &funcObject]() {
-			for(int i = 0; i < iterateCount; ++i) {
-				for(int c = 0; c < callbackCount; ++c) {
-					globalFunction(i, i);
-				}
-			}
-		});
+        struct SingleThreadingPolicies {
+            using Threading = eventpp::SingleThreading;
+        };
+        eventpp::CallbackList<void(int, int), SingleThreadingPolicies> callbackListSingleThreading;
+        for (int c = 0; c < callbackCount; ++c) {
+            callbackListSingleThreading.append(&globalFunction);
+        }
+        const uint64_t callbackListSingleThreadingTime =
+            measureElapsedTime([iterateCount, &callbackListSingleThreading]() {
+                for (int i = 0; i < iterateCount; ++i) {
+                    callbackListSingleThreading(i, i);
+                }
+            });
 
-		struct SingleThreadingPolicies {
-			using Threading = eventpp::SingleThreading;
-		};
-		eventpp::CallbackList<void (int, int), SingleThreadingPolicies> callbackListSingleThreading;
-		for(int c = 0; c < callbackCount; ++c) {
-			callbackListSingleThreading.append(&globalFunction);
-		}
-		const uint64_t callbackListSingleThreadingTime = measureElapsedTime([iterateCount, &callbackListSingleThreading]() {
-			for(int i = 0; i < iterateCount; ++i) {
-				callbackListSingleThreading(i, i);
-			}
-		});
+        struct MultiThreadingPolicies {
+            using Threading = eventpp::MultipleThreading;
+        };
+        eventpp::CallbackList<void(int, int), MultiThreadingPolicies> callbackListMultiThreading;
+        for (int c = 0; c < callbackCount; ++c) {
+            callbackListMultiThreading.append(&globalFunction);
+        }
+        const uint64_t callbackListMultiThreadingTime =
+            measureElapsedTime([iterateCount, &callbackListMultiThreading]() {
+                for (int i = 0; i < iterateCount; ++i) {
+                    callbackListMultiThreading(i, i);
+                }
+            });
 
-		struct MultiThreadingPolicies {
-			using Threading = eventpp::MultipleThreading;
-		};
-		eventpp::CallbackList<void (int, int), MultiThreadingPolicies> callbackListMultiThreading;
-		for(int c = 0; c < callbackCount; ++c) {
-			callbackListMultiThreading.append(&globalFunction);
-		}
-		const uint64_t callbackListMultiThreadingTime = measureElapsedTime([iterateCount, &callbackListMultiThreading]() {
-			for(int i = 0; i < iterateCount; ++i) {
-				callbackListMultiThreading(i, i);
-			}
-		});
+        std::cout << "globalFunction: " << cppTime << " " << callbackListSingleThreadingTime << " "
+                  << callbackListMultiThreadingTime << std::endl;
+    }
 
-		std::cout << "globalFunction: " << cppTime << " " << callbackListSingleThreadingTime << " " << callbackListMultiThreadingTime << std::endl;
-	}
+    {
+        FunctionObject funcObject;
+        const uint64_t cppTime = measureElapsedTime([iterateCount, callbackCount, &funcObject]() {
+            for (int i = 0; i < iterateCount; ++i) {
+                for (int c = 0; c < callbackCount; ++c) {
+                    nonInlineGlobalFunction(i, i);
+                }
+            }
+        });
 
-	{
-		FunctionObject funcObject;
-		const uint64_t cppTime = measureElapsedTime([iterateCount, callbackCount, &funcObject]() {
-			for(int i = 0; i < iterateCount; ++i) {
-				for(int c = 0; c < callbackCount; ++c) {
-					nonInlineGlobalFunction(i, i);
-				}
-			}
-		});
+        struct SingleThreadingPolicies {
+            using Threading = eventpp::SingleThreading;
+        };
+        eventpp::CallbackList<void(int, int), SingleThreadingPolicies> callbackListSingleThreading;
+        for (int c = 0; c < callbackCount; ++c) {
+            callbackListSingleThreading.append(&nonInlineGlobalFunction);
+        }
+        const uint64_t callbackListSingleThreadingTime =
+            measureElapsedTime([iterateCount, &callbackListSingleThreading]() {
+                for (int i = 0; i < iterateCount; ++i) {
+                    callbackListSingleThreading(i, i);
+                }
+            });
 
-		struct SingleThreadingPolicies {
-			using Threading = eventpp::SingleThreading;
-		};
-		eventpp::CallbackList<void (int, int), SingleThreadingPolicies> callbackListSingleThreading;
-		for(int c = 0; c < callbackCount; ++c) {
-			callbackListSingleThreading.append(&nonInlineGlobalFunction);
-		}
-		const uint64_t callbackListSingleThreadingTime = measureElapsedTime([iterateCount, &callbackListSingleThreading]() {
-			for(int i = 0; i < iterateCount; ++i) {
-				callbackListSingleThreading(i, i);
-			}
-		});
+        struct MultiThreadingPolicies {
+            using Threading = eventpp::MultipleThreading;
+        };
+        eventpp::CallbackList<void(int, int), MultiThreadingPolicies> callbackListMultiThreading;
+        for (int c = 0; c < callbackCount; ++c) {
+            callbackListMultiThreading.append(&nonInlineGlobalFunction);
+        }
+        const uint64_t callbackListMultiThreadingTime =
+            measureElapsedTime([iterateCount, &callbackListMultiThreading]() {
+                for (int i = 0; i < iterateCount; ++i) {
+                    callbackListMultiThreading(i, i);
+                }
+            });
 
-		struct MultiThreadingPolicies {
-			using Threading = eventpp::MultipleThreading;
-		};
-		eventpp::CallbackList<void (int, int), MultiThreadingPolicies> callbackListMultiThreading;
-		for(int c = 0; c < callbackCount; ++c) {
-			callbackListMultiThreading.append(&nonInlineGlobalFunction);
-		}
-		const uint64_t callbackListMultiThreadingTime = measureElapsedTime([iterateCount, &callbackListMultiThreading]() {
-			for(int i = 0; i < iterateCount; ++i) {
-				callbackListMultiThreading(i, i);
-			}
-		});
+        std::cout << "nonInlineGlobalFunction: " << cppTime << " " << callbackListSingleThreadingTime << " "
+                  << callbackListMultiThreadingTime << std::endl;
+    }
 
-		std::cout << "nonInlineGlobalFunction: " << cppTime << " " << callbackListSingleThreadingTime << " " << callbackListMultiThreadingTime << std::endl;
-	}
+    {
+        FunctionObject funcObject;
+        const uint64_t cppTime = measureElapsedTime([iterateCount, callbackCount, &funcObject]() {
+            for (int i = 0; i < iterateCount; ++i) {
+                for (int c = 0; c < callbackCount; ++c) {
+                    funcObject(i, i);
+                }
+            }
+        });
 
-	{
-		FunctionObject funcObject;
-		const uint64_t cppTime = measureElapsedTime([iterateCount, callbackCount, &funcObject]() {
-			for(int i = 0; i < iterateCount; ++i) {
-				for(int c = 0; c < callbackCount; ++c) {
-					funcObject(i, i);
-				}
-			}
-		});
+        struct SingleThreadingPolicies {
+            using Threading = eventpp::SingleThreading;
+        };
+        eventpp::CallbackList<void(int, int), SingleThreadingPolicies> callbackListSingleThreading;
+        for (int c = 0; c < callbackCount; ++c) {
+            callbackListSingleThreading.append(funcObject);
+        }
+        const uint64_t callbackListSingleThreadingTime =
+            measureElapsedTime([iterateCount, &callbackListSingleThreading]() {
+                for (int i = 0; i < iterateCount; ++i) {
+                    callbackListSingleThreading(i, i);
+                }
+            });
 
-		struct SingleThreadingPolicies {
-			using Threading = eventpp::SingleThreading;
-		};
-		eventpp::CallbackList<void (int, int), SingleThreadingPolicies> callbackListSingleThreading;
-		for(int c = 0; c < callbackCount; ++c) {
-			callbackListSingleThreading.append(funcObject);
-		}
-		const uint64_t callbackListSingleThreadingTime = measureElapsedTime([iterateCount, &callbackListSingleThreading]() {
-			for(int i = 0; i < iterateCount; ++i) {
-				callbackListSingleThreading(i, i);
-			}
-		});
+        struct MultiThreadingPolicies {
+            using Threading = eventpp::MultipleThreading;
+        };
+        eventpp::CallbackList<void(int, int), MultiThreadingPolicies> callbackListMultiThreading;
+        for (int c = 0; c < callbackCount; ++c) {
+            callbackListMultiThreading.append(funcObject);
+        }
+        const uint64_t callbackListMultiThreadingTime =
+            measureElapsedTime([iterateCount, &callbackListMultiThreading]() {
+                for (int i = 0; i < iterateCount; ++i) {
+                    callbackListMultiThreading(i, i);
+                }
+            });
 
-		struct MultiThreadingPolicies {
-			using Threading = eventpp::MultipleThreading;
-		};
-		eventpp::CallbackList<void (int, int), MultiThreadingPolicies> callbackListMultiThreading;
-		for(int c = 0; c < callbackCount; ++c) {
-			callbackListMultiThreading.append(funcObject);
-		}
-		const uint64_t callbackListMultiThreadingTime = measureElapsedTime([iterateCount, &callbackListMultiThreading]() {
-			for(int i = 0; i < iterateCount; ++i) {
-				callbackListMultiThreading(i, i);
-			}
-		});
+        std::cout << "funcObject: " << cppTime << " " << callbackListSingleThreadingTime << " "
+                  << callbackListMultiThreadingTime << std::endl;
+    }
 
-		std::cout << "funcObject: " << cppTime << " " << callbackListSingleThreadingTime << " " << callbackListMultiThreadingTime << std::endl;
-	}
+    {
+        FunctionObject funcObject;
+        const uint64_t cppTime = measureElapsedTime([iterateCount, callbackCount, &funcObject]() {
+            for (int i = 0; i < iterateCount; ++i) {
+                for (int c = 0; c < callbackCount; ++c) {
+                    funcObject.virFunc(i, i);
+                }
+            }
+        });
 
-	{
-		FunctionObject funcObject;
-		const uint64_t cppTime = measureElapsedTime([iterateCount, callbackCount, &funcObject]() {
-			for(int i = 0; i < iterateCount; ++i) {
-				for(int c = 0; c < callbackCount; ++c) {
-					funcObject.virFunc(i, i);
-				}
-			}
-		});
+        struct SingleThreadingPolicies {
+            using Threading = eventpp::SingleThreading;
+        };
+        eventpp::CallbackList<void(int, int), SingleThreadingPolicies> callbackListSingleThreading;
+        for (int c = 0; c < callbackCount; ++c) {
+            callbackListSingleThreading.append(
+                std::bind(&FunctionObject::virFunc, &funcObject, std::placeholders::_1, std::placeholders::_2));
+        }
+        const uint64_t callbackListSingleThreadingTime =
+            measureElapsedTime([iterateCount, &callbackListSingleThreading]() {
+                for (int i = 0; i < iterateCount; ++i) {
+                    callbackListSingleThreading(i, i);
+                }
+            });
 
-		struct SingleThreadingPolicies {
-			using Threading = eventpp::SingleThreading;
-		};
-		eventpp::CallbackList<void (int, int), SingleThreadingPolicies> callbackListSingleThreading;
-		for(int c = 0; c < callbackCount; ++c) {
-			callbackListSingleThreading.append(std::bind(&FunctionObject::virFunc, &funcObject, std::placeholders::_1, std::placeholders::_2));
-		}
-		const uint64_t callbackListSingleThreadingTime = measureElapsedTime([iterateCount, &callbackListSingleThreading]() {
-			for(int i = 0; i < iterateCount; ++i) {
-				callbackListSingleThreading(i, i);
-			}
-		});
+        struct MultiThreadingPolicies {
+            using Threading = eventpp::MultipleThreading;
+        };
+        eventpp::CallbackList<void(int, int), MultiThreadingPolicies> callbackListMultiThreading;
+        for (int c = 0; c < callbackCount; ++c) {
+            callbackListMultiThreading.append(
+                std::bind(&FunctionObject::virFunc, &funcObject, std::placeholders::_1, std::placeholders::_2));
+        }
+        const uint64_t callbackListMultiThreadingTime =
+            measureElapsedTime([iterateCount, &callbackListMultiThreading]() {
+                for (int i = 0; i < iterateCount; ++i) {
+                    callbackListMultiThreading(i, i);
+                }
+            });
 
-		struct MultiThreadingPolicies {
-			using Threading = eventpp::MultipleThreading;
-		};
-		eventpp::CallbackList<void (int, int), MultiThreadingPolicies> callbackListMultiThreading;
-		for(int c = 0; c < callbackCount; ++c) {
-			callbackListMultiThreading.append(std::bind(&FunctionObject::virFunc, &funcObject, std::placeholders::_1, std::placeholders::_2));
-		}
-		const uint64_t callbackListMultiThreadingTime = measureElapsedTime([iterateCount, &callbackListMultiThreading]() {
-			for(int i = 0; i < iterateCount; ++i) {
-				callbackListMultiThreading(i, i);
-			}
-		});
+        std::cout << "funcObject.virFunc: " << cppTime << " " << callbackListSingleThreadingTime << " "
+                  << callbackListMultiThreadingTime << std::endl;
+    }
 
-		std::cout << "funcObject.virFunc: " << cppTime << " " << callbackListSingleThreadingTime << " " << callbackListMultiThreadingTime << std::endl;
-	}
+    {
+        FunctionObject funcObject;
+        const uint64_t cppTime = measureElapsedTime([iterateCount, callbackCount, &funcObject]() {
+            for (int i = 0; i < iterateCount; ++i) {
+                for (int c = 0; c < callbackCount; ++c) {
+                    funcObject.nonVirFunc(i, i);
+                }
+            }
+        });
 
-	{
-		FunctionObject funcObject;
-		const uint64_t cppTime = measureElapsedTime([iterateCount, callbackCount, &funcObject]() {
-			for(int i = 0; i < iterateCount; ++i) {
-				for(int c = 0; c < callbackCount; ++c) {
-					funcObject.nonVirFunc(i, i);
-				}
-			}
-		});
+        struct SingleThreadingPolicies {
+            using Threading = eventpp::SingleThreading;
+        };
+        eventpp::CallbackList<void(int, int), SingleThreadingPolicies> callbackListSingleThreading;
+        for (int c = 0; c < callbackCount; ++c) {
+            callbackListSingleThreading.append(
+                std::bind(&FunctionObject::nonVirFunc, &funcObject, std::placeholders::_1, std::placeholders::_2));
+        }
+        const uint64_t callbackListSingleThreadingTime =
+            measureElapsedTime([iterateCount, &callbackListSingleThreading]() {
+                for (int i = 0; i < iterateCount; ++i) {
+                    callbackListSingleThreading(i, i);
+                }
+            });
 
-		struct SingleThreadingPolicies {
-			using Threading = eventpp::SingleThreading;
-		};
-		eventpp::CallbackList<void (int, int), SingleThreadingPolicies> callbackListSingleThreading;
-		for(int c = 0; c < callbackCount; ++c) {
-			callbackListSingleThreading.append(std::bind(&FunctionObject::nonVirFunc, &funcObject, std::placeholders::_1, std::placeholders::_2));
-		}
-		const uint64_t callbackListSingleThreadingTime = measureElapsedTime([iterateCount, &callbackListSingleThreading]() {
-			for(int i = 0; i < iterateCount; ++i) {
-				callbackListSingleThreading(i, i);
-			}
-		});
+        struct MultiThreadingPolicies {
+            using Threading = eventpp::MultipleThreading;
+        };
+        eventpp::CallbackList<void(int, int), MultiThreadingPolicies> callbackListMultiThreading;
+        for (int c = 0; c < callbackCount; ++c) {
+            callbackListMultiThreading.append(
+                std::bind(&FunctionObject::nonVirFunc, &funcObject, std::placeholders::_1, std::placeholders::_2));
+        }
+        const uint64_t callbackListMultiThreadingTime =
+            measureElapsedTime([iterateCount, &callbackListMultiThreading]() {
+                for (int i = 0; i < iterateCount; ++i) {
+                    callbackListMultiThreading(i, i);
+                }
+            });
 
-		struct MultiThreadingPolicies {
-			using Threading = eventpp::MultipleThreading;
-		};
-		eventpp::CallbackList<void (int, int), MultiThreadingPolicies> callbackListMultiThreading;
-		for(int c = 0; c < callbackCount; ++c) {
-			callbackListMultiThreading.append(std::bind(&FunctionObject::nonVirFunc, &funcObject, std::placeholders::_1, std::placeholders::_2));
-		}
-		const uint64_t callbackListMultiThreadingTime = measureElapsedTime([iterateCount, &callbackListMultiThreading]() {
-			for(int i = 0; i < iterateCount; ++i) {
-				callbackListMultiThreading(i, i);
-			}
-		});
+        std::cout << "funcObject.nonVirFunc: " << cppTime << " " << callbackListSingleThreadingTime << " "
+                  << callbackListMultiThreadingTime << std::endl;
+    }
 
-		std::cout << "funcObject.nonVirFunc: " << cppTime << " " << callbackListSingleThreadingTime << " " << callbackListMultiThreadingTime << std::endl;
-	}
+    {
+        FunctionObject funcObject;
+        const uint64_t cppTime = measureElapsedTime([iterateCount, callbackCount, &funcObject]() {
+            for (int i = 0; i < iterateCount; ++i) {
+                for (int c = 0; c < callbackCount; ++c) {
+                    funcObject.nonInlineVirFunc(i, i);
+                }
+            }
+        });
 
-	{
-		FunctionObject funcObject;
-		const uint64_t cppTime = measureElapsedTime([iterateCount, callbackCount, &funcObject]() {
-			for(int i = 0; i < iterateCount; ++i) {
-				for(int c = 0; c < callbackCount; ++c) {
-					funcObject.nonInlineVirFunc(i, i);
-				}
-			}
-		});
+        struct SingleThreadingPolicies {
+            using Threading = eventpp::SingleThreading;
+        };
+        eventpp::CallbackList<void(int, int), SingleThreadingPolicies> callbackListSingleThreading;
+        for (int c = 0; c < callbackCount; ++c) {
+            callbackListSingleThreading.append(std::bind(&FunctionObject::nonInlineVirFunc, &funcObject,
+                                                         std::placeholders::_1, std::placeholders::_2));
+        }
+        const uint64_t callbackListSingleThreadingTime =
+            measureElapsedTime([iterateCount, &callbackListSingleThreading]() {
+                for (int i = 0; i < iterateCount; ++i) {
+                    callbackListSingleThreading(i, i);
+                }
+            });
 
-		struct SingleThreadingPolicies {
-			using Threading = eventpp::SingleThreading;
-		};
-		eventpp::CallbackList<void (int, int), SingleThreadingPolicies> callbackListSingleThreading;
-		for(int c = 0; c < callbackCount; ++c) {
-			callbackListSingleThreading.append(std::bind(&FunctionObject::nonInlineVirFunc, &funcObject, std::placeholders::_1, std::placeholders::_2));
-		}
-		const uint64_t callbackListSingleThreadingTime = measureElapsedTime([iterateCount, &callbackListSingleThreading]() {
-			for(int i = 0; i < iterateCount; ++i) {
-				callbackListSingleThreading(i, i);
-			}
-		});
+        struct MultiThreadingPolicies {
+            using Threading = eventpp::MultipleThreading;
+        };
+        eventpp::CallbackList<void(int, int), MultiThreadingPolicies> callbackListMultiThreading;
+        for (int c = 0; c < callbackCount; ++c) {
+            callbackListMultiThreading.append(std::bind(&FunctionObject::nonInlineVirFunc, &funcObject,
+                                                        std::placeholders::_1, std::placeholders::_2));
+        }
+        const uint64_t callbackListMultiThreadingTime =
+            measureElapsedTime([iterateCount, &callbackListMultiThreading]() {
+                for (int i = 0; i < iterateCount; ++i) {
+                    callbackListMultiThreading(i, i);
+                }
+            });
 
-		struct MultiThreadingPolicies {
-			using Threading = eventpp::MultipleThreading;
-		};
-		eventpp::CallbackList<void (int, int), MultiThreadingPolicies> callbackListMultiThreading;
-		for(int c = 0; c < callbackCount; ++c) {
-			callbackListMultiThreading.append(std::bind(&FunctionObject::nonInlineVirFunc, &funcObject, std::placeholders::_1, std::placeholders::_2));
-		}
-		const uint64_t callbackListMultiThreadingTime = measureElapsedTime([iterateCount, &callbackListMultiThreading]() {
-			for(int i = 0; i < iterateCount; ++i) {
-				callbackListMultiThreading(i, i);
-			}
-		});
+        std::cout << "funcObject.nonInlineVirFunc: " << cppTime << " " << callbackListSingleThreadingTime << " "
+                  << callbackListMultiThreadingTime << std::endl;
+    }
 
-		std::cout << "funcObject.nonInlineVirFunc: " << cppTime << " " << callbackListSingleThreadingTime << " " << callbackListMultiThreadingTime << std::endl;
-	}
+    {
+        FunctionObject funcObject;
+        const uint64_t cppTime = measureElapsedTime([iterateCount, callbackCount, &funcObject]() {
+            for (int i = 0; i < iterateCount; ++i) {
+                for (int c = 0; c < callbackCount; ++c) {
+                    funcObject.nonInlineNonVirFunc(i, i);
+                }
+            }
+        });
 
-	{
-		FunctionObject funcObject;
-		const uint64_t cppTime = measureElapsedTime([iterateCount, callbackCount, &funcObject]() {
-			for(int i = 0; i < iterateCount; ++i) {
-				for(int c = 0; c < callbackCount; ++c) {
-					funcObject.nonInlineNonVirFunc(i, i);
-				}
-			}
-		});
+        struct SingleThreadingPolicies {
+            using Threading = eventpp::SingleThreading;
+        };
+        eventpp::CallbackList<void(int, int), SingleThreadingPolicies> callbackListSingleThreading;
+        for (int c = 0; c < callbackCount; ++c) {
+            callbackListSingleThreading.append(std::bind(&FunctionObject::nonInlineNonVirFunc, &funcObject,
+                                                         std::placeholders::_1, std::placeholders::_2));
+        }
+        const uint64_t callbackListSingleThreadingTime =
+            measureElapsedTime([iterateCount, &callbackListSingleThreading]() {
+                for (int i = 0; i < iterateCount; ++i) {
+                    callbackListSingleThreading(i, i);
+                }
+            });
 
-		struct SingleThreadingPolicies {
-			using Threading = eventpp::SingleThreading;
-		};
-		eventpp::CallbackList<void (int, int), SingleThreadingPolicies> callbackListSingleThreading;
-		for(int c = 0; c < callbackCount; ++c) {
-			callbackListSingleThreading.append(std::bind(&FunctionObject::nonInlineNonVirFunc, &funcObject, std::placeholders::_1, std::placeholders::_2));
-		}
-		const uint64_t callbackListSingleThreadingTime = measureElapsedTime([iterateCount, &callbackListSingleThreading]() {
-			for(int i = 0; i < iterateCount; ++i) {
-				callbackListSingleThreading(i, i);
-			}
-		});
+        struct MultiThreadingPolicies {
+            using Threading = eventpp::MultipleThreading;
+        };
+        eventpp::CallbackList<void(int, int), MultiThreadingPolicies> callbackListMultiThreading;
+        for (int c = 0; c < callbackCount; ++c) {
+            callbackListMultiThreading.append(std::bind(&FunctionObject::nonInlineNonVirFunc, &funcObject,
+                                                        std::placeholders::_1, std::placeholders::_2));
+        }
+        const uint64_t callbackListMultiThreadingTime =
+            measureElapsedTime([iterateCount, &callbackListMultiThreading]() {
+                for (int i = 0; i < iterateCount; ++i) {
+                    callbackListMultiThreading(i, i);
+                }
+            });
 
-		struct MultiThreadingPolicies {
-			using Threading = eventpp::MultipleThreading;
-		};
-		eventpp::CallbackList<void (int, int), MultiThreadingPolicies> callbackListMultiThreading;
-		for(int c = 0; c < callbackCount; ++c) {
-			callbackListMultiThreading.append(std::bind(&FunctionObject::nonInlineNonVirFunc, &funcObject, std::placeholders::_1, std::placeholders::_2));
-		}
-		const uint64_t callbackListMultiThreadingTime = measureElapsedTime([iterateCount, &callbackListMultiThreading]() {
-			for(int i = 0; i < iterateCount; ++i) {
-				callbackListMultiThreading(i, i);
-			}
-		});
+        std::cout << "funcObject.nonInlineNonVirFunc: " << cppTime << " " << callbackListSingleThreadingTime << " "
+                  << callbackListMultiThreadingTime << std::endl;
+    }
 
-		std::cout << "funcObject.nonInlineNonVirFunc: " << cppTime << " " << callbackListSingleThreadingTime << " " << callbackListMultiThreadingTime << std::endl;
-	}
+    {
+        FunctionObject funcObject;
+        const uint64_t cppTime = measureElapsedTime([iterateCount, &funcObject]() {
+            for (int i = 0; i < iterateCount; ++i) {
+                globalFunction(i, i);
+                nonInlineGlobalFunction(i, i);
+                funcObject(i, i);
+                funcObject.virFunc(i, i);
+                funcObject.nonVirFunc(i, i);
+                funcObject.nonInlineVirFunc(i, i);
+                funcObject.nonInlineNonVirFunc(i, i);
+            }
+        });
 
-	{
-		FunctionObject funcObject;
-		const uint64_t cppTime = measureElapsedTime([iterateCount, &funcObject]() {
-			for(int i = 0; i < iterateCount; ++i) {
-				globalFunction(i, i);
-				nonInlineGlobalFunction(i, i);
-				funcObject(i, i);
-				funcObject.virFunc(i, i);
-				funcObject.nonVirFunc(i, i);
-				funcObject.nonInlineVirFunc(i, i);
-				funcObject.nonInlineNonVirFunc(i, i);
-			}
-		});
+        struct SingleThreadingPolicies {
+            using Threading = eventpp::SingleThreading;
+        };
+        eventpp::CallbackList<void(int, int), SingleThreadingPolicies> callbackListSingleThreading;
+        callbackListSingleThreading.append(&globalFunction);
+        callbackListSingleThreading.append(&nonInlineGlobalFunction);
+        callbackListSingleThreading.append(funcObject);
+        callbackListSingleThreading.append(
+            std::bind(&FunctionObject::virFunc, &funcObject, std::placeholders::_1, std::placeholders::_2));
+        callbackListSingleThreading.append(
+            std::bind(&FunctionObject::nonVirFunc, &funcObject, std::placeholders::_1, std::placeholders::_2));
+        callbackListSingleThreading.append(
+            std::bind(&FunctionObject::nonInlineVirFunc, &funcObject, std::placeholders::_1, std::placeholders::_2));
+        callbackListSingleThreading.append(
+            std::bind(&FunctionObject::nonInlineNonVirFunc, &funcObject, std::placeholders::_1, std::placeholders::_2));
+        const uint64_t callbackListSingleThreadingTime =
+            measureElapsedTime([iterateCount, &callbackListSingleThreading]() {
+                for (int i = 0; i < iterateCount; ++i) {
+                    callbackListSingleThreading(i, i);
+                }
+            });
 
-		struct SingleThreadingPolicies {
-			using Threading = eventpp::SingleThreading;
-		};
-		eventpp::CallbackList<void (int, int), SingleThreadingPolicies> callbackListSingleThreading;
-		callbackListSingleThreading.append(&globalFunction);
-		callbackListSingleThreading.append(&nonInlineGlobalFunction);
-		callbackListSingleThreading.append(funcObject);
-		callbackListSingleThreading.append(std::bind(&FunctionObject::virFunc, &funcObject, std::placeholders::_1, std::placeholders::_2));
-		callbackListSingleThreading.append(std::bind(&FunctionObject::nonVirFunc, &funcObject, std::placeholders::_1, std::placeholders::_2));
-		callbackListSingleThreading.append(std::bind(&FunctionObject::nonInlineVirFunc, &funcObject, std::placeholders::_1, std::placeholders::_2));
-		callbackListSingleThreading.append(std::bind(&FunctionObject::nonInlineNonVirFunc, &funcObject, std::placeholders::_1, std::placeholders::_2));
-		const uint64_t callbackListSingleThreadingTime = measureElapsedTime([iterateCount, &callbackListSingleThreading]() {
-			for(int i = 0; i < iterateCount; ++i) {
-				callbackListSingleThreading(i, i);
-			}
-		});
+        struct MultiThreadingPolicies {
+            using Threading = eventpp::MultipleThreading;
+        };
+        eventpp::CallbackList<void(int, int), MultiThreadingPolicies> callbackListMultiThreading;
+        callbackListMultiThreading.append(&globalFunction);
+        callbackListMultiThreading.append(&nonInlineGlobalFunction);
+        callbackListMultiThreading.append(funcObject);
+        callbackListMultiThreading.append(
+            std::bind(&FunctionObject::virFunc, &funcObject, std::placeholders::_1, std::placeholders::_2));
+        callbackListMultiThreading.append(
+            std::bind(&FunctionObject::nonVirFunc, &funcObject, std::placeholders::_1, std::placeholders::_2));
+        callbackListMultiThreading.append(
+            std::bind(&FunctionObject::nonInlineVirFunc, &funcObject, std::placeholders::_1, std::placeholders::_2));
+        callbackListMultiThreading.append(
+            std::bind(&FunctionObject::nonInlineNonVirFunc, &funcObject, std::placeholders::_1, std::placeholders::_2));
+        const uint64_t callbackListMultiThreadingTime =
+            measureElapsedTime([iterateCount, &callbackListMultiThreading]() {
+                for (int i = 0; i < iterateCount; ++i) {
+                    callbackListMultiThreading(i, i);
+                }
+            });
 
-		struct MultiThreadingPolicies {
-			using Threading = eventpp::MultipleThreading;
-		};
-		eventpp::CallbackList<void (int, int), MultiThreadingPolicies> callbackListMultiThreading;
-		callbackListMultiThreading.append(&globalFunction);
-		callbackListMultiThreading.append(&nonInlineGlobalFunction);
-		callbackListMultiThreading.append(funcObject);
-		callbackListMultiThreading.append(std::bind(&FunctionObject::virFunc, &funcObject, std::placeholders::_1, std::placeholders::_2));
-		callbackListMultiThreading.append(std::bind(&FunctionObject::nonVirFunc, &funcObject, std::placeholders::_1, std::placeholders::_2));
-		callbackListMultiThreading.append(std::bind(&FunctionObject::nonInlineVirFunc, &funcObject, std::placeholders::_1, std::placeholders::_2));
-		callbackListMultiThreading.append(std::bind(&FunctionObject::nonInlineNonVirFunc, &funcObject, std::placeholders::_1, std::placeholders::_2));
-		const uint64_t callbackListMultiThreadingTime = measureElapsedTime([iterateCount, &callbackListMultiThreading]() {
-			for(int i = 0; i < iterateCount; ++i) {
-				callbackListMultiThreading(i, i);
-			}
-		});
-
-		std::cout << "All: " << cppTime << " " << callbackListSingleThreadingTime << " " << callbackListMultiThreadingTime << std::endl;
-	}
+        std::cout << "All: " << cppTime << " " << callbackListSingleThreadingTime << " "
+                  << callbackListMultiThreadingTime << std::endl;
+    }
 }
-
