@@ -20,121 +20,140 @@
 #include "eventpp/callbacklist.h"
 #undef private
 
+#include <vector>
 #include <algorithm>
 #include <numeric>
-#include <vector>
 
 template <typename CL, typename T>
-void verifyLinkedList(CL& callbackList, const std::vector<T>& dataList) {
-    const int count = (int)dataList.size();
-    if (count == 0) {
-        REQUIRE(!callbackList.head);
-        REQUIRE(!callbackList.tail);
-        return;
-    }
+void verifyLinkedList(CL & callbackList, const std::vector<T> & dataList)
+{
+	const int count = (int)dataList.size();
+	if(count == 0) {
+		REQUIRE(! callbackList.head);
+		REQUIRE(! callbackList.tail);
+		return;
+	}
 
-    REQUIRE(!callbackList.head->previous);
-    REQUIRE(!callbackList.tail->next);
+	REQUIRE(! callbackList.head->previous);
+	REQUIRE(! callbackList.tail->next);
 
-    if (count == 1) {
-        REQUIRE(callbackList.head);
-        REQUIRE(callbackList.head == callbackList.tail);
-    }
+	if(count == 1) {
+		REQUIRE(callbackList.head);
+		REQUIRE(callbackList.head == callbackList.tail);
+	}
 
-    auto node = callbackList.head;
-    for (int i = 0; i < count; ++i) {
-        REQUIRE(node);
+	auto node = callbackList.head;
+	for(int i = 0; i < count; ++i) {
+		REQUIRE(node);
+		
+		if(i == 0) {
+			REQUIRE(! node->previous);
+			REQUIRE(node == callbackList.head);
+		}
+		if(i == count - 1) {
+			REQUIRE(! node->next);
+			REQUIRE(node == callbackList.tail);
+		}
+		
+		REQUIRE(node->callback == dataList[i]);
 
-        if (i == 0) {
-            REQUIRE(!node->previous);
-            REQUIRE(node == callbackList.head);
-        }
-        if (i == count - 1) {
-            REQUIRE(!node->next);
-            REQUIRE(node == callbackList.tail);
-        }
-
-        REQUIRE(node->callback == dataList[i]);
-
-        node = node->next;
-    }
+		node = node->next;
+	}
 }
 
 template <typename CL, typename T>
-void verifyDisorderedLinkedList(CL& callbackList, std::vector<T> dataList) {
-    std::vector<T> buffer;
+void verifyDisorderedLinkedList(CL & callbackList, std::vector<T> dataList)
+{
+	std::vector<T> buffer;
 
-    auto node = callbackList.head;
-    while (node) {
-        buffer.push_back(node->callback);
-        node = node->next;
-    }
+	auto node = callbackList.head;
+	while(node) {
+		buffer.push_back(node->callback);
+		node = node->next;
+	}
 
-    std::sort(buffer.begin(), buffer.end());
-    std::sort(dataList.begin(), dataList.end());
+	std::sort(buffer.begin(), buffer.end());
+	std::sort(dataList.begin(), dataList.end());
 
-    REQUIRE(buffer == dataList);
+	REQUIRE(buffer == dataList);
 }
 
 template <typename CL>
-auto extractCallbackListHandles(CL& callbackList) -> std::vector<typename CL::Handle> {
-    std::vector<typename CL::Handle> result;
+auto extractCallbackListHandles(CL & callbackList)
+	-> std::vector<typename CL::Handle>
+{
+	std::vector<typename CL::Handle> result;
 
-    auto node = callbackList.head;
-    while (node) {
-        result.push_back(typename CL::Handle(node));
-        node = node->next;
-    }
+	auto node = callbackList.head;
+	while(node) {
+		result.push_back(typename CL::Handle(node));
+		node = node->next;
+	}
 
-    return result;
+	return result;
 }
 
-struct RemovalTester {
-    RemovalTester(const int callbackCount, const int removerIndex, const std::vector<int>& indexesToBeRemoved) :
-    callbackCount(callbackCount), removerIndex(removerIndex), indexesToBeRemoved(indexesToBeRemoved) {
-    }
+struct RemovalTester
+{
+	RemovalTester(
+			const int callbackCount,
+			const int removerIndex,
+			const std::vector<int> & indexesToBeRemoved
+		)
+		:
+			callbackCount(callbackCount),
+			removerIndex(removerIndex),
+			indexesToBeRemoved(indexesToBeRemoved)
+	{
+	}
 
-    void test() {
-        using CL = eventpp::CallbackList<void()>;
-        CL callbackList;
-        std::vector<CL::Handle> handleList(callbackCount);
-        std::vector<int> dataList(callbackCount);
+	void test()
+	{
+		using CL = eventpp::CallbackList<void()>;
+		CL callbackList;
+		std::vector<CL::Handle> handleList(callbackCount);
+		std::vector<int> dataList(callbackCount);
 
-        for (int i = 0; i < callbackCount; ++i) {
-            if (i == removerIndex) {
-                handleList[i] = callbackList.append([this, &dataList, &handleList, &callbackList, i]() {
-                    dataList[i] = i + 1;
+		for(int i = 0; i < callbackCount; ++i) {
+			if(i == removerIndex) {
+				handleList[i] = callbackList.append([this, &dataList, &handleList, &callbackList, i]() {
+					dataList[i] = i + 1;
+					
+					for(auto index : indexesToBeRemoved) {
+						callbackList.remove(handleList[index]);
+					}
+				});
+			}
+			else {
+				handleList[i] = callbackList.append([&dataList, i]() {
+					dataList[i] = i + 1;
+				});
+			}
+		}
 
-                    for (auto index : indexesToBeRemoved) {
-                        callbackList.remove(handleList[index]);
-                    }
-                });
-            } else {
-                handleList[i] = callbackList.append([&dataList, i]() { dataList[i] = i + 1; });
-            }
-        }
+		callbackList();
 
-        callbackList();
+		std::vector<int> compareList(callbackCount);
+		std::iota(compareList.begin(), compareList.end(), 1);
 
-        std::vector<int> compareList(callbackCount);
-        std::iota(compareList.begin(), compareList.end(), 1);
+		for (auto index : indexesToBeRemoved) {
+			if(index > removerIndex) {
+				compareList[index] = 0;
+			}
+		}
 
-        for (auto index : indexesToBeRemoved) {
-            if (index > removerIndex) {
-                compareList[index] = 0;
-            }
-        }
+		REQUIRE(dataList == compareList);
+	}
 
-        REQUIRE(dataList == compareList);
-    }
-
-    const int callbackCount;
-    const int removerIndex;
-    const std::vector<int> indexesToBeRemoved;
+	const int callbackCount;
+	const int removerIndex;
+	const std::vector<int> indexesToBeRemoved;
 };
 
-struct FakeCallbackListPolicies {
-    using Callback = int;
+struct FakeCallbackListPolicies
+{
+	using Callback = int;
 };
+
 
 #endif

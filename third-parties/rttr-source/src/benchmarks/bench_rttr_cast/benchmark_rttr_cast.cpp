@@ -1,36 +1,36 @@
 /************************************************************************************
- *                                                                                   *
- *   Copyright (c) 2014 - 2018 Axel Menzel <info@rttr.org>                           *
- *                                                                                   *
- *   This file is part of RTTR (Run Time Type Reflection)                            *
- *   License: MIT License                                                            *
- *                                                                                   *
- *   Permission is hereby granted, free of charge, to any person obtaining           *
- *   a copy of this software and associated documentation files (the "Software"),    *
- *   to deal in the Software without restriction, including without limitation       *
- *   the rights to use, copy, modify, merge, publish, distribute, sublicense,        *
- *   and/or sell copies of the Software, and to permit persons to whom the           *
- *   Software is furnished to do so, subject to the following conditions:            *
- *                                                                                   *
- *   The above copyright notice and this permission notice shall be included in      *
- *   all copies or substantial portions of the Software.                             *
- *                                                                                   *
- *   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR      *
- *   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,        *
- *   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE     *
- *   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER          *
- *   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,   *
- *   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE   *
- *   SOFTWARE.                                                                       *
- *                                                                                   *
- *************************************************************************************/
+*                                                                                   *
+*   Copyright (c) 2014 - 2018 Axel Menzel <info@rttr.org>                           *
+*                                                                                   *
+*   This file is part of RTTR (Run Time Type Reflection)                            *
+*   License: MIT License                                                            *
+*                                                                                   *
+*   Permission is hereby granted, free of charge, to any person obtaining           *
+*   a copy of this software and associated documentation files (the "Software"),    *
+*   to deal in the Software without restriction, including without limitation       *
+*   the rights to use, copy, modify, merge, publish, distribute, sublicense,        *
+*   and/or sell copies of the Software, and to permit persons to whom the           *
+*   Software is furnished to do so, subject to the following conditions:            *
+*                                                                                   *
+*   The above copyright notice and this permission notice shall be included in      *
+*   all copies or substantial portions of the Software.                             *
+*                                                                                   *
+*   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR      *
+*   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,        *
+*   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE     *
+*   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER          *
+*   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,   *
+*   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE   *
+*   SOFTWARE.                                                                       *
+*                                                                                   *
+*************************************************************************************/
 
 #include "benchmarks/bench_rttr_cast/test_classes.h"
 
 #include <rttr/type>
 
-#include <nonius/html_group_reporter.h>
 #include <nonius/nonius.h++>
+#include <nonius/html_group_reporter.h>
 
 #include <iostream>
 #include <memory>
@@ -41,19 +41,22 @@ using namespace rttr;
 
 #define ITEM_COUNT 10
 
-template <typename T>
-struct bench_data {
-    std::vector<std::shared_ptr<T>> m_vec;
+template<typename T>
+struct bench_data
+{
+    std::vector<std::shared_ptr<T> > m_vec;
 };
 
 using bench_data_single_base = bench_data<ClassSingleBase>;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-bench_data_single_base setup_level_1() {
-    std::vector<std::shared_ptr<ClassSingleBase>> vec;
+bench_data_single_base setup_level_1()
+{
+    std::vector<std::shared_ptr<ClassSingleBase> > vec;
     vec.reserve(ITEM_COUNT * 5);
-    for (int i = 0; i < ITEM_COUNT; ++i) {
+    for (int i = 0; i < ITEM_COUNT; ++i)
+    {
         vec.push_back(std::make_shared<ClassSingle1A>());
         vec.push_back(std::make_shared<ClassSingle1B>());
         vec.push_back(std::make_shared<ClassSingle1C>());
@@ -61,15 +64,17 @@ bench_data_single_base setup_level_1() {
         vec.push_back(std::make_shared<ClassSingle1E>());
     }
 
-    return bench_data_single_base { std::move(vec) };
+    return bench_data_single_base{std::move(vec)};
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-bench_data_single_base setup_level_3() {
-    std::vector<std::shared_ptr<ClassSingleBase>> vec;
+bench_data_single_base setup_level_3()
+{
+    std::vector<std::shared_ptr<ClassSingleBase> > vec;
     vec.reserve(ITEM_COUNT * 5);
-    for (int i = 0; i < ITEM_COUNT; ++i) {
+    for (int i = 0; i < ITEM_COUNT; ++i)
+    {
         vec.push_back(detail::make_unique<ClassSingle3A>());
         vec.push_back(detail::make_unique<ClassSingle3B>());
         vec.push_back(detail::make_unique<ClassSingle3C>());
@@ -77,15 +82,17 @@ bench_data_single_base setup_level_3() {
         vec.push_back(detail::make_unique<ClassSingle3E>());
     }
 
-    return bench_data_single_base { std::move(vec) };
+    return bench_data_single_base{std::move(vec)};
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-bench_data_single_base setup_level_6() {
-    std::vector<std::shared_ptr<ClassSingleBase>> vec;
+bench_data_single_base setup_level_6()
+{
+    std::vector<std::shared_ptr<ClassSingleBase> > vec;
     vec.reserve(ITEM_COUNT * 5);
-    for (int i = 0; i < ITEM_COUNT; ++i) {
+    for (int i = 0; i < ITEM_COUNT; ++i)
+    {
         vec.push_back(detail::make_unique<ClassSingle6A>());
         vec.push_back(detail::make_unique<ClassSingle6B>());
         vec.push_back(detail::make_unique<ClassSingle6C>());
@@ -93,7 +100,7 @@ bench_data_single_base setup_level_6() {
         vec.push_back(detail::make_unique<ClassSingle6E>());
     }
 
-    return bench_data_single_base { std::move(vec) };
+    return bench_data_single_base{std::move(vec)};
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -104,54 +111,62 @@ using bench_data_virtual = bench_data<ClassDiamondTop>;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-bench_data_virtual setup_virtual_inheritance_level_1() {
-    std::vector<std::shared_ptr<ClassDiamondTop>> vec;
+bench_data_virtual setup_virtual_inheritance_level_1()
+{
+    std::vector<std::shared_ptr<ClassDiamondTop> > vec;
     vec.reserve(ITEM_COUNT * 3);
-    for (int i = 0; i < ITEM_COUNT; ++i) {
+    for (int i = 0; i < ITEM_COUNT; ++i)
+    {
         vec.push_back(detail::make_unique<ClassDiamondLeft1>());
         vec.push_back(detail::make_unique<ClassDiamondMiddle1>());
         vec.push_back(detail::make_unique<ClassDiamondRight1>());
     }
 
-    return bench_data_virtual { std::move(vec) };
+    return bench_data_virtual{std::move(vec)};
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-bench_data_virtual setup_virtual_inheritance_level_3() {
-    std::vector<std::shared_ptr<ClassDiamondTop>> vec;
+bench_data_virtual setup_virtual_inheritance_level_3()
+{
+    std::vector<std::shared_ptr<ClassDiamondTop> > vec;
     vec.reserve(ITEM_COUNT * 3);
-    for (int i = 0; i < ITEM_COUNT; ++i) {
+    for (int i = 0; i < ITEM_COUNT; ++i)
+    {
         vec.push_back(detail::make_unique<ClassDiamondLeft3>());
         vec.push_back(detail::make_unique<ClassDiamondMiddle3>());
         vec.push_back(detail::make_unique<ClassDiamondRight3>());
     }
 
-    return bench_data_virtual { std::move(vec) };
+    return bench_data_virtual{std::move(vec)};
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-bench_data_virtual setup_virtual_inheritance_level_6() {
-    std::vector<std::shared_ptr<ClassDiamondTop>> vec;
+bench_data_virtual setup_virtual_inheritance_level_6()
+{
+    std::vector<std::shared_ptr<ClassDiamondTop> > vec;
     vec.reserve(ITEM_COUNT * 3);
-    for (int i = 0; i < ITEM_COUNT; ++i) {
+    for (int i = 0; i < ITEM_COUNT; ++i)
+    {
         vec.push_back(detail::make_unique<ClassDiamondLeft6>());
         vec.push_back(detail::make_unique<ClassDiamondMiddle6>());
         vec.push_back(detail::make_unique<ClassDiamondRight6>());
     }
 
-    return bench_data_virtual { std::move(vec) };
+    return bench_data_virtual{std::move(vec)};
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////
 
-bench_data<ClassMultipleBaseC> setup_multiple_class_hierachy() {
-    std::vector<std::shared_ptr<ClassMultipleBaseC>> vec;
+bench_data<ClassMultipleBaseC> setup_multiple_class_hierachy()
+{
+    std::vector<std::shared_ptr<ClassMultipleBaseC> > vec;
     vec.reserve(ITEM_COUNT * 7);
-    for (int i = 0; i < ITEM_COUNT; ++i) {
+    for (int i = 0; i < ITEM_COUNT; ++i)
+    {
         vec.push_back(detail::make_unique<FinalClass>());
         vec.push_back(detail::make_unique<ClassMultiple5C>());
         vec.push_back(detail::make_unique<FinalClass>());
@@ -161,54 +176,73 @@ bench_data<ClassMultipleBaseC> setup_multiple_class_hierachy() {
         vec.push_back(detail::make_unique<FinalClass>());
     }
 
-    return bench_data<ClassMultipleBaseC> { std::move(vec) };
+    return bench_data<ClassMultipleBaseC>{std::move(vec)};
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////
 
-bench_data<ClassMultiple3A> setup_cross_cast_class_hierachy_1() {
-    std::vector<std::shared_ptr<ClassMultiple3A>> vec;
+bench_data<ClassMultiple3A> setup_cross_cast_class_hierachy_1()
+{
+    std::vector<std::shared_ptr<ClassMultiple3A> > vec;
     vec.reserve(ITEM_COUNT * 2);
-    for (int i = 0; i < ITEM_COUNT; ++i) {
+    for (int i = 0; i < ITEM_COUNT; ++i)
+    {
         vec.push_back(detail::make_unique<FinalClass>());
         vec.push_back(detail::make_unique<ClassMultiple6A>());
     }
 
-    return bench_data<ClassMultiple3A> { std::move(vec) };
+    return bench_data<ClassMultiple3A>{std::move(vec)};
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-bench_data<ClassMultiple6A> setup_cross_cast_class_hierachy_2() {
-    std::vector<std::shared_ptr<ClassMultiple6A>> vec;
+bench_data<ClassMultiple6A> setup_cross_cast_class_hierachy_2()
+{
+    std::vector<std::shared_ptr<ClassMultiple6A> > vec;
     vec.reserve(ITEM_COUNT * 2);
-    for (int i = 0; i < ITEM_COUNT; ++i) {
+    for (int i = 0; i < ITEM_COUNT; ++i)
+    {
         vec.push_back(detail::make_unique<FinalClass>());
         vec.push_back(detail::make_unique<ClassMultiple6A>());
     }
 
-    return bench_data<ClassMultiple6A> { std::move(vec) };
+    return bench_data<ClassMultiple6A>{std::move(vec)};
 }
+
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-nonius::benchmark bench_level_1_dynamic_cast() {
-    return nonius::benchmark("dynamic_cast", [](nonius::chronometer meter) {
+
+nonius::benchmark bench_level_1_dynamic_cast()
+{
+    return nonius::benchmark("dynamic_cast", [](nonius::chronometer meter)
+    {
         const bench_data_single_base bench_data = setup_level_1();
-        volatile std::size_t value              = 0;
-        meter.measure([&]() {
-            for (std::size_t i = 0; i < bench_data.m_vec.size(); ++i) {
-                if (dynamic_cast<ClassSingle1A*>(bench_data.m_vec[i].get())) {
+        volatile std::size_t value = 0;
+        meter.measure([&]()
+        {
+            for (std::size_t i = 0; i < bench_data.m_vec.size(); ++i)
+            {
+                if (dynamic_cast<ClassSingle1A*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
-                } else if (dynamic_cast<ClassSingle1B*>(bench_data.m_vec[i].get())) {
+                }
+                else if (dynamic_cast<ClassSingle1B*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
-                } else if (dynamic_cast<ClassSingle1C*>(bench_data.m_vec[i].get())) {
+                }
+                else if (dynamic_cast<ClassSingle1C*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
-                } else if (dynamic_cast<ClassSingle1D*>(bench_data.m_vec[i].get())) {
+                }
+                else if (dynamic_cast<ClassSingle1D*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
-                } else if (dynamic_cast<ClassSingle1E*>(bench_data.m_vec[i].get())) {
+                }
+                else if (dynamic_cast<ClassSingle1E*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
                 }
             }
@@ -220,21 +254,34 @@ nonius::benchmark bench_level_1_dynamic_cast() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-nonius::benchmark bench_level_1_rttr_cast() {
-    return nonius::benchmark("rttr_cast", [](nonius::chronometer meter) {
+nonius::benchmark bench_level_1_rttr_cast()
+{
+    return nonius::benchmark("rttr_cast", [](nonius::chronometer meter)
+    {
         bench_data_single_base bench_data = setup_level_1();
-        volatile std::size_t value        = 0;
-        meter.measure([&]() {
-            for (std::size_t i = 0; i < bench_data.m_vec.size(); ++i) {
-                if (rttr_cast<ClassSingle1A*>(bench_data.m_vec[i].get())) {
+        volatile std::size_t value = 0;
+        meter.measure([&]()
+        {
+            for (std::size_t i = 0; i < bench_data.m_vec.size(); ++i)
+            {
+                if (rttr_cast<ClassSingle1A*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
-                } else if (rttr_cast<ClassSingle1B*>(bench_data.m_vec[i].get())) {
+                }
+                else if (rttr_cast<ClassSingle1B*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
-                } else if (rttr_cast<ClassSingle1C*>(bench_data.m_vec[i].get())) {
+                }
+                else if (rttr_cast<ClassSingle1C*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
-                } else if (rttr_cast<ClassSingle1D*>(bench_data.m_vec[i].get())) {
+                }
+                else if (rttr_cast<ClassSingle1D*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
-                } else if (rttr_cast<ClassSingle1E*>(bench_data.m_vec[i].get())) {
+                }
+                else if (rttr_cast<ClassSingle1E*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
                 }
             }
@@ -246,21 +293,34 @@ nonius::benchmark bench_level_1_rttr_cast() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-nonius::benchmark bench_level_3_dynamic_cast() {
-    return nonius::benchmark("dynamic_cast", [](nonius::chronometer meter) {
+nonius::benchmark bench_level_3_dynamic_cast()
+{
+    return nonius::benchmark("dynamic_cast", [](nonius::chronometer meter)
+    {
         bench_data_single_base bench_data = setup_level_3();
-        volatile std::size_t value        = 0;
-        meter.measure([&]() {
-            for (std::size_t i = 0; i < bench_data.m_vec.size(); ++i) {
-                if (dynamic_cast<ClassSingle3A*>(bench_data.m_vec[i].get())) {
+        volatile std::size_t value = 0;
+        meter.measure([&]()
+        {
+            for (std::size_t i = 0; i < bench_data.m_vec.size(); ++i)
+            {
+                if (dynamic_cast<ClassSingle3A*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
-                } else if (dynamic_cast<ClassSingle3B*>(bench_data.m_vec[i].get())) {
+                }
+                else if (dynamic_cast<ClassSingle3B*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
-                } else if (dynamic_cast<ClassSingle3C*>(bench_data.m_vec[i].get())) {
+                }
+                else if (dynamic_cast<ClassSingle3C*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
-                } else if (dynamic_cast<ClassSingle3D*>(bench_data.m_vec[i].get())) {
+                }
+                else if (dynamic_cast<ClassSingle3D*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
-                } else if (dynamic_cast<ClassSingle3E*>(bench_data.m_vec[i].get())) {
+                }
+                else if (dynamic_cast<ClassSingle3E*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
                 }
             }
@@ -272,21 +332,34 @@ nonius::benchmark bench_level_3_dynamic_cast() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-nonius::benchmark bench_level_3_rttr_cast() {
-    return nonius::benchmark("rttr_cast", [](nonius::chronometer meter) {
+nonius::benchmark bench_level_3_rttr_cast()
+{
+    return nonius::benchmark("rttr_cast", [](nonius::chronometer meter)
+    {
         bench_data_single_base bench_data = setup_level_3();
-        volatile std::size_t value        = 0;
-        meter.measure([&]() {
-            for (std::size_t i = 0; i < bench_data.m_vec.size(); ++i) {
-                if (rttr_cast<ClassSingle3A*>(bench_data.m_vec[i].get())) {
+        volatile std::size_t value = 0;
+        meter.measure([&]()
+        {
+            for (std::size_t i = 0; i < bench_data.m_vec.size(); ++i)
+            {
+                if (rttr_cast<ClassSingle3A*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
-                } else if (rttr_cast<ClassSingle3B*>(bench_data.m_vec[i].get())) {
+                }
+                else if (rttr_cast<ClassSingle3B*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
-                } else if (rttr_cast<ClassSingle3C*>(bench_data.m_vec[i].get())) {
+                }
+                else if (rttr_cast<ClassSingle3C*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
-                } else if (rttr_cast<ClassSingle3D*>(bench_data.m_vec[i].get())) {
+                }
+                else if (rttr_cast<ClassSingle3D*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
-                } else if (rttr_cast<ClassSingle3E*>(bench_data.m_vec[i].get())) {
+                }
+                else if (rttr_cast<ClassSingle3E*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
                 }
             }
@@ -298,21 +371,34 @@ nonius::benchmark bench_level_3_rttr_cast() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-nonius::benchmark bench_level_6_dynamic_cast() {
-    return nonius::benchmark("dynamic_cast", [](nonius::chronometer meter) {
+nonius::benchmark bench_level_6_dynamic_cast()
+{
+    return nonius::benchmark("dynamic_cast", [](nonius::chronometer meter)
+    {
         bench_data_single_base bench_data = setup_level_6();
-        volatile std::size_t value        = 0;
-        meter.measure([&]() {
-            for (std::size_t i = 0; i < bench_data.m_vec.size(); ++i) {
-                if (dynamic_cast<ClassSingle6A*>(bench_data.m_vec[i].get())) {
+        volatile std::size_t value = 0;
+        meter.measure([&]()
+        {
+            for (std::size_t i = 0; i < bench_data.m_vec.size(); ++i)
+            {
+                if (dynamic_cast<ClassSingle6A*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
-                } else if (dynamic_cast<ClassSingle6B*>(bench_data.m_vec[i].get())) {
+                }
+                else if (dynamic_cast<ClassSingle6B*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
-                } else if (dynamic_cast<ClassSingle6C*>(bench_data.m_vec[i].get())) {
+                }
+                else if (dynamic_cast<ClassSingle6C*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
-                } else if (dynamic_cast<ClassSingle6D*>(bench_data.m_vec[i].get())) {
+                }
+                else if (dynamic_cast<ClassSingle6D*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
-                } else if (dynamic_cast<ClassSingle6E*>(bench_data.m_vec[i].get())) {
+                }
+                else if (dynamic_cast<ClassSingle6E*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
                 }
             }
@@ -324,21 +410,34 @@ nonius::benchmark bench_level_6_dynamic_cast() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-nonius::benchmark bench_level_6_rttr_cast() {
-    return nonius::benchmark("rttr_cast", [](nonius::chronometer meter) {
+nonius::benchmark bench_level_6_rttr_cast()
+{
+    return nonius::benchmark("rttr_cast", [](nonius::chronometer meter)
+    {
         bench_data_single_base bench_data = setup_level_6();
-        volatile std::size_t value        = 0;
-        meter.measure([&]() {
-            for (std::size_t i = 0; i < bench_data.m_vec.size(); ++i) {
-                if (rttr_cast<ClassSingle6A*>(bench_data.m_vec[i].get())) {
+        volatile std::size_t value = 0;
+        meter.measure([&]()
+        {
+            for (std::size_t i = 0; i < bench_data.m_vec.size(); ++i)
+            {
+                if (rttr_cast<ClassSingle6A*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
-                } else if (rttr_cast<ClassSingle6B*>(bench_data.m_vec[i].get())) {
+                }
+                else if (rttr_cast<ClassSingle6B*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
-                } else if (rttr_cast<ClassSingle6C*>(bench_data.m_vec[i].get())) {
+                }
+                else if (rttr_cast<ClassSingle6C*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
-                } else if (rttr_cast<ClassSingle6D*>(bench_data.m_vec[i].get())) {
+                }
+                else if (rttr_cast<ClassSingle6D*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
-                } else if (rttr_cast<ClassSingle6E*>(bench_data.m_vec[i].get())) {
+                }
+                else if (rttr_cast<ClassSingle6E*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
                 }
             }
@@ -352,17 +451,26 @@ nonius::benchmark bench_level_6_rttr_cast() {
 /////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////
 
-nonius::benchmark bench_virtual_inheritance_level_1_dynamic_cast() {
-    return nonius::benchmark("dynamic_cast", [](nonius::chronometer meter) {
+nonius::benchmark bench_virtual_inheritance_level_1_dynamic_cast()
+{
+    return nonius::benchmark("dynamic_cast", [](nonius::chronometer meter)
+    {
         bench_data_virtual bench_data = setup_virtual_inheritance_level_1();
-        volatile std::size_t value    = 0;
-        meter.measure([&]() {
-            for (std::size_t i = 0; i < bench_data.m_vec.size(); ++i) {
-                if (dynamic_cast<ClassDiamondLeft1*>(bench_data.m_vec[i].get())) {
+        volatile std::size_t value = 0;
+        meter.measure([&]()
+        {
+            for (std::size_t i = 0; i < bench_data.m_vec.size(); ++i)
+            {
+                if (dynamic_cast<ClassDiamondLeft1*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
-                } else if (dynamic_cast<ClassDiamondMiddle1*>(bench_data.m_vec[i].get())) {
+                }
+                else if (dynamic_cast<ClassDiamondMiddle1*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
-                } else if (dynamic_cast<ClassDiamondRight1*>(bench_data.m_vec[i].get())) {
+                }
+                else if (dynamic_cast<ClassDiamondRight1*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
                 }
             }
@@ -374,17 +482,26 @@ nonius::benchmark bench_virtual_inheritance_level_1_dynamic_cast() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-nonius::benchmark bench_virtual_inheritance_level_1_rttr_cast() {
-    return nonius::benchmark("rttr_cast", [](nonius::chronometer meter) {
+nonius::benchmark bench_virtual_inheritance_level_1_rttr_cast()
+{
+    return nonius::benchmark("rttr_cast", [](nonius::chronometer meter)
+    {
         bench_data_virtual bench_data = setup_virtual_inheritance_level_1();
-        volatile std::size_t value    = 0;
-        meter.measure([&]() {
-            for (std::size_t i = 0; i < bench_data.m_vec.size(); ++i) {
-                if (rttr_cast<ClassDiamondLeft1*>(bench_data.m_vec[i].get())) {
+        volatile std::size_t value = 0;
+        meter.measure([&]()
+        {
+            for (std::size_t i = 0; i < bench_data.m_vec.size(); ++i)
+            {
+                if (rttr_cast<ClassDiamondLeft1*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
-                } else if (rttr_cast<ClassDiamondMiddle1*>(bench_data.m_vec[i].get())) {
+                }
+                else if (rttr_cast<ClassDiamondMiddle1*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
-                } else if (rttr_cast<ClassDiamondRight1*>(bench_data.m_vec[i].get())) {
+                }
+                else if (rttr_cast<ClassDiamondRight1*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
                 }
             }
@@ -396,17 +513,26 @@ nonius::benchmark bench_virtual_inheritance_level_1_rttr_cast() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-nonius::benchmark bench_virtual_inheritance_level_3_dynamic_cast() {
-    return nonius::benchmark("dynamic_cast", [](nonius::chronometer meter) {
+nonius::benchmark bench_virtual_inheritance_level_3_dynamic_cast()
+{
+    return nonius::benchmark("dynamic_cast", [](nonius::chronometer meter)
+    {
         bench_data_virtual bench_data = setup_virtual_inheritance_level_3();
-        volatile std::size_t value    = 0;
-        meter.measure([&]() {
-            for (std::size_t i = 0; i < bench_data.m_vec.size(); ++i) {
-                if (dynamic_cast<ClassDiamondLeft3*>(bench_data.m_vec[i].get())) {
+        volatile std::size_t value = 0;
+        meter.measure([&]()
+        {
+            for (std::size_t i = 0; i < bench_data.m_vec.size(); ++i)
+            {
+                if (dynamic_cast<ClassDiamondLeft3*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
-                } else if (dynamic_cast<ClassDiamondMiddle3*>(bench_data.m_vec[i].get())) {
+                }
+                else if (dynamic_cast<ClassDiamondMiddle3*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
-                } else if (dynamic_cast<ClassDiamondRight3*>(bench_data.m_vec[i].get())) {
+                }
+                else if (dynamic_cast<ClassDiamondRight3*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
                 }
             }
@@ -418,17 +544,26 @@ nonius::benchmark bench_virtual_inheritance_level_3_dynamic_cast() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-nonius::benchmark bench_virtual_inheritance_level_3_rttr_cast() {
-    return nonius::benchmark("rttr_cast", [](nonius::chronometer meter) {
+nonius::benchmark bench_virtual_inheritance_level_3_rttr_cast()
+{
+    return nonius::benchmark("rttr_cast", [](nonius::chronometer meter)
+    {
         bench_data_virtual bench_data = setup_virtual_inheritance_level_3();
-        volatile std::size_t value    = 0;
-        meter.measure([&]() {
-            for (std::size_t i = 0; i < bench_data.m_vec.size(); ++i) {
-                if (rttr_cast<ClassDiamondLeft3*>(bench_data.m_vec[i].get())) {
+        volatile std::size_t value = 0;
+        meter.measure([&]()
+        {
+            for (std::size_t i = 0; i < bench_data.m_vec.size(); ++i)
+            {
+                if (rttr_cast<ClassDiamondLeft3*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
-                } else if (rttr_cast<ClassDiamondMiddle3*>(bench_data.m_vec[i].get())) {
+                }
+                else if (rttr_cast<ClassDiamondMiddle3*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
-                } else if (rttr_cast<ClassDiamondRight3*>(bench_data.m_vec[i].get())) {
+                }
+                else if (rttr_cast<ClassDiamondRight3*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
                 }
             }
@@ -438,19 +573,29 @@ nonius::benchmark bench_virtual_inheritance_level_3_rttr_cast() {
     });
 }
 
+
 /////////////////////////////////////////////////////////////////////////////////////////
 
-nonius::benchmark bench_virtual_inheritance_level_6_dynamic_cast() {
-    return nonius::benchmark("dynamic_cast", [](nonius::chronometer meter) {
+nonius::benchmark bench_virtual_inheritance_level_6_dynamic_cast()
+{
+    return nonius::benchmark("dynamic_cast", [](nonius::chronometer meter)
+    {
         bench_data_virtual bench_data = setup_virtual_inheritance_level_6();
-        volatile std::size_t value    = 0;
-        meter.measure([&]() {
-            for (std::size_t i = 0; i < bench_data.m_vec.size(); ++i) {
-                if (dynamic_cast<ClassDiamondLeft6*>(bench_data.m_vec[i].get())) {
+        volatile std::size_t value = 0;
+        meter.measure([&]()
+        {
+            for (std::size_t i = 0; i < bench_data.m_vec.size(); ++i)
+            {
+                if (dynamic_cast<ClassDiamondLeft6*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
-                } else if (dynamic_cast<ClassDiamondMiddle6*>(bench_data.m_vec[i].get())) {
+                }
+                else if (dynamic_cast<ClassDiamondMiddle6*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
-                } else if (dynamic_cast<ClassDiamondRight6*>(bench_data.m_vec[i].get())) {
+                }
+                else if (dynamic_cast<ClassDiamondRight6*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
                 }
             }
@@ -462,37 +607,26 @@ nonius::benchmark bench_virtual_inheritance_level_6_dynamic_cast() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-nonius::benchmark bench_virtual_inheritance_level_6_rttr_cast() {
-    return nonius::benchmark("rttr_cast", [](nonius::chronometer meter) {
+nonius::benchmark bench_virtual_inheritance_level_6_rttr_cast()
+{
+    return nonius::benchmark("rttr_cast", [](nonius::chronometer meter)
+    {
         bench_data_virtual bench_data = setup_virtual_inheritance_level_6();
-        volatile std::size_t value    = 0;
-        meter.measure([&]() {
-            for (std::size_t i = 0; i < bench_data.m_vec.size(); ++i) {
-                if (rttr_cast<ClassDiamondLeft6*>(bench_data.m_vec[i].get())) {
-                    value += 1;
-                } else if (rttr_cast<ClassDiamondMiddle6*>(bench_data.m_vec[i].get())) {
-                    value += 1;
-                } else if (rttr_cast<ClassDiamondRight6*>(bench_data.m_vec[i].get())) {
-                    value += 1;
-                }
-            }
-
-            return value;
-        });
-    });
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////////////
-
-nonius::benchmark bench_multiple_inheritance_dynamic_cast() {
-    return nonius::benchmark("dynamic_cast", [](nonius::chronometer meter) {
-        auto bench_data            = setup_multiple_class_hierachy();
         volatile std::size_t value = 0;
-        meter.measure([&]() {
-            for (std::size_t i = 0; i < bench_data.m_vec.size(); ++i) {
-                if (dynamic_cast<FinalClass*>(bench_data.m_vec[i].get())) {
+        meter.measure([&]()
+        {
+            for (std::size_t i = 0; i < bench_data.m_vec.size(); ++i)
+            {
+                if (rttr_cast<ClassDiamondLeft6*>(bench_data.m_vec[i].get()))
+                {
+                    value += 1;
+                }
+                else if (rttr_cast<ClassDiamondMiddle6*>(bench_data.m_vec[i].get()))
+                {
+                    value += 1;
+                }
+                else if (rttr_cast<ClassDiamondRight6*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
                 }
             }
@@ -503,14 +637,21 @@ nonius::benchmark bench_multiple_inheritance_dynamic_cast() {
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////
 
-nonius::benchmark bench_multiple_inheritance_rttr_cast() {
-    return nonius::benchmark("rttr_cast", [](nonius::chronometer meter) {
-        auto bench_data            = setup_multiple_class_hierachy();
+nonius::benchmark bench_multiple_inheritance_dynamic_cast()
+{
+    return nonius::benchmark("dynamic_cast", [](nonius::chronometer meter)
+    {
+        auto bench_data = setup_multiple_class_hierachy();
         volatile std::size_t value = 0;
-        meter.measure([&]() {
-            for (std::size_t i = 0; i < bench_data.m_vec.size(); ++i) {
-                if (rttr_cast<FinalClass*>(bench_data.m_vec[i].get())) {
+        meter.measure([&]()
+        {
+            for (std::size_t i = 0; i < bench_data.m_vec.size(); ++i)
+            {
+                if (dynamic_cast<FinalClass*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
                 }
             }
@@ -521,16 +662,19 @@ nonius::benchmark bench_multiple_inheritance_rttr_cast() {
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////////////
 
-nonius::benchmark bench_cross_cast_dynamic_cast_1() {
-    return nonius::benchmark("dynamic_cast", [](nonius::chronometer meter) {
-        auto bench_data            = setup_cross_cast_class_hierachy_1();
+nonius::benchmark bench_multiple_inheritance_rttr_cast()
+{
+    return nonius::benchmark("rttr_cast", [](nonius::chronometer meter)
+    {
+        auto bench_data = setup_multiple_class_hierachy();
         volatile std::size_t value = 0;
-        meter.measure([&]() {
-            for (std::size_t i = 0; i < bench_data.m_vec.size(); ++i) {
-                if (dynamic_cast<ClassMultiple3C*>(bench_data.m_vec[i].get())) {
+        meter.measure([&]()
+        {
+            for (std::size_t i = 0; i < bench_data.m_vec.size(); ++i)
+            {
+                if (rttr_cast<FinalClass*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
                 }
             }
@@ -541,14 +685,21 @@ nonius::benchmark bench_cross_cast_dynamic_cast_1() {
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////
 
-nonius::benchmark bench_cross_cast_rttr_cast_1() {
-    return nonius::benchmark("rttr_cast", [](nonius::chronometer meter) {
-        auto bench_data            = setup_cross_cast_class_hierachy_1();
+nonius::benchmark bench_cross_cast_dynamic_cast_1()
+{
+    return nonius::benchmark("dynamic_cast", [](nonius::chronometer meter)
+    {
+        auto bench_data = setup_cross_cast_class_hierachy_1();
         volatile std::size_t value = 0;
-        meter.measure([&]() {
-            for (std::size_t i = 0; i < bench_data.m_vec.size(); ++i) {
-                if (rttr_cast<ClassMultiple3C*>(bench_data.m_vec[i].get())) {
+        meter.measure([&]()
+        {
+            for (std::size_t i = 0; i < bench_data.m_vec.size(); ++i)
+            {
+                if (dynamic_cast<ClassMultiple3C*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
                 }
             }
@@ -560,13 +711,18 @@ nonius::benchmark bench_cross_cast_rttr_cast_1() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-nonius::benchmark bench_cross_cast_dynamic_cast_2() {
-    return nonius::benchmark("dynamic_cast", [](nonius::chronometer meter) {
-        auto bench_data            = setup_cross_cast_class_hierachy_2();
+nonius::benchmark bench_cross_cast_rttr_cast_1()
+{
+    return nonius::benchmark("rttr_cast", [](nonius::chronometer meter)
+    {
+        auto bench_data = setup_cross_cast_class_hierachy_1();
         volatile std::size_t value = 0;
-        meter.measure([&]() {
-            for (std::size_t i = 0; i < bench_data.m_vec.size(); ++i) {
-                if (dynamic_cast<ClassMultiple6E*>(bench_data.m_vec[i].get())) {
+        meter.measure([&]()
+        {
+            for (std::size_t i = 0; i < bench_data.m_vec.size(); ++i)
+            {
+                if (rttr_cast<ClassMultiple3C*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
                 }
             }
@@ -578,13 +734,18 @@ nonius::benchmark bench_cross_cast_dynamic_cast_2() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-nonius::benchmark bench_cross_cast_rttr_cast_2() {
-    return nonius::benchmark("rttr_cast", [](nonius::chronometer meter) {
-        auto bench_data            = setup_cross_cast_class_hierachy_2();
+nonius::benchmark bench_cross_cast_dynamic_cast_2()
+{
+    return nonius::benchmark("dynamic_cast", [](nonius::chronometer meter)
+    {
+        auto bench_data = setup_cross_cast_class_hierachy_2();
         volatile std::size_t value = 0;
-        meter.measure([&]() {
-            for (std::size_t i = 0; i < bench_data.m_vec.size(); ++i) {
-                if (rttr_cast<ClassMultiple6E*>(bench_data.m_vec[i].get())) {
+        meter.measure([&]()
+        {
+            for (std::size_t i = 0; i < bench_data.m_vec.size(); ++i)
+            {
+                if (dynamic_cast<ClassMultiple6E*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
                 }
             }
@@ -595,24 +756,61 @@ nonius::benchmark bench_cross_cast_rttr_cast_2() {
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
+
+nonius::benchmark bench_cross_cast_rttr_cast_2()
+{
+    return nonius::benchmark("rttr_cast", [](nonius::chronometer meter)
+    {
+        auto bench_data = setup_cross_cast_class_hierachy_2();
+        volatile std::size_t value = 0;
+        meter.measure([&]()
+        {
+            for (std::size_t i = 0; i < bench_data.m_vec.size(); ++i)
+            {
+                if (rttr_cast<ClassMultiple6E*>(bench_data.m_vec[i].get()))
+                {
+                    value += 1;
+                }
+            }
+
+            return value;
+        });
+    });
+}
+
+
+/////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////
 
-nonius::benchmark bench_level_6_typeid() {
-    return nonius::benchmark("typeid", [](nonius::chronometer meter) {
+nonius::benchmark bench_level_6_typeid()
+{
+    return nonius::benchmark("typeid", [](nonius::chronometer meter)
+    {
         bench_data_single_base bench_data = setup_level_6();
-        volatile std::size_t value        = 0;
-        meter.measure([&]() {
-            for (std::size_t i = 0; i < bench_data.m_vec.size(); ++i) {
-                if (dynamic_cast<ClassSingle1A*>(bench_data.m_vec[i].get())) {
+        volatile std::size_t value = 0;
+        meter.measure([&]()
+        {
+            for (std::size_t i = 0; i < bench_data.m_vec.size(); ++i)
+            {
+                if ( dynamic_cast<ClassSingle1A*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
-                } else if (dynamic_cast<ClassSingle1B*>(bench_data.m_vec[i].get())) {
+                }
+                else if (dynamic_cast<ClassSingle1B*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
-                } else if (dynamic_cast<ClassSingle1C*>(bench_data.m_vec[i].get())) {
+                }
+                else if (dynamic_cast<ClassSingle1C*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
-                } else if (dynamic_cast<ClassSingle1D*>(bench_data.m_vec[i].get())) {
+                }
+                else if (dynamic_cast<ClassSingle1D*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
-                } else if (dynamic_cast<ClassSingle1E*>(bench_data.m_vec[i].get())) {
+                }
+                else if (dynamic_cast<ClassSingle1E*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
                 }
             }
@@ -624,21 +822,34 @@ nonius::benchmark bench_level_6_typeid() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-nonius::benchmark bench_level_6_type() {
-    return nonius::benchmark("type", [](nonius::chronometer meter) {
+nonius::benchmark bench_level_6_type()
+{
+    return nonius::benchmark("type", [](nonius::chronometer meter)
+    {
         bench_data_single_base bench_data = setup_level_6();
-        volatile std::size_t value        = 0;
-        meter.measure([&]() {
-            for (std::size_t i = 0; i < bench_data.m_vec.size(); ++i) {
-                if (rttr_cast<ClassSingle1A*>(bench_data.m_vec[i].get())) {
+        volatile std::size_t value = 0;
+        meter.measure([&]()
+        {
+            for (std::size_t i = 0; i < bench_data.m_vec.size(); ++i)
+            {
+                if (rttr_cast<ClassSingle1A*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
-                } else if (rttr_cast<ClassSingle1B*>(bench_data.m_vec[i].get())) {
+                }
+                else if (rttr_cast<ClassSingle1B*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
-                } else if (rttr_cast<ClassSingle1C*>(bench_data.m_vec[i].get())) {
+                }
+                else if (rttr_cast<ClassSingle1C*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
-                } else if (rttr_cast<ClassSingle1D*>(bench_data.m_vec[i].get())) {
+                }
+                else if (rttr_cast<ClassSingle1D*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
-                } else if (rttr_cast<ClassSingle1E*>(bench_data.m_vec[i].get())) {
+                }
+                else if (rttr_cast<ClassSingle1E*>(bench_data.m_vec[i].get()))
+                {
                     value += 1;
                 }
             }
@@ -654,7 +865,8 @@ nonius::benchmark bench_level_6_type() {
 /////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////
 
-void start_rttr_cast_benchmark() {
+void start_rttr_cast_benchmark()
+{
     nonius::configuration cfg;
     cfg.title = "dynamic_cast vs. rttr_cast";
 
@@ -675,49 +887,39 @@ void start_rttr_cast_benchmark() {
 
     ///////////////////////////////////////////////////////////////////////////////
 
-    reporter.set_current_group_name("virtual inheritance level 1",
-                                    "A cast from virtual base class one hierarchy levels down.");
-    nonius::benchmark benchmarks_group_4[] = { bench_virtual_inheritance_level_1_dynamic_cast(),
-                                               bench_virtual_inheritance_level_1_rttr_cast() };
+    reporter.set_current_group_name("virtual inheritance level 1", "A cast from virtual base class one hierarchy levels down.");
+    nonius::benchmark benchmarks_group_4[] = { bench_virtual_inheritance_level_1_dynamic_cast(), bench_virtual_inheritance_level_1_rttr_cast() };
     nonius::go(cfg, std::begin(benchmarks_group_4), std::end(benchmarks_group_4), reporter);
 
-    reporter.set_current_group_name("virtual inheritance level 3",
-                                    "A cast from virtual base class three hierarchy levels down.");
-    nonius::benchmark benchmarks_group_5[] = { bench_virtual_inheritance_level_3_dynamic_cast(),
-                                               bench_virtual_inheritance_level_3_rttr_cast() };
+    reporter.set_current_group_name("virtual inheritance level 3", "A cast from virtual base class three hierarchy levels down.");
+    nonius::benchmark benchmarks_group_5[] = { bench_virtual_inheritance_level_3_dynamic_cast(), bench_virtual_inheritance_level_3_rttr_cast() };
     nonius::go(cfg, std::begin(benchmarks_group_5), std::end(benchmarks_group_5), reporter);
 
-    reporter.set_current_group_name("virtual inheritance level 6",
-                                    "A cast from virtual base class six hierarchy levels down.");
-    nonius::benchmark benchmarks_group_6[] = { bench_virtual_inheritance_level_6_dynamic_cast(),
-                                               bench_virtual_inheritance_level_6_rttr_cast() };
+    reporter.set_current_group_name("virtual inheritance level 6", "A cast from virtual base class six hierarchy levels down.");
+    nonius::benchmark benchmarks_group_6[] = { bench_virtual_inheritance_level_6_dynamic_cast(), bench_virtual_inheritance_level_6_rttr_cast() };
     nonius::go(cfg, std::begin(benchmarks_group_6), std::end(benchmarks_group_6), reporter);
 
     ///////////////////////////////////////////////////////////////////////////////
 
-    reporter.set_current_group_name("multiple inheritance",
-                                    "A cast from virtual base class to the most derived class,<br>which itself is "
-                                    "derived from 5 other classes (all 7 hierarchy levels deep).");
-    nonius::benchmark benchmarks_group_7[] = { bench_multiple_inheritance_dynamic_cast(),
-                                               bench_multiple_inheritance_rttr_cast() };
+    reporter.set_current_group_name("multiple inheritance", "A cast from virtual base class to the most derived class,<br>which itself is derived from 5 other classes (all 7 hierarchy levels deep).");
+    nonius::benchmark benchmarks_group_7[] = { bench_multiple_inheritance_dynamic_cast(), bench_multiple_inheritance_rttr_cast() };
     nonius::go(cfg, std::begin(benchmarks_group_7), std::end(benchmarks_group_7), reporter);
 
     ///////////////////////////////////////////////////////////////////////////////
 
-    reporter.set_current_group_name(
-        "cross cast 1",
-        "A cross cast in the 4th hierarchy level (out of 8)<br>to the third (out of 5 class wide hierarchy).");
+    reporter.set_current_group_name("cross cast 1", "A cross cast in the 4th hierarchy level (out of 8)<br>to the third (out of 5 class wide hierarchy).");
     nonius::benchmark benchmarks_group_8[] = { bench_cross_cast_dynamic_cast_1(), bench_cross_cast_rttr_cast_1() };
     nonius::go(cfg, std::begin(benchmarks_group_8), std::end(benchmarks_group_8), reporter);
 
-    reporter.set_current_group_name(
-        "cross cast 2",
-        "A cross cast in the 7th hierarchy level (out of 8)<br>to the fifth (out of 5 class wide hierarchy).");
+
+    reporter.set_current_group_name("cross cast 2", "A cross cast in the 7th hierarchy level (out of 8)<br>to the fifth (out of 5 class wide hierarchy).");
     nonius::benchmark benchmarks_group_9[] = { bench_cross_cast_dynamic_cast_2(), bench_cross_cast_rttr_cast_2() };
     nonius::go(cfg, std::begin(benchmarks_group_9), std::end(benchmarks_group_9), reporter);
 
     reporter.generate_report();
 }
+
+
 
 /////////////////////////////////////////////////////////////////////////////////////////
 #if 0

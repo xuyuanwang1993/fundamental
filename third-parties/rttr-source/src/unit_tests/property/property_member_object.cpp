@@ -1,35 +1,35 @@
 /************************************************************************************
- *                                                                                   *
- *   Copyright (c) 2014 - 2018 Axel Menzel <info@rttr.org>                           *
- *                                                                                   *
- *   This file is part of RTTR (Run Time Type Reflection)                            *
- *   License: MIT License                                                            *
- *                                                                                   *
- *   Permission is hereby granted, free of charge, to any person obtaining           *
- *   a copy of this software and associated documentation files (the "Software"),    *
- *   to deal in the Software without restriction, including without limitation       *
- *   the rights to use, copy, modify, merge, publish, distribute, sublicense,        *
- *   and/or sell copies of the Software, and to permit persons to whom the           *
- *   Software is furnished to do so, subject to the following conditions:            *
- *                                                                                   *
- *   The above copyright notice and this permission notice shall be included in      *
- *   all copies or substantial portions of the Software.                             *
- *                                                                                   *
- *   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR      *
- *   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,        *
- *   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE     *
- *   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER          *
- *   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,   *
- *   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE   *
- *   SOFTWARE.                                                                       *
- *                                                                                   *
- *************************************************************************************/
+*                                                                                   *
+*   Copyright (c) 2014 - 2018 Axel Menzel <info@rttr.org>                           *
+*                                                                                   *
+*   This file is part of RTTR (Run Time Type Reflection)                            *
+*   License: MIT License                                                            *
+*                                                                                   *
+*   Permission is hereby granted, free of charge, to any person obtaining           *
+*   a copy of this software and associated documentation files (the "Software"),    *
+*   to deal in the Software without restriction, including without limitation       *
+*   the rights to use, copy, modify, merge, publish, distribute, sublicense,        *
+*   and/or sell copies of the Software, and to permit persons to whom the           *
+*   Software is furnished to do so, subject to the following conditions:            *
+*                                                                                   *
+*   The above copyright notice and this permission notice shall be included in      *
+*   all copies or substantial portions of the Software.                             *
+*                                                                                   *
+*   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR      *
+*   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,        *
+*   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE     *
+*   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER          *
+*   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,   *
+*   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE   *
+*   SOFTWARE.                                                                       *
+*                                                                                   *
+*************************************************************************************/
 
-#include <functional>
-#include <iostream>
-#include <memory>
 #include <rttr/registration>
 #include <rttr/registration_friend>
+#include <iostream>
+#include <memory>
+#include <functional>
 
 #include <catch/catch.hpp>
 
@@ -38,20 +38,26 @@ using namespace std;
 
 static int g_invalid_instance = 0;
 
-using func_ptr = void (*)(int);
-struct property_member_obj_test {
-    property_member_obj_test() : _p1(0), _p3(1000, 42) {
+using func_ptr = void(*)(int);
+struct property_member_obj_test
+{
+    property_member_obj_test()
+    : _p1(0), _p3(1000, 42)
+    {
     }
 
-    int _p1;
-    const int _p2 = 12;
-    std::vector<int> _p3;
-    std::vector<int> _p4 = std::vector<int>(50, 12);
-    variant _p7          = std::string("hello");
-    const variant _p8    = 23;
-    int* _p9             = nullptr;
-    int* _p10            = &_p1;
-    int _p11[4][4]       = { { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 } };
+
+
+    int                 _p1;
+    const int           _p2 = 12;
+    std::vector<int>    _p3;
+    std::vector<int>    _p4 = std::vector<int>(50, 12);
+    variant             _p7 = std::string("hello");
+    const variant       _p8 = 23;
+    int*                _p9 = nullptr;
+    int*                _p10 = &_p1;
+    int                 _p11[4][4] = { {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0} };
+
 
 private:
     property_member_obj_test& operator=(const property_member_obj_test& obj);
@@ -59,32 +65,49 @@ private:
     RTTR_REGISTRATION_FRIEND
 };
 
+
 /////////////////////////////////////////////////////////////////////////////////////////
 // init static variables and some global functions added as properties to the test class
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-RTTR_REGISTRATION {
+RTTR_REGISTRATION
+{
     registration::class_<property_member_obj_test>("property_member_obj_test")
-        .property("p1", &property_member_obj_test::_p1)(metadata("Description", "Some Text"))
-        .property_readonly("p2", &property_member_obj_test::_p2)(metadata("Description", "Some Text"))
-        .property("p3", &property_member_obj_test::_p3)(metadata("Description", "Some Text"), policy::prop::bind_as_ptr)
-        .property_readonly("p4", &property_member_obj_test::_p4)(metadata("Description", "Some Text"),
-                                                                 policy::prop::bind_as_ptr)
-        .property("p5", &property_member_obj_test::_p3)(metadata("Description", "Some Text"),
-                                                        policy::prop::as_reference_wrapper)
-        .property_readonly("p6", &property_member_obj_test::_p4)(metadata("Description", "Some Text"),
-                                                                 policy::prop::as_reference_wrapper)
+        .property("p1",    &property_member_obj_test::_p1) ( metadata("Description", "Some Text") )
+        .property_readonly("p2",    &property_member_obj_test::_p2) ( metadata("Description", "Some Text") )
+        .property("p3",    &property_member_obj_test::_p3)
+        (
+            metadata("Description", "Some Text"),
+            policy::prop::bind_as_ptr
+        )
+         .property_readonly("p4",    &property_member_obj_test::_p4)
+        (
+            metadata("Description", "Some Text"),
+            policy::prop::bind_as_ptr
+        )
+        .property("p5",    &property_member_obj_test::_p3)
+        (
+            metadata("Description", "Some Text"),
+            policy::prop::as_reference_wrapper
+        )
+         .property_readonly("p6",    &property_member_obj_test::_p4)
+        (
+            metadata("Description", "Some Text"),
+            policy::prop::as_reference_wrapper
+        )
         .property("p7", &property_member_obj_test::_p7)
         .property_readonly("p8", &property_member_obj_test::_p8)
         .property("p9", &property_member_obj_test::_p9)
         .property_readonly("p10", &property_member_obj_test::_p10)
-        .property("p11", &property_member_obj_test::_p11);
+        .property("p11", &property_member_obj_test::_p11)
+        ;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-TEST_CASE("property - class object", "[property]") {
+TEST_CASE("property - class object", "[property]")
+{
     property_member_obj_test obj;
     type prop_type = type::get(obj);
     REQUIRE(prop_type.is_valid() == true);
@@ -112,7 +135,8 @@ TEST_CASE("property - class object", "[property]") {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-TEST_CASE("property - class object - read only", "[property]") {
+TEST_CASE("property - class object - read only", "[property]")
+{
     property_member_obj_test obj;
     type prop_type = type::get(obj);
 
@@ -137,7 +161,8 @@ TEST_CASE("property - class object - read only", "[property]") {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-TEST_CASE("property - class object - bind as ptr", "[property]") {
+TEST_CASE("property - class object - bind as ptr", "[property]")
+{
     property_member_obj_test obj;
     type prop_type = type::get(obj);
 
@@ -170,7 +195,8 @@ TEST_CASE("property - class object - bind as ptr", "[property]") {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-TEST_CASE("property - class object - read only - bind as ptr", "[property]") {
+TEST_CASE("property - class object - read only - bind as ptr", "[property]")
+{
     property_member_obj_test obj;
     type prop_type = type::get(obj);
 
@@ -203,7 +229,8 @@ TEST_CASE("property - class object - read only - bind as ptr", "[property]") {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-TEST_CASE("property - class object - as_reference_wrapper", "[property]") {
+TEST_CASE("property - class object - as_reference_wrapper", "[property]")
+{
     property_member_obj_test obj;
     type prop_type = type::get(obj);
 
@@ -245,7 +272,8 @@ TEST_CASE("property - class object - as_reference_wrapper", "[property]") {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-TEST_CASE("property - class object - read only - as_reference_wrapper", "[property]") {
+TEST_CASE("property - class object - read only - as_reference_wrapper", "[property]")
+{
     property_member_obj_test obj;
     type prop_type = type::get(obj);
 
@@ -288,8 +316,10 @@ TEST_CASE("property - class object - read only - as_reference_wrapper", "[proper
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-TEST_CASE("property - variant as property", "[property]") {
-    SECTION("Writable") {
+TEST_CASE("property - variant as property", "[property]")
+{
+    SECTION("Writable")
+    {
         property_member_obj_test obj;
         type prop_type = type::get(obj);
 
@@ -305,7 +335,8 @@ TEST_CASE("property - variant as property", "[property]") {
         CHECK(obj._p7.to_int() == 23);
     }
 
-    SECTION("Read Only") {
+    SECTION("Read Only")
+    {
         property_member_obj_test obj;
         type prop_type = type::get(obj);
 
@@ -319,8 +350,10 @@ TEST_CASE("property - variant as property", "[property]") {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-TEST_CASE("property - raw pointer as property", "[property]") {
-    SECTION("Writable") {
+TEST_CASE("property - raw pointer as property", "[property]")
+{
+    SECTION("Writable")
+    {
         property_member_obj_test obj;
         type prop_type = type::get(obj);
 
@@ -336,7 +369,8 @@ TEST_CASE("property - raw pointer as property", "[property]") {
         CHECK(obj._p9 == &new_value);
     }
 
-    SECTION("Read Only") {
+    SECTION("Read Only")
+    {
         property_member_obj_test obj;
         type prop_type = type::get(obj);
 
@@ -353,13 +387,14 @@ TEST_CASE("property - raw pointer as property", "[property]") {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-TEST_CASE("property - array property", "[property]") {
+TEST_CASE("property - array property", "[property]")
+{
     property_member_obj_test obj;
-    type t    = type::get(obj);
+    type t = type::get(obj);
     auto prop = t.get_property("p11");
     REQUIRE(prop.is_valid() == true);
 
-    auto var  = prop.get_value(obj);
+    auto var = prop.get_value(obj);
     auto view = var.create_sequential_view();
     CHECK(view.get_rank() == 2);
     int line[4] = { 1, 2, 3, 4 };
@@ -369,6 +404,7 @@ TEST_CASE("property - array property", "[property]") {
 
     CHECK(prop.set_value(obj, var) == true);
     CHECK(var == obj._p11);
+
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

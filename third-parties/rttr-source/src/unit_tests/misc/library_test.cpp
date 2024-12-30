@@ -1,35 +1,35 @@
 /************************************************************************************
- *                                                                                   *
- *   Copyright (c) 2014 - 2018 Axel Menzel <info@rttr.org>                           *
- *                                                                                   *
- *   This file is part of RTTR (Run Time Type Reflection)                            *
- *   License: MIT License                                                            *
- *                                                                                   *
- *   Permission is hereby granted, free of charge, to any person obtaining           *
- *   a copy of this software and associated documentation files (the "Software"),    *
- *   to deal in the Software without restriction, including without limitation       *
- *   the rights to use, copy, modify, merge, publish, distribute, sublicense,        *
- *   and/or sell copies of the Software, and to permit persons to whom the           *
- *   Software is furnished to do so, subject to the following conditions:            *
- *                                                                                   *
- *   The above copyright notice and this permission notice shall be included in      *
- *   all copies or substantial portions of the Software.                             *
- *                                                                                   *
- *   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR      *
- *   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,        *
- *   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE     *
- *   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER          *
- *   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,   *
- *   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE   *
- *   SOFTWARE.                                                                       *
- *                                                                                   *
- *************************************************************************************/
+*                                                                                   *
+*   Copyright (c) 2014 - 2018 Axel Menzel <info@rttr.org>                           *
+*                                                                                   *
+*   This file is part of RTTR (Run Time Type Reflection)                            *
+*   License: MIT License                                                            *
+*                                                                                   *
+*   Permission is hereby granted, free of charge, to any person obtaining           *
+*   a copy of this software and associated documentation files (the "Software"),    *
+*   to deal in the Software without restriction, including without limitation       *
+*   the rights to use, copy, modify, merge, publish, distribute, sublicense,        *
+*   and/or sell copies of the Software, and to permit persons to whom the           *
+*   Software is furnished to do so, subject to the following conditions:            *
+*                                                                                   *
+*   The above copyright notice and this permission notice shall be included in      *
+*   all copies or substantial portions of the Software.                             *
+*                                                                                   *
+*   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR      *
+*   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,        *
+*   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE     *
+*   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER          *
+*   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,   *
+*   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE   *
+*   SOFTWARE.                                                                       *
+*                                                                                   *
+*************************************************************************************/
 
 #include <catch/catch.hpp>
 
 #include "unit_tests/base_library/base_class.h"
-#include <rttr/registration>
 #include <rttr/type>
+#include <rttr/registration>
 
 #include <iostream>
 
@@ -38,21 +38,25 @@ using namespace rttr;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #ifdef NDEBUG
-static string_view library_name("unit_test_plugin");
+    static string_view library_name("unit_test_plugin");
 #else
-static string_view library_name("unit_test_plugin_d");
+    static string_view library_name("unit_test_plugin_d");
 #endif
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-bool does_plugin_type_exist() {
-    return type::get_by_name("test_plugin_class").is_valid() && type::get_by_name("test_container_plugin").is_valid();
+bool does_plugin_type_exist()
+{
+    return type::get_by_name("test_plugin_class").is_valid() &&
+           type::get_by_name("test_container_plugin").is_valid();
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-TEST_CASE("library - load", "[library]") {
-    SECTION("positive test") {
+TEST_CASE("library - load", "[library]")
+{
+    SECTION("positive test")
+    {
         library lib(library_name);
 
         CHECK(does_plugin_type_exist() == false);
@@ -60,36 +64,38 @@ TEST_CASE("library - load", "[library]") {
         REQUIRE(lib.get_error_string().empty() == true);
         CHECK(does_plugin_type_exist() == true);
 
-        CHECK(lib.get_types().size() > 1);
+        CHECK(lib.get_types().size()             > 1);
         CHECK(lib.get_global_properties().size() == 0);
-        CHECK(lib.get_global_methods().size() == 0);
+        CHECK(lib.get_global_methods().size()    == 0);
 
         CHECK(lib.unload() == true);
-        CHECK(lib.get_error_string().empty() == true);
+        CHECK(lib.get_error_string().empty()     == true);
 
-        CHECK(lib.get_types().size() == 0);
+        CHECK(lib.get_types().size()             == 0);
         CHECK(lib.get_global_properties().size() == 0);
-        CHECK(lib.get_global_methods().size() == 0);
-        CHECK(does_plugin_type_exist() == false);
+        CHECK(lib.get_global_methods().size()    == 0);
+        CHECK(does_plugin_type_exist()           == false);
     }
 
-    SECTION("negative test") {
+    SECTION("negative test")
+    {
         library lib("SomeNonExisitingLibrary");
 
-        CHECK(lib.is_loaded() == false);
-        CHECK(lib.get_types().size() == 0);
+        CHECK(lib.is_loaded()                    == false);
+        CHECK(lib.get_types().size()             == 0);
         CHECK(lib.get_global_properties().size() == 0);
-        CHECK(lib.get_global_methods().size() == 0);
-        CHECK(lib.get_error_string().empty() == true);
+        CHECK(lib.get_global_methods().size()    == 0);
+        CHECK(lib.get_error_string().empty()     == true);
 
-        CHECK(lib.load() == false);
+        CHECK(lib.load()                         == false);
 
-        CHECK(lib.is_loaded() == false);
-        CHECK(lib.get_error_string().empty() == false);
-        CHECK(lib.unload() == false);
+        CHECK(lib.is_loaded()                    == false);
+        CHECK(lib.get_error_string().empty()     == false);
+        CHECK(lib.unload()                       == false);
     }
 
-    SECTION("load with suffix") {
+    SECTION("load with suffix")
+    {
 #if RTTR_PLATFORM == RTTR_PLATFORM_WINDOWS
         library lib(library_name + std::string(".dll"));
 #elif RTTR_PLATFORM == RTTR_PLATFORM_LINUX
@@ -99,40 +105,43 @@ TEST_CASE("library - load", "[library]") {
 #else
     #error "Don't know library suffix on this plattform!"
 #endif
-        CHECK(does_plugin_type_exist() == false);
-        CHECK(lib.load() == true);
-        REQUIRE(lib.get_error_string().empty() == true);
-        CHECK(does_plugin_type_exist() == true);
+        CHECK(does_plugin_type_exist()          == false);
+        CHECK(lib.load()                        == true);
+        REQUIRE(lib.get_error_string().empty()  == true);
+        CHECK(does_plugin_type_exist()          == true);
 
-        CHECK(lib.get_error_string().empty() == true);
-        CHECK(lib.unload() == true);
+        CHECK(lib.get_error_string().empty()    == true);
+        CHECK(lib.unload()                      == true);
 
-        CHECK(does_plugin_type_exist() == false);
+        CHECK(does_plugin_type_exist()          == false);
     }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-TEST_CASE("library - multi load", "[library]") {
-    SECTION("load multiple times") {
+TEST_CASE("library - multi load", "[library]")
+{
+    SECTION("load multiple times")
+    {
         library lib(library_name);
 
-        CHECK(does_plugin_type_exist() == false);
-        CHECK(lib.load() == true);
-        CHECK(lib.load() == true);
+        CHECK(does_plugin_type_exist()              == false);
+        CHECK(lib.load()                            == true);
+        CHECK(lib.load()                            == true);
 
-        REQUIRE(lib.get_error_string().empty() == true);
-        CHECK(does_plugin_type_exist() == true);
+        REQUIRE(lib.get_error_string().empty()      == true);
+        CHECK(does_plugin_type_exist()              == true);
 
-        CHECK(lib.get_types().size() > 1);
-        CHECK(lib.get_global_properties().size() == 0);
-        CHECK(lib.get_global_methods().size() == 0);
+        CHECK(lib.get_types().size()                > 1);
+        CHECK(lib.get_global_properties().size()    == 0);
+        CHECK(lib.get_global_methods().size()       == 0);
 
         CHECK(lib.unload() == true);
         CHECK(does_plugin_type_exist() == false);
     }
 
-    SECTION("load the same lib from different instance multiple times") {
+    SECTION("load the same lib from different instance multiple times")
+    {
         library lib1(library_name);
         library lib2(library_name);
 
@@ -153,7 +162,8 @@ TEST_CASE("library - multi load", "[library]") {
         CHECK(does_plugin_type_exist() == false);
     }
 
-    SECTION("load the same lib multiple times 2xload() and 2xunload()") {
+    SECTION("load the same lib multiple times 2xload() and 2xunload()")
+    {
         library lib(library_name);
 
         CHECK(does_plugin_type_exist() == false);
@@ -174,14 +184,16 @@ TEST_CASE("library - multi load", "[library]") {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-TEST_CASE("library - using types", "[library]") {
-    SECTION("property invoke") {
+TEST_CASE("library - using types", "[library]")
+{
+    SECTION("property invoke")
+    {
         library lib(library_name);
 
         CHECK(lib.load() == true);
 
         {
-            auto t          = type::get_by_name("test_plugin_class");
+            auto t = type::get_by_name("test_plugin_class");
             variant var_obj = t.create();
             CHECK(var_obj.get_type() == t);
 
@@ -206,13 +218,14 @@ TEST_CASE("library - using types", "[library]") {
         CHECK(lib.unload() == true);
     }
 
-    SECTION("sequential view") {
+    SECTION("sequential view")
+    {
         library lib(library_name);
 
         CHECK(lib.load() == true);
 
         {
-            auto t          = type::get_by_name("test_container_plugin");
+            auto t = type::get_by_name("test_container_plugin");
             variant var_obj = t.create();
             CHECK(var_obj.is_valid() == true);
 
@@ -236,11 +249,13 @@ TEST_CASE("library - using types", "[library]") {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-TEST_CASE("library - unload derived types", "[library]") {
+TEST_CASE("library - unload derived types", "[library]")
+{
     base_test_class obj;
     type::get<base_test_class>();
 
-    SECTION("load lib") {
+    SECTION("load lib")
+    {
         library lib(library_name);
         //// LOAD
         CHECK(lib.load() == true);
@@ -248,31 +263,32 @@ TEST_CASE("library - unload derived types", "[library]") {
         auto derived_t = type::get_by_name("derived_plugin_class");
         CHECK(derived_t.is_valid() == true);
         //
-        auto t_base       = type::get<base_test_class>();
+        auto t_base = type::get<base_test_class>();
         auto base_classes = derived_t.get_base_classes();
         auto ret1 = std::find_if(base_classes.begin(), base_classes.end(), [t_base](type t) { return t == t_base; });
         CHECK(ret1 != base_classes.end());
         //
         auto derived_classes = t_base.get_derived_classes();
         CHECK(derived_classes.size() == 1);
-        auto ret2 = std::find_if(derived_classes.begin(), derived_classes.end(),
-                                 [derived_t](type t) { return t == derived_t; });
+        auto ret2 = std::find_if(derived_classes.begin(), derived_classes.end(), [derived_t](type t) { return t == derived_t; });
         CHECK(ret2 != derived_classes.end());
 
         //// UNLOAD
         CHECK(lib.unload() == true);
     }
 
-    SECTION("unloaded lib") {
+    SECTION("unloaded lib")
+    {
         auto derived_t = type::get_by_name("derived_plugin_class");
         CHECK(derived_t.is_valid() == false);
 
-        auto t_base          = type::get<base_test_class>();
+        auto t_base = type::get<base_test_class>();
         auto derived_classes = t_base.get_derived_classes();
         CHECK(derived_classes.size() == 0);
     }
 
-    SECTION("load lib again") {
+    SECTION("load lib again")
+    {
         library lib(library_name);
         //// LOAD
         CHECK(lib.load() == true);
@@ -280,11 +296,10 @@ TEST_CASE("library - unload derived types", "[library]") {
         auto derived_t = type::get_by_name("derived_plugin_class");
         CHECK(derived_t.is_valid() == true);
 
-        auto t_base          = type::get<base_test_class>();
+        auto t_base = type::get<base_test_class>();
         auto derived_classes = t_base.get_derived_classes();
         CHECK(derived_classes.size() == 1);
-        auto ret = std::find_if(derived_classes.begin(), derived_classes.end(),
-                                [derived_t](type t) { return t == derived_t; });
+        auto ret = std::find_if(derived_classes.begin(), derived_classes.end(), [derived_t](type t) { return t == derived_t; });
         CHECK(ret != derived_classes.end());
 
         CHECK(lib.unload() == true);

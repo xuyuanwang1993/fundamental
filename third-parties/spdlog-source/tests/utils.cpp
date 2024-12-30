@@ -1,5 +1,5 @@
-#include "utils.hpp"
 #include "includes.h"
+#include "utils.hpp"
 
 void prepare_logdir()
 {
@@ -52,3 +52,4 @@ bool ends_with(std::string const &value, std::string const &ending)
         return false;
     return std::equal(ending.rbegin(), ending.rend(), value.rbegin());
 }
+

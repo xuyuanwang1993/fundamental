@@ -1,41 +1,40 @@
 /************************************************************************************
- *                                                                                   *
- *   Copyright (c) 2014 - 2018 Axel Menzel <info@rttr.org>                           *
- *                                                                                   *
- *   This file is part of RTTR (Run Time Type Reflection)                            *
- *   License: MIT License                                                            *
- *                                                                                   *
- *   Permission is hereby granted, free of charge, to any person obtaining           *
- *   a copy of this software and associated documentation files (the "Software"),    *
- *   to deal in the Software without restriction, including without limitation       *
- *   the rights to use, copy, modify, merge, publish, distribute, sublicense,        *
- *   and/or sell copies of the Software, and to permit persons to whom the           *
- *   Software is furnished to do so, subject to the following conditions:            *
- *                                                                                   *
- *   The above copyright notice and this permission notice shall be included in      *
- *   all copies or substantial portions of the Software.                             *
- *                                                                                   *
- *   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR      *
- *   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,        *
- *   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE     *
- *   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER          *
- *   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,   *
- *   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE   *
- *   SOFTWARE.                                                                       *
- *                                                                                   *
- *************************************************************************************/
+*                                                                                   *
+*   Copyright (c) 2014 - 2018 Axel Menzel <info@rttr.org>                           *
+*                                                                                   *
+*   This file is part of RTTR (Run Time Type Reflection)                            *
+*   License: MIT License                                                            *
+*                                                                                   *
+*   Permission is hereby granted, free of charge, to any person obtaining           *
+*   a copy of this software and associated documentation files (the "Software"),    *
+*   to deal in the Software without restriction, including without limitation       *
+*   the rights to use, copy, modify, merge, publish, distribute, sublicense,        *
+*   and/or sell copies of the Software, and to permit persons to whom the           *
+*   Software is furnished to do so, subject to the following conditions:            *
+*                                                                                   *
+*   The above copyright notice and this permission notice shall be included in      *
+*   all copies or substantial portions of the Software.                             *
+*                                                                                   *
+*   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR      *
+*   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,        *
+*   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE     *
+*   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER          *
+*   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,   *
+*   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE   *
+*   SOFTWARE.                                                                       *
+*                                                                                   *
+*************************************************************************************/
 
 #ifndef RTTR_WRAPPER_MAPPER_H_
 #define RTTR_WRAPPER_MAPPER_H_
 
 #include "rttr/detail/base/core_prerequisites.h"
 
-namespace rttr {
+namespace rttr
+{
 //////////////////////////////////////////////////////////////////////////////////////
 
-namespace detail {
-struct invalid_wrapper_type {};
-} // namespace detail
+namespace detail { struct invalid_wrapper_type { }; }
 
 /*!
  * The \ref wrapper_mapper class is a class template to access different wrapper types via one common interface.
@@ -62,10 +61,10 @@ struct invalid_wrapper_type {};
  *
  * \remark The \ref rttr::wrapper_mapper<T>::create(T& obj) "create()" function is optional. When no one is provided,
  *         then it will be not possible to convert from the wrapped type to the wrapper class from inside a variant.
- *         The \ref rttr::wrapper_mapper<T>::convert(const type& source, bool& ok) "convert()" function is also
- * optional. When no one is provided, you cannot use the \ref
- * rttr::type::register_wrapper_converter_for_base_classes<T>() function. For the wrapper classes: `std::shared_ptr<T>`
- * and `std::reference_wrapper<T>` default conversion functions are included.
+ *         The \ref rttr::wrapper_mapper<T>::convert(const type& source, bool& ok) "convert()" function is also optional.
+ *         When no one is provided, you cannot use the \ref rttr::type::register_wrapper_converter_for_base_classes<T>()
+ *         function. For the wrapper classes: `std::shared_ptr<T>` and `std::reference_wrapper<T>`
+ *         default conversion functions are included.
  *
  * \see variant::convert()
  *
@@ -130,25 +129,29 @@ struct invalid_wrapper_type {};
  * The best place for this code, is below the declaration of your wrapper type.
  * When this is not possible, include your specialization code before registering your types to RTTR.
  */
-template <typename T>
-struct wrapper_mapper {
+template<typename T>
+struct wrapper_mapper
+{
 #ifndef DOXYGEN
-    using wrapped_type = detail::invalid_wrapper_type;
-    using type         = T;
+    using wrapped_type  = detail::invalid_wrapper_type;
+    using type          = T;
 #else
-    using wrapped_type = typename wrapper_type::encapsulated_type;
-    using type         = T;
+    using wrapped_type  = typename wrapper_type::encapsulated_type;
+    using type          = T;
 
-    inline static wrapped_type get(const type& obj) {
+    inline static wrapped_type get(const type& obj)
+    {
         return obj.get();
     }
 
-    inline static type create(const wrapped_type& value) {
+    inline static type create(const wrapped_type& value)
+    {
         return type(value);
     }
 
-    template <typename U>
-    inline static T<U> convert(const type& source, bool& ok) {
+    template<typename U>
+    inline static T<U> convert(const type& source, bool& ok)
+    {
         return type(value);
     }
 #endif

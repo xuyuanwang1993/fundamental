@@ -1,53 +1,55 @@
 /************************************************************************************
- *                                                                                   *
- *   Copyright (c) 2014 - 2018 Axel Menzel <info@rttr.org>                           *
- *                                                                                   *
- *   This file is part of RTTR (Run Time Type Reflection)                            *
- *   License: MIT License                                                            *
- *                                                                                   *
- *   Permission is hereby granted, free of charge, to any person obtaining           *
- *   a copy of this software and associated documentation files (the "Software"),    *
- *   to deal in the Software without restriction, including without limitation       *
- *   the rights to use, copy, modify, merge, publish, distribute, sublicense,        *
- *   and/or sell copies of the Software, and to permit persons to whom the           *
- *   Software is furnished to do so, subject to the following conditions:            *
- *                                                                                   *
- *   The above copyright notice and this permission notice shall be included in      *
- *   all copies or substantial portions of the Software.                             *
- *                                                                                   *
- *   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR      *
- *   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,        *
- *   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE     *
- *   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER          *
- *   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,   *
- *   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE   *
- *   SOFTWARE.                                                                       *
- *                                                                                   *
- *************************************************************************************/
+*                                                                                   *
+*   Copyright (c) 2014 - 2018 Axel Menzel <info@rttr.org>                           *
+*                                                                                   *
+*   This file is part of RTTR (Run Time Type Reflection)                            *
+*   License: MIT License                                                            *
+*                                                                                   *
+*   Permission is hereby granted, free of charge, to any person obtaining           *
+*   a copy of this software and associated documentation files (the "Software"),    *
+*   to deal in the Software without restriction, including without limitation       *
+*   the rights to use, copy, modify, merge, publish, distribute, sublicense,        *
+*   and/or sell copies of the Software, and to permit persons to whom the           *
+*   Software is furnished to do so, subject to the following conditions:            *
+*                                                                                   *
+*   The above copyright notice and this permission notice shall be included in      *
+*   all copies or substantial portions of the Software.                             *
+*                                                                                   *
+*   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR      *
+*   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,        *
+*   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE     *
+*   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER          *
+*   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,   *
+*   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE   *
+*   SOFTWARE.                                                                       *
+*                                                                                   *
+*************************************************************************************/
 
 #ifndef RTTR_TYPE_REGISTER_P_H_
 #define RTTR_TYPE_REGISTER_P_H_
 
 #include "rttr/detail/base/core_prerequisites.h"
-#include "rttr/detail/metadata/metadata.h"
-#include "rttr/detail/misc/flat_map.h"
 #include "rttr/detail/misc/flat_multimap.h"
+#include "rttr/detail/misc/flat_map.h"
 #include "rttr/enumeration.h"
 #include "rttr/variant.h"
+#include "rttr/detail/metadata/metadata.h"
 
 #include "rttr/string_view.h"
 
 #include <memory>
-#include <mutex>
 #include <string>
 #include <vector>
+#include <mutex>
 
-namespace rttr {
+namespace rttr
+{
 class type;
 class property;
 class method;
 
-namespace detail {
+namespace detail
+{
 
 class constructor_wrapper_base;
 class destructor_wrapper_base;
@@ -61,8 +63,10 @@ struct type_data;
  * This class contains all logic to register properties, methods etc.. for a specific type.
  * It is not part of the rttr API
  */
-class RTTR_LOCAL type_register_private {
+class RTTR_LOCAL type_register_private
+{
 public:
+
     /////////////////////////////////////////////////////////////////////////////////////
     void register_reg_manager(registration_manager* manager);
     void unregister_reg_manager(registration_manager* manager);
@@ -129,49 +133,54 @@ private:
     type_register_private();
     ~type_register_private();
 
-    template <typename T, typename Data_Type = conditional_t<std::is_pointer<T>::value, T, std::unique_ptr<T>>>
-    struct data_container {
-        data_container(type::type_id id) : m_id(id) {
-        }
-        data_container(type::type_id id, Data_Type data) : m_id(id), m_data(std::move(data)) {
-        }
-        data_container(data_container<T, Data_Type>&& other) : m_id(other.m_id), m_data(std::move(other.m_data)) {
-        }
-        data_container<T, Data_Type>& operator=(data_container<T, Data_Type>&& other) {
-            m_id   = other.m_id;
+    template<typename T, typename Data_Type = conditional_t<std::is_pointer<T>::value, T, std::unique_ptr<T>>>
+    struct data_container
+    {
+        data_container(type::type_id id) : m_id(id) {}
+        data_container(type::type_id id, Data_Type data) : m_id(id), m_data(std::move(data)) {}
+        data_container(data_container<T, Data_Type>&& other) : m_id(other.m_id), m_data(std::move(other.m_data)) {}
+        data_container<T, Data_Type>& operator = (data_container<T, Data_Type>&& other)
+        {
+            m_id = other.m_id;
             m_data = std::move(other.m_data);
             return *this;
         }
 
-        struct order_by_id {
-            RTTR_INLINE bool operator()(const data_container<T>& _left, const data_container<T>& _right) const {
+        struct order_by_id
+        {
+            RTTR_INLINE bool operator () ( const data_container<T>& _left, const data_container<T>& _right )  const
+            {
                 return _left.m_id < _right.m_id;
             }
-            RTTR_INLINE bool operator()(const type::type_id& _left, const data_container<T>& _right) const {
+            RTTR_INLINE bool operator () ( const type::type_id& _left, const data_container<T>& _right ) const
+            {
                 return _left < _right.m_id;
             }
-            RTTR_INLINE bool operator()(const data_container<T>& _left, const type::type_id& _right) const {
+            RTTR_INLINE bool operator () ( const data_container<T>& _left, const type::type_id& _right ) const
+            {
                 return _left.m_id < _right;
             }
 
-            RTTR_INLINE bool operator()(const data_container<T>& _left, const Data_Type& _right) const {
+            RTTR_INLINE bool operator () ( const data_container<T>& _left, const Data_Type& _right ) const
+            {
                 return _left.m_data < _right;
             }
         };
 
-        type::type_id m_id;
-        Data_Type m_data;
+        type::type_id   m_id;
+        Data_Type       m_data;
     };
 
     static bool register_comparator_impl(const type& t, const type_comparator_base* comparator,
                                          std::vector<data_container<const type_comparator_base*>>& comparator_list);
-    static const type_comparator_base* get_type_comparator_impl(
-        const type& t, const std::vector<data_container<const type_comparator_base*>>& comparator_list);
+    static const type_comparator_base* get_type_comparator_impl(const type& t,
+                                                                const std::vector<data_container<const type_comparator_base*>>& comparator_list);
 
     static ::rttr::property get_type_property(const type& t, string_view name);
-    static ::rttr::method get_type_method(const type& t, string_view name, const std::vector<type>& type_list);
+    static ::rttr::method get_type_method(const type& t, string_view name,
+                                          const std::vector<type>& type_list);
 
-    template <typename T>
+    template<typename T>
     static void update_class_list(const type& t, T item_ptr);
 
     static std::string derive_name(const type& t);
@@ -179,9 +188,9 @@ private:
     type_data* register_name_if_neccessary(type_data* info);
     static void register_base_class_info(type_data* info);
     /*!
-     * \brief This will create the derived name of a template instance, with all the custom names of a template
-     * parameter. e.g.: `std::reference_wrapper<class std::basic_string<char,struct std::char_traits<char>,class
-     * std::allocator<char> > >` => `std::reference_wrapper<class std::string>`
+     * \brief This will create the derived name of a template instance, with all the custom names of a template parameter.
+     * e.g.: `std::reference_wrapper<class std::basic_string<char,struct std::char_traits<char>,class std::allocator<char> > >` =>
+     *       `std::reference_wrapper<class std::string>`
      *
      */
     static std::string derive_template_instance_name(type_data* info);
@@ -202,23 +211,23 @@ private:
      * are trying to deregister its content, although the RTTR library is already unloaded.
      * So every registration manager class holds a flag whether it should deregister itself or not.
      */
-    std::set<registration_manager*> m_registration_manager_list;
+    std::set<registration_manager*>                             m_registration_manager_list;
 
-    flat_map<std::string, type, hash> m_custom_name_to_id;
-    flat_map<string_view, type> m_orig_name_to_id;
-    std::vector<type> m_type_list;
-    std::vector<type_data*> m_type_data_storage;
+    flat_map<std::string, type, hash>                           m_custom_name_to_id;
+    flat_map<string_view, type>                                 m_orig_name_to_id;
+    std::vector<type>                                           m_type_list;
+    std::vector<type_data*>                                     m_type_data_storage;
 
-    flat_multimap<string_view, ::rttr::property> m_global_property_stroage;
-    flat_multimap<string_view, ::rttr::method> m_global_method_stroage;
-    std::vector<::rttr::property> m_global_properties;
-    std::vector<::rttr::method> m_global_methods;
+    flat_multimap<string_view, ::rttr::property>                m_global_property_stroage;
+    flat_multimap<string_view, ::rttr::method>                  m_global_method_stroage;
+    std::vector<::rttr::property>                               m_global_properties;
+    std::vector<::rttr::method>                                 m_global_methods;
 
-    std::vector<data_container<const type_converter_base*>> m_type_converter_list;
-    std::vector<data_container<const type_comparator_base*>> m_type_equal_cmp_list;
-    std::vector<data_container<const type_comparator_base*>> m_type_less_than_cmp_list;
+    std::vector<data_container<const type_converter_base*>>     m_type_converter_list;
+    std::vector<data_container<const type_comparator_base*>>    m_type_equal_cmp_list;
+    std::vector<data_container<const type_comparator_base*>>    m_type_less_than_cmp_list;
 
-    std::mutex m_mutex;
+    std::mutex                                                  m_mutex;
 };
 
 } // end namespace detail
