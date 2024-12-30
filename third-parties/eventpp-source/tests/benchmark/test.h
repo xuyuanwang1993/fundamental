@@ -20,10 +20,12 @@
 #include <iostream>
 
 template <typename F>
-uint64_t measureElapsedTime(F f) {
-    std::chrono::steady_clock::time_point t = std::chrono::steady_clock::now();
-    f();
-    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - t).count();
+uint64_t measureElapsedTime(F f)
+{
+	std::chrono::steady_clock::time_point t = std::chrono::steady_clock::now();
+	f();
+	return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - t).count();
 }
+
 
 #endif

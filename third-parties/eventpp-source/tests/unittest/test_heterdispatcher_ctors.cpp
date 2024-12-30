@@ -16,101 +16,124 @@
 #include "eventpp/hetereventdispatcher.h"
 #undef private
 
-TEST_CASE("HeterEventDispatcher, copy constructor from empty HeterEventDispatcher") {
-    using ED = eventpp::HeterEventDispatcher<int, eventpp::HeterTuple<void(), void(int)>>;
-    ED dispatcher;
+TEST_CASE("HeterEventDispatcher, copy constructor from empty HeterEventDispatcher")
+{
+	using ED = eventpp::HeterEventDispatcher<int, eventpp::HeterTuple<void (), void (int)> >;
+	ED dispatcher;
 
-    REQUIRE(dispatcher.eventCallbackListMap.empty());
+	REQUIRE(dispatcher.eventCallbackListMap.empty());
 
-    ED copiedDispatcher(dispatcher);
-    REQUIRE(copiedDispatcher.eventCallbackListMap.empty());
-    REQUIRE(dispatcher.eventCallbackListMap.empty());
+	ED copiedDispatcher(dispatcher);
+	REQUIRE(copiedDispatcher.eventCallbackListMap.empty());
+	REQUIRE(dispatcher.eventCallbackListMap.empty());
 }
 
-TEST_CASE("HeterEventDispatcher, copy constructor from non-empty HeterEventDispatcher") {
-    using ED = eventpp::HeterEventDispatcher<int, eventpp::HeterTuple<void(), void(int)>>;
-    ED dispatcher;
-    constexpr int event = 3;
+TEST_CASE("HeterEventDispatcher, copy constructor from non-empty HeterEventDispatcher")
+{
+	using ED = eventpp::HeterEventDispatcher<int, eventpp::HeterTuple<void (), void (int)> >;
+	ED dispatcher;
+	constexpr int event = 3;
 
-    std::vector<int> dataList(3);
+	std::vector<int> dataList(3);
 
-    dispatcher.appendListener(event, [&dataList]() { ++dataList[0]; });
-    dispatcher.appendListener(event, [&dataList](int) { ++dataList[1]; });
+	dispatcher.appendListener(event, [&dataList]() {
+		++dataList[0];
+	});
+	dispatcher.appendListener(event, [&dataList](int) {
+		++dataList[1];
+	});
 
-    REQUIRE(dataList == std::vector<int> { 0, 0, 0 });
-    dispatcher.dispatch(event);
-    REQUIRE(dataList == std::vector<int> { 1, 0, 0 });
-    dispatcher.dispatch(event, 5);
-    REQUIRE(dataList == std::vector<int> { 1, 1, 0 });
-
-    ED copiedDispatcher(dispatcher);
-    copiedDispatcher.dispatch(event);
-    REQUIRE(dataList == std::vector<int> { 2, 1, 0 });
-    copiedDispatcher.dispatch(event, 5);
-    REQUIRE(dataList == std::vector<int> { 2, 2, 0 });
-    copiedDispatcher.appendListener(event, [&dataList]() { ++dataList[2]; });
-    copiedDispatcher.dispatch(event);
-    copiedDispatcher.dispatch(event, 5);
-    REQUIRE(dataList == std::vector<int> { 3, 3, 1 });
-    dispatcher.dispatch(event);
-    dispatcher.dispatch(event, 5);
-    REQUIRE(dataList == std::vector<int> { 4, 4, 1 });
+	REQUIRE(dataList == std::vector<int> { 0, 0, 0 });
+	dispatcher.dispatch(event);
+	REQUIRE(dataList == std::vector<int> { 1, 0, 0 });
+	dispatcher.dispatch(event, 5);
+	REQUIRE(dataList == std::vector<int> { 1, 1, 0 });
+	
+	ED copiedDispatcher(dispatcher);
+	copiedDispatcher.dispatch(event);
+	REQUIRE(dataList == std::vector<int> { 2, 1, 0 });
+	copiedDispatcher.dispatch(event, 5);
+	REQUIRE(dataList == std::vector<int> { 2, 2, 0 });
+	copiedDispatcher.appendListener(event, [&dataList]() {
+		++dataList[2];
+	});
+	copiedDispatcher.dispatch(event);
+	copiedDispatcher.dispatch(event, 5);
+	REQUIRE(dataList == std::vector<int> { 3, 3, 1 });
+	dispatcher.dispatch(event);
+	dispatcher.dispatch(event, 5);
+	REQUIRE(dataList == std::vector<int> { 4, 4, 1 });
 }
 
-TEST_CASE("HeterEventDispatcher, assign from non-empty HeterEventDispatcher") {
-    using ED = eventpp::HeterEventDispatcher<int, eventpp::HeterTuple<void(), void(int)>>;
-    ED dispatcher;
-    constexpr int event = 3;
+TEST_CASE("HeterEventDispatcher, assign from non-empty HeterEventDispatcher")
+{
+	using ED = eventpp::HeterEventDispatcher<int, eventpp::HeterTuple<void (), void (int)> >;
+	ED dispatcher;
+	constexpr int event = 3;
 
-    std::vector<int> dataList(3);
+	std::vector<int> dataList(3);
 
-    dispatcher.appendListener(event, [&dataList]() { ++dataList[0]; });
-    dispatcher.appendListener(event, [&dataList](int) { ++dataList[1]; });
+	dispatcher.appendListener(event, [&dataList]() {
+		++dataList[0];
+	});
+	dispatcher.appendListener(event, [&dataList](int) {
+		++dataList[1];
+	});
 
-    REQUIRE(dataList == std::vector<int> { 0, 0, 0 });
-    dispatcher.dispatch(event);
-    dispatcher.dispatch(event, 5);
-    REQUIRE(dataList == std::vector<int> { 1, 1, 0 });
-
-    ED assignedDispatcher;
-    assignedDispatcher = dispatcher;
-    assignedDispatcher.dispatch(event);
-    assignedDispatcher.dispatch(event, 5);
-    REQUIRE(dataList == std::vector<int> { 2, 2, 0 });
-    assignedDispatcher.appendListener(event, [&dataList]() { ++dataList[2]; });
-    assignedDispatcher.dispatch(event);
-    assignedDispatcher.dispatch(event, 5);
-    REQUIRE(dataList == std::vector<int> { 3, 3, 1 });
-    dispatcher.dispatch(event);
-    dispatcher.dispatch(event, 5);
-    REQUIRE(dataList == std::vector<int> { 4, 4, 1 });
+	REQUIRE(dataList == std::vector<int> { 0, 0, 0 });
+	dispatcher.dispatch(event);
+	dispatcher.dispatch(event, 5);
+	REQUIRE(dataList == std::vector<int> { 1, 1, 0 });
+	
+	ED assignedDispatcher;
+	assignedDispatcher = dispatcher;
+	assignedDispatcher.dispatch(event);
+	assignedDispatcher.dispatch(event, 5);
+	REQUIRE(dataList == std::vector<int> { 2, 2, 0 });
+	assignedDispatcher.appendListener(event, [&dataList]() {
+		++dataList[2];
+	});
+	assignedDispatcher.dispatch(event);
+	assignedDispatcher.dispatch(event, 5);
+	REQUIRE(dataList == std::vector<int> { 3, 3, 1 });
+	dispatcher.dispatch(event);
+	dispatcher.dispatch(event, 5);
+	REQUIRE(dataList == std::vector<int> { 4, 4, 1 });
 }
 
-TEST_CASE("HeterEventDispatcher, move assign from non-empty HeterEventDispatcher") {
-    using ED = eventpp::HeterEventDispatcher<int, eventpp::HeterTuple<void(), void(std::string)>>;
-    ED dispatcher;
-    constexpr int event = 3;
+TEST_CASE("HeterEventDispatcher, move assign from non-empty HeterEventDispatcher")
+{
+	using ED = eventpp::HeterEventDispatcher<int, eventpp::HeterTuple<void (), void (std::string)> >;
+	ED dispatcher;
+	constexpr int event = 3;
 
-    std::vector<int> dataList(3);
+	std::vector<int> dataList(3);
 
-    dispatcher.appendListener(event, [&dataList]() { ++dataList[0]; });
-    dispatcher.appendListener(event, [&dataList](std::string) { ++dataList[1]; });
+	dispatcher.appendListener(event, [&dataList]() {
+		++dataList[0];
+	});
+	dispatcher.appendListener(event, [&dataList](std::string) {
+		++dataList[1];
+	});
 
-    REQUIRE(dataList == std::vector<int> { 0, 0, 0 });
-    dispatcher.dispatch(event);
-    dispatcher.dispatch(event, "a");
-    REQUIRE(dataList == std::vector<int> { 1, 1, 0 });
-
-    ED assignedDispatcher;
-    assignedDispatcher = std::move(dispatcher);
-    assignedDispatcher.dispatch(event);
-    assignedDispatcher.dispatch(event, "a");
-    REQUIRE(dataList == std::vector<int> { 2, 2, 0 });
-    assignedDispatcher.appendListener(event, [&dataList]() { ++dataList[2]; });
-    assignedDispatcher.dispatch(event);
-    assignedDispatcher.dispatch(event, "a");
-    REQUIRE(dataList == std::vector<int> { 3, 3, 1 });
-    dispatcher.dispatch(event);
-    dispatcher.dispatch(event, "a");
-    REQUIRE(dataList == std::vector<int> { 3, 3, 1 });
+	REQUIRE(dataList == std::vector<int> { 0, 0, 0 });
+	dispatcher.dispatch(event);
+	dispatcher.dispatch(event, "a");
+	REQUIRE(dataList == std::vector<int> { 1, 1, 0 });
+	
+	ED assignedDispatcher;
+	assignedDispatcher = std::move(dispatcher);
+	assignedDispatcher.dispatch(event);
+	assignedDispatcher.dispatch(event, "a");
+	REQUIRE(dataList == std::vector<int> { 2, 2, 0 });
+	assignedDispatcher.appendListener(event, [&dataList]() {
+		++dataList[2];
+	});
+	assignedDispatcher.dispatch(event);
+	assignedDispatcher.dispatch(event, "a");
+	REQUIRE(dataList == std::vector<int> { 3, 3, 1 });
+	dispatcher.dispatch(event);
+	dispatcher.dispatch(event, "a");
+	REQUIRE(dataList == std::vector<int> { 3, 3, 1 });
 }
+

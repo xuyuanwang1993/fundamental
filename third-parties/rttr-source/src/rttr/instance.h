@@ -1,38 +1,39 @@
 /************************************************************************************
- *                                                                                   *
- *   Copyright (c) 2014 - 2018 Axel Menzel <info@rttr.org>                           *
- *                                                                                   *
- *   This file is part of RTTR (Run Time Type Reflection)                            *
- *   License: MIT License                                                            *
- *                                                                                   *
- *   Permission is hereby granted, free of charge, to any person obtaining           *
- *   a copy of this software and associated documentation files (the "Software"),    *
- *   to deal in the Software without restriction, including without limitation       *
- *   the rights to use, copy, modify, merge, publish, distribute, sublicense,        *
- *   and/or sell copies of the Software, and to permit persons to whom the           *
- *   Software is furnished to do so, subject to the following conditions:            *
- *                                                                                   *
- *   The above copyright notice and this permission notice shall be included in      *
- *   all copies or substantial portions of the Software.                             *
- *                                                                                   *
- *   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR      *
- *   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,        *
- *   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE     *
- *   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER          *
- *   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,   *
- *   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE   *
- *   SOFTWARE.                                                                       *
- *                                                                                   *
- *************************************************************************************/
+*                                                                                   *
+*   Copyright (c) 2014 - 2018 Axel Menzel <info@rttr.org>                           *
+*                                                                                   *
+*   This file is part of RTTR (Run Time Type Reflection)                            *
+*   License: MIT License                                                            *
+*                                                                                   *
+*   Permission is hereby granted, free of charge, to any person obtaining           *
+*   a copy of this software and associated documentation files (the "Software"),    *
+*   to deal in the Software without restriction, including without limitation       *
+*   the rights to use, copy, modify, merge, publish, distribute, sublicense,        *
+*   and/or sell copies of the Software, and to permit persons to whom the           *
+*   Software is furnished to do so, subject to the following conditions:            *
+*                                                                                   *
+*   The above copyright notice and this permission notice shall be included in      *
+*   all copies or substantial portions of the Software.                             *
+*                                                                                   *
+*   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR      *
+*   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,        *
+*   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE     *
+*   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER          *
+*   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,   *
+*   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE   *
+*   SOFTWARE.                                                                       *
+*                                                                                   *
+*************************************************************************************/
 
 #ifndef RTTR_INSTANCE_H_
 #define RTTR_INSTANCE_H_
 
 #include "rttr/detail/base/core_prerequisites.h"
-#include "rttr/detail/misc/data_address_container.h"
 #include "rttr/detail/misc/misc_type_traits.h"
+#include "rttr/detail/misc/data_address_container.h"
 
-namespace rttr {
+namespace rttr
+{
 class variant;
 class type;
 class argument;
@@ -40,14 +41,14 @@ class argument;
 /*!
  * The \ref instance class is used for forwarding the instance of an object to invoke a \ref property or \ref method.
  *
- * \remark The \ref instance class will internally hold a reference to the object. It will not perform any copy
- * operation on the data itself. Make sure you don't hold an \ref instance, while the underlying object is already
- * destroyed. Otherwise it will lead to undefined behavior.
+ * \remark The \ref instance class will internally hold a reference to the object. It will not perform any copy operation on the data itself.
+ *         Make sure you don't hold an \ref instance, while the underlying object is already destroyed. Otherwise it will lead to undefined behavior.
  */
-class RTTR_API instance {
-    template <typename T, typename Tp = detail::decay_t<T>>
-    using decay_instance_t =
-        detail::enable_if_t<!std::is_same<instance, Tp>::value && !std::is_same<variant, Tp>::value, T>;
+class RTTR_API instance
+{
+    template<typename T, typename Tp = detail::decay_t<T>>
+    using decay_instance_t = detail::enable_if_t<!std::is_same<instance, Tp>::value &&
+                                                 !std::is_same<variant, Tp>::value, T>;
 
 public:
     /*!
@@ -72,7 +73,7 @@ public:
      *
      * \remark Internally, the instance class will hold a reference to the address of the given object \p data.
      */
-    template <typename T, typename Tp = decay_instance_t<T>>
+    template<typename T, typename Tp = decay_instance_t<T>>
     RTTR_INLINE instance(T& data) RTTR_NOEXCEPT;
 
     /*!
@@ -81,7 +82,7 @@ public:
      *
      * \return A pointer to the instance of \p Target_Type, when the conversion succeeds, otherwise a nullptr.
      */
-    template <typename Target_Type>
+    template<typename Target_Type>
     RTTR_INLINE Target_Type* try_convert() const RTTR_NOEXCEPT;
 
     /*!

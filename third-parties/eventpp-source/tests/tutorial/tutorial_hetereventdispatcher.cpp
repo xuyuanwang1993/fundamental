@@ -21,92 +21,101 @@
 namespace {
 
 // This is the definition of event types
-enum class EventType {
-    // for MouseEvent
-    mouse,
+enum class EventType
+{
+	// for MouseEvent
+	mouse,
 
-    // for KeyboardEvent
-    keyboard,
+	// for KeyboardEvent
+	keyboard,
 };
 
 // This is the base event. It has a getType function to return the actual event type.
-class Event {
+class Event
+{
 public:
-    explicit Event(const EventType type) : type(type) {
-    }
+	explicit Event(const EventType type) : type(type) {
+	}
 
-    virtual ~Event() {
-    }
+	virtual ~Event() {
+	}
 
-    EventType getType() const {
-        return type;
-    }
+	EventType getType() const {
+		return type;
+	}
 
 private:
-    EventType type;
+	EventType type;
 };
 
-class MouseEvent : public Event {
+class MouseEvent : public Event
+{
 public:
-    MouseEvent(const int x, const int y) : Event(EventType::mouse), x(x), y(y) {
-    }
+	MouseEvent(const int x, const int y)
+		: Event(EventType::mouse), x(x), y(y)
+	{
+	}
 
-    int getX() const {
-        return x;
-    }
-    int getY() const {
-        return y;
-    }
+	int getX() const { return x; }
+	int getY() const { return y; }
 
 private:
-    int x;
-    int y;
+	int x;
+	int y;
 };
 
-class KeyboardEvent : public Event {
+class KeyboardEvent : public Event
+{
 public:
-    explicit KeyboardEvent(const int key) : Event(EventType::keyboard), key(key) {
-    }
+	explicit KeyboardEvent(const int key)
+		: Event(EventType::keyboard), key(key)
+	{
+	}
 
-    int getKey() const {
-        return key;
-    }
+	int getKey() const { return key; }
 
 private:
-    int key;
+	int key;
 };
 
 // We are going to dispatch event objects directly without specify the event type explicitly, so we need to let eventpp
 // know how to get the event type from the event object. The event policy does that.
 // Note ArgumentPassingMode must be eventpp::ArgumentPassingIncludeEvent here,
 // the heterogeneous doesn't support eventpp::ArgumentPassingAutoDetect.
-struct EventPolicy {
-    using ArgumentPassingMode = eventpp::ArgumentPassingIncludeEvent;
+struct EventPolicy
+{
+	using ArgumentPassingMode = eventpp::ArgumentPassingIncludeEvent;
 
-    template <typename E>
-    static EventType getEvent(const E& event) {
-        return event.getType();
-    }
+	template <typename E>
+	static EventType getEvent(const E & event) {
+		return event.getType();
+	}
 };
 
-TEST_CASE("HeterEventDispatcher tutorial 1, basic") {
-    std::cout << std::endl << "HeterEventDispatcher tutorial 1, basic" << std::endl;
+TEST_CASE("HeterEventDispatcher tutorial 1, basic")
+{
+	std::cout << std::endl << "HeterEventDispatcher tutorial 1, basic" << std::endl;
 
-    // The namespace is eventpp
-    // the second parameter is a HeterTuple of the listener prototypes.
-    eventpp::HeterEventDispatcher<EventType, eventpp::HeterTuple<void(const MouseEvent&), void(const KeyboardEvent&)>,
-                                  EventPolicy>
-        dispatcher;
+	// The namespace is eventpp
+	// the second parameter is a HeterTuple of the listener prototypes.
+	eventpp::HeterEventDispatcher<EventType, eventpp::HeterTuple<
+			void (const MouseEvent &),
+			void (const KeyboardEvent &)
+		>,
+		EventPolicy
+	> dispatcher;
 
-    dispatcher.appendListener(EventType::mouse, [](const MouseEvent& event) {
-        std::cout << "Received mouse event, x=" << event.getX() << " y=" << event.getY() << std::endl;
-    });
-    dispatcher.appendListener(EventType::keyboard, [](const KeyboardEvent& event) {
-        std::cout << "Received keyboard event, key=" << (char)event.getKey() << std::endl;
-    });
+	dispatcher.appendListener(EventType::mouse, [](const MouseEvent & event) {
+		std::cout << "Received mouse event, x=" << event.getX() << " y=" << event.getY() << std::endl;
+	});
+	dispatcher.appendListener(EventType::keyboard, [](const KeyboardEvent & event) {
+		std::cout << "Received keyboard event, key=" << (char)event.getKey() << std::endl;
+	});
 
-    dispatcher.dispatch(MouseEvent(5, 38));
-    dispatcher.dispatch(KeyboardEvent('W'));
+	dispatcher.dispatch(MouseEvent(5, 38));
+	dispatcher.dispatch(KeyboardEvent('W'));
 }
+
+
 
 } // namespace

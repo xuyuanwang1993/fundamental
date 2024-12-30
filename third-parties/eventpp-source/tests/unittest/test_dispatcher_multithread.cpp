@@ -11,60 +11,61 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "eventpp/eventdispatcher.h"
 #include "test.h"
+#include "eventpp/eventdispatcher.h"
 
-#include <algorithm>
+#include <thread>
 #include <numeric>
 #include <random>
-#include <thread>
+#include <algorithm>
 
-TEST_CASE("EventDispatcher, multi threading, int, void (int)") {
-    using ED = eventpp::EventDispatcher<int, void(int)>;
-    ED dispatcher;
+TEST_CASE("EventDispatcher, multi threading, int, void (int)")
+{
+	using ED = eventpp::EventDispatcher<int, void (int)>;
+	ED dispatcher;
 
-    constexpr int threadCount         = 256;
-    constexpr int eventCountPerThread = 1024 * 4;
-    constexpr int itemCount           = threadCount * eventCountPerThread;
+	constexpr int threadCount = 256;
+	constexpr int eventCountPerThread = 1024 * 4;
+	constexpr int itemCount = threadCount * eventCountPerThread;
 
-    std::vector<int> eventList(itemCount);
-    std::iota(eventList.begin(), eventList.end(), 0);
-    std::shuffle(eventList.begin(), eventList.end(), std::mt19937(std::random_device()()));
+	std::vector<int> eventList(itemCount);
+	std::iota(eventList.begin(), eventList.end(), 0);
+	std::shuffle(eventList.begin(), eventList.end(), std::mt19937(std::random_device()()));
 
-    std::vector<int> dataList(itemCount);
-    std::vector<ED::Handle> handleList(itemCount);
+	std::vector<int> dataList(itemCount);
+	std::vector<ED::Handle> handleList(itemCount);
 
-    std::vector<std::thread> threadList;
+	std::vector<std::thread> threadList;
 
-    for (int i = 0; i < threadCount; ++i) {
-        threadList.emplace_back([i, eventCountPerThread, &dispatcher, &eventList, &handleList, &dataList]() {
-            for (int k = i * eventCountPerThread; k < (i + 1) * eventCountPerThread; ++k) {
-                handleList[k] = dispatcher.appendListener(
-                    eventList[k], [&dispatcher, k, &dataList, &eventList, &handleList](const int e) {
-                        dataList[k] += e;
-                        dispatcher.removeListener(eventList[k], handleList[k]);
-                    });
-            }
-        });
-    }
-    for (int i = 0; i < threadCount; ++i) {
-        threadList[i].join();
-    }
+	for(int i = 0; i < threadCount; ++i) {
+		threadList.emplace_back([i, eventCountPerThread, &dispatcher, &eventList, &handleList, &dataList]() {
+			for(int k = i * eventCountPerThread; k < (i + 1) * eventCountPerThread; ++k) {
+				handleList[k] = dispatcher.appendListener(eventList[k], [&dispatcher, k, &dataList, &eventList, &handleList](const int e) {
+					dataList[k] += e;
+					dispatcher.removeListener(eventList[k], handleList[k]);
+				});
+			}
+		});
+	}
+	for(int i = 0; i < threadCount; ++i) {
+		threadList[i].join();
+	}
 
-    threadList.clear();
-    for (int i = 0; i < threadCount; ++i) {
-        threadList.emplace_back([i, eventCountPerThread, &dispatcher, &eventList]() {
-            for (int k = i * eventCountPerThread; k < (i + 1) * eventCountPerThread; ++k) {
-                dispatcher.dispatch(eventList[k]);
-            }
-        });
-    }
-    for (int i = 0; i < threadCount; ++i) {
-        threadList[i].join();
-    }
+	threadList.clear();
+	for(int i = 0; i < threadCount; ++i) {
+		threadList.emplace_back([i, eventCountPerThread, &dispatcher, &eventList]() {
+			for(int k = i * eventCountPerThread; k < (i + 1) * eventCountPerThread; ++k) {
+				dispatcher.dispatch(eventList[k]);
+			}
+		});
+	}
+	for(int i = 0; i < threadCount; ++i) {
+		threadList[i].join();
+	}
 
-    std::sort(eventList.begin(), eventList.end());
-    std::sort(dataList.begin(), dataList.end());
+	std::sort(eventList.begin(), eventList.end());
+	std::sort(dataList.begin(), dataList.end());
 
-    REQUIRE(eventList == dataList);
+	REQUIRE(eventList == dataList);
 }
+

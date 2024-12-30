@@ -2921,7 +2921,7 @@ struct ArgArray<N, false /*IsPacked*/>
 
 #if FMT_USE_VARIADIC_TEMPLATES
 template<typename Arg, typename... Args>
-inline uint64_t make_type(const Arg &first, const Args &...tail)
+inline uint64_t make_type(const Arg &first, const Args &... tail)
 {
     return make_type(first) | (make_type(tail...) << 4);
 }
@@ -2965,7 +2965,7 @@ inline uint64_t make_type(FMT_GEN15(FMT_ARG_TYPE_DEFAULT))
 // Defines a variadic function returning void.
 #define FMT_VARIADIC_VOID(func, arg_type)                                                                                                  \
     template<typename... Args>                                                                                                             \
-    void func(arg_type arg0, const Args &...args)                                                                                          \
+    void func(arg_type arg0, const Args &... args)                                                                                         \
     {                                                                                                                                      \
         typedef fmt::internal::ArgArray<sizeof...(Args)> ArgArray;                                                                         \
         typename ArgArray::Type array{ArgArray::template make<fmt::BasicFormatter<Char>>(args)...};                                        \
@@ -2975,7 +2975,7 @@ inline uint64_t make_type(FMT_GEN15(FMT_ARG_TYPE_DEFAULT))
 // Defines a variadic constructor.
 #define FMT_VARIADIC_CTOR(ctor, func, arg0_type, arg1_type)                                                                                \
     template<typename... Args>                                                                                                             \
-    ctor(arg0_type arg0, arg1_type arg1, const Args &...args)                                                                              \
+    ctor(arg0_type arg0, arg1_type arg1, const Args &... args)                                                                             \
     {                                                                                                                                      \
         typedef fmt::internal::ArgArray<sizeof...(Args)> ArgArray;                                                                         \
         typename ArgArray::Type array{ArgArray::template make<fmt::BasicFormatter<Char>>(args)...};                                        \
@@ -3612,14 +3612,16 @@ void BasicWriter<Char>::write_int(T value, Spec spec)
     switch (spec.type())
     {
     case 0:
-    case 'd': {
+    case 'd':
+    {
         unsigned num_digits = internal::count_digits(abs_value);
         CharPtr p = prepare_int_buffer(num_digits, spec, prefix, prefix_size) + 1;
         internal::format_decimal(get(p), abs_value, 0);
         break;
     }
     case 'x':
-    case 'X': {
+    case 'X':
+    {
         UnsignedType n = abs_value;
         if (spec.flag(HASH_FLAG))
         {
@@ -3641,7 +3643,8 @@ void BasicWriter<Char>::write_int(T value, Spec spec)
         break;
     }
     case 'b':
-    case 'B': {
+    case 'B':
+    {
         UnsignedType n = abs_value;
         if (spec.flag(HASH_FLAG))
         {
@@ -3661,7 +3664,8 @@ void BasicWriter<Char>::write_int(T value, Spec spec)
         } while ((n >>= 1) != 0);
         break;
     }
-    case 'o': {
+    case 'o':
+    {
         UnsignedType n = abs_value;
         if (spec.flag(HASH_FLAG))
             prefix[prefix_size++] = '0';
@@ -3678,7 +3682,8 @@ void BasicWriter<Char>::write_int(T value, Spec spec)
         } while ((n >>= 3) != 0);
         break;
     }
-    case 'n': {
+    case 'n':
+    {
         unsigned num_digits = internal::count_digits(abs_value);
         fmt::StringRef sep = "";
 #if !(defined(ANDROID) || defined(__ANDROID__))
@@ -4332,7 +4337,7 @@ void arg(WStringRef, const internal::NamedArg<Char> &) FMT_DELETED_OR_UNDEFINED;
 #if FMT_USE_VARIADIC_TEMPLATES
 #define FMT_VARIADIC_(Const, Char, ReturnType, func, call, ...)                                                                            \
     template<typename... Args>                                                                                                             \
-    ReturnType func(FMT_FOR_EACH(FMT_ADD_ARG_NAME, __VA_ARGS__), const Args &...args) Const                                                \
+    ReturnType func(FMT_FOR_EACH(FMT_ADD_ARG_NAME, __VA_ARGS__), const Args &... args) Const                                               \
     {                                                                                                                                      \
         typedef fmt::internal::ArgArray<sizeof...(Args)> ArgArray;                                                                         \
         typename ArgArray::Type array{ArgArray::template make<fmt::BasicFormatter<Char>>(args)...};                                        \
@@ -4832,7 +4837,7 @@ struct UdlFormat
     const Char *str;
 
     template<typename... Args>
-    auto operator()(Args &&...args) const -> decltype(format(str, std::forward<Args>(args)...))
+    auto operator()(Args &&... args) const -> decltype(format(str, std::forward<Args>(args)...))
     {
         return format(str, std::forward<Args>(args)...);
     }

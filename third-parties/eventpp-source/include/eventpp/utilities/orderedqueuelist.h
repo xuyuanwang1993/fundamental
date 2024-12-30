@@ -20,57 +20,62 @@
 
 namespace eventpp {
 
-struct OrderedQueueListCompare {
-    template <typename T>
-    bool operator()(const T& a, const T& b) const {
-        return a.event < b.event;
-    }
+struct OrderedQueueListCompare
+{
+	template <typename T>
+	bool operator() (const T & a, const T & b) const {
+		return a.event < b.event;
+	}
 };
 
 template <typename T, typename Compare = OrderedQueueListCompare>
-class OrderedQueueList : private std::list<T> {
+class OrderedQueueList : private std::list<T>
+{
 private:
-    using super = std::list<T>;
+	using super = std::list<T>;
 
 public:
-    using iterator       = typename super::iterator;
-    using const_iterator = typename super::const_iterator;
-    using super::begin;
-    using super::emplace_back;
-    using super::empty;
-    using super::end;
-    using super::front;
-    using super::swap;
+	using iterator = typename super::iterator;
+	using const_iterator = typename super::const_iterator;
+	using super::empty;
+	using super::begin;
+	using super::end;
+	using super::front;
+	using super::swap;
+	using super::emplace_back;
 
-    void splice(const_iterator pos, OrderedQueueList& other) {
-        super::splice(pos, other);
-        doSort();
-    }
+	void splice(const_iterator pos, OrderedQueueList & other) {
+		super::splice(pos, other);
+		doSort();
+	}
 
-    void splice(const_iterator pos, OrderedQueueList& other, const_iterator it) {
-        super::splice(pos, other, it);
-        doSort();
-    }
+	void splice(const_iterator pos, OrderedQueueList & other, const_iterator it) {
+		super::splice(pos, other, it);
+		doSort();
+	}
 
 private:
-    void doSort() {
-        auto compare = Compare();
-        this->sort([compare](const T& a, const T& b) {
-            // a and b may be empty if they are recycled to free list.
-            if (a.empty()) {
-                if (b.empty()) {
-                    return false;
-                }
-                return true;
-            } else if (b.empty()) {
-                return false;
-            }
+	void doSort() {
+		auto compare = Compare();
+		this->sort([compare](const T & a, const T & b) {
+			// a and b may be empty if they are recycled to free list.
+			if(a.empty()) {
+				if(b.empty()) {
+					return false;
+				}
+				return true;
+			}
+			else if(b.empty()) {
+				return false;
+			}
 
-            return compare(a.get(), b.get());
-        });
-    }
+			return compare(a.get(), b.get());
+		});
+	}
 };
 
-} // namespace eventpp
+
+} //namespace eventpp
 
 #endif
+
