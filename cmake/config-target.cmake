@@ -83,9 +83,6 @@ if(ENABLE_DEBUG_MEMORY_TRACE)
 endif()
 
 
-target_link_options(BuildSettings INTERFACE
-    "$<$<CONFIG:Debug>:-fsanitize=address>"
-)
 
 set_target_properties(BuildSettings PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
@@ -95,6 +92,19 @@ target_link_libraries(BuildSettings INTERFACE
     pthread
 )
 target_enable_clang_tidy(BuildSettings)
+
+
+function(config_enable_sanitize_address_check target_name)
+target_compile_options(${target_name} INTERFACE
+    "$<$<CONFIG:Debug>:-fsanitize=address"
+)
+
+target_link_options(${target_name} INTERFACE
+    "$<$<CONFIG:Debug>:-fsanitize=address>"
+)
+
+endfunction()
+
 
 function(add_plugin plugin_name)
     if(PLUGIN_USE_STATIC)
