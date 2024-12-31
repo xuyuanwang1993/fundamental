@@ -63,7 +63,7 @@ endmacro(ADD_COMPILE_DEFINITION)
 ADD_COMPILE_DEFINITION(Debug DEBUG)
 ADD_COMPILE_DEFINITION(Release NDEBUG)
 target_compile_options(BuildSettings INTERFACE
-    "$<$<CONFIG:Debug>:-O0;-Wall;-g2;-ggdb;-fsanitize=address;-fno-omit-frame-pointer>"
+    "$<$<CONFIG:Debug>:-O0;-Wall;-g2;-ggdb;-fno-omit-frame-pointer>"
     "$<$<CONFIG:Release>:-O3;-Wall>"
 )
 
