@@ -65,6 +65,7 @@ ADD_COMPILE_DEFINITION(Release NDEBUG)
 target_compile_options(BuildSettings INTERFACE
     "$<$<CONFIG:Debug>:-O0;-Wall;-g2;-ggdb;-fno-omit-frame-pointer>"
     "$<$<CONFIG:Release>:-O3;-Wall>"
+    "-fPIC"
 )
 
 target_compile_features(BuildSettings INTERFACE
