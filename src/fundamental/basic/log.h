@@ -229,7 +229,8 @@ private:
     #define FDEBUGS                                                                                                    \
         Fundamental::LoggerStream(Fundamental::Logger::s_defaultLogger, Fundamental::LogLevel::debug).stream()
 #else
-    #define FDEBUGS Fundamental::LoggerStream(Fundamental::Logger::s_defaultLogger, Fundamental::LogLevel::debug).null_stream()
+    #define FDEBUGS                                                                                                    \
+        Fundamental::LoggerStream(Fundamental::Logger::s_defaultLogger, Fundamental::LogLevel::debug).null_stream()
 #endif
 
 #define FINFOS Fundamental::LoggerStream(Fundamental::Logger::s_defaultLogger, Fundamental::LogLevel::info).stream()
@@ -245,11 +246,17 @@ private:
     Fundamental::LoggerStream(Fundamental::Logger::s_defaultLogger, Fundamental::LogLevel::warn, __FILE__, __func__,   \
                               __LINE__)                                                                                \
         .stream()
-#define FTRACES                                                                                                        \
-    Fundamental::LoggerStream(Fundamental::Logger::s_defaultLogger, Fundamental::LogLevel::trace, __FILE__, __func__,  \
-                              __LINE__)                                                                                \
-        .stream()
-
+#ifndef DISABLE_TRACE
+    #define FTRACES                                                                                                    \
+        Fundamental::LoggerStream(Fundamental::Logger::s_defaultLogger, Fundamental::LogLevel::trace, __FILE__,        \
+                                  __func__, __LINE__)                                                                  \
+            .stream()
+#else
+    #define FTRACES                                                                                                    \
+        Fundamental::LoggerStream(Fundamental::Logger::s_defaultLogger, Fundamental::LogLevel::trace, __FILE__,        \
+                                  __func__, __LINE__)                                                                  \
+            .null_stream()
+#endif
 #ifndef DISABLE_ASSERT
     #define FASSERT(_check, ...) FASSERT_THROWN(_check, ##__VA_ARGS__)
 
