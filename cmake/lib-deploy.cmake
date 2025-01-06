@@ -27,40 +27,34 @@ set(Custom_SystemRoot
 set(CMAKE_INSTALL_PREFIX "${Custom_SystemRoot}")
 message(STATUS "use Custom_SystemRoot=${Custom_SystemRoot}")
 
+
 function(native_install_lib_package lib_name version)
-    set(TARGET_CMAKE_OUTPUT_DIR "${Custom_SystemRoot}/lib/cmake")
-    set(TARGET_INCLUDE_OUTPUT_DIR "${Custom_SystemRoot}/lib/${lib_name}/include")
-    set(TARGET_LIB_OUTPUT_DIR "${Custom_SystemRoot}/lib/${lib_name}/lib")
-    set(TARGET_BIN_OUTPUT_DIR "${Custom_SystemRoot}/lib/${lib_name}/bin")
+    set(TARGET_CMAKE_INSTALL_DIR "${Custom_SystemRoot}/lib/cmake/${lib_name}")
+    set(TARGET_INCLUDE_INSTALL_DIR "${Custom_SystemRoot}/include/")
+    set(TARGET_LIB_INSTALL_DIR "${Custom_SystemRoot}/lib/${lib_name}")
+    set(TARGET_BIN_INSTALL_DIR "${Custom_SystemRoot}/bin/${lib_name}")
 
-
-    set_target_properties(${lib_name} PROPERTIES
-        RUNTIME_OUTPUT_DIRECTORY "${TARGET_BIN_OUTPUT_DIR}")
-    set_target_properties(${lib_name} PROPERTIES
-        LIBRARY_OUTPUT_DIRECTORY "${TARGET_LIB_OUTPUT_DIR}")
-    set_target_properties(${lib_name} PROPERTIES
-        ARCHIVE_OUTPUT_DIRECTORY "${TARGET_LIB_OUTPUT_DIR}")
 
 
     set_target_properties(${lib_name} PROPERTIES
-        TARGET_CMAKE_OUTPUT_DIR "${TARGET_CMAKE_OUTPUT_DIR}"
-        TARGET_INCLUDE_OUTPUT_DIR "${TARGET_INCLUDE_OUTPUT_DIR}"
-        TARGET_LIB_OUTPUT_DIR "${TARGET_LIB_OUTPUT_DIR}"
-        TARGET_BIN_OUTPUT_DIR "${TARGET_BIN_OUTPUT_DIR}"
+        TARGET_CMAKE_INSTALL_DIR "${TARGET_CMAKE_INSTALL_DIR}"
+        TARGET_INCLUDE_INSTALL_DIR "${TARGET_INCLUDE_INSTALL_DIR}"
+        TARGET_LIB_INSTALL_DIR "${TARGET_LIB_INSTALL_DIR}"
+        TARGET_BIN_INSTALL_DIR "${TARGET_BIN_INSTALL_DIR}"
     )
-    message(STATUS "TARGET_CMAKE_OUTPUT_DIR=${TARGET_CMAKE_OUTPUT_DIR}")
-    message(STATUS "TARGET_INCLUDE_OUTPUT_DIR=${TARGET_INCLUDE_OUTPUT_DIR}")
-    message(STATUS "TARGET_LIB_OUTPUT_DIR=${TARGET_LIB_OUTPUT_DIR}")
-    message(STATUS "TARGET_BIN_OUTPUT_DIR=${TARGET_BIN_OUTPUT_DIR}")
+    message(STATUS "TARGET_CMAKE_INSTALL_DIR=${TARGET_CMAKE_INSTALL_DIR}")
+    message(STATUS "TARGET_INCLUDE_INSTALL_DIR=${TARGET_INCLUDE_INSTALL_DIR}")
+    message(STATUS "TARGET_LIB_INSTALL_DIR=${TARGET_LIB_INSTALL_DIR}")
+    message(STATUS "TARGET_BIN_INSTALL_DIR=${TARGET_BIN_INSTALL_DIR}")
 
     set(ExportTargets "${lib_name}Targets")
     set(ExportConfigVersion "${lib_name}ConfigVersion")
     set(ExportConfig "${lib_name}Config")
     install(TARGETS ${lib_name} EXPORT ${ExportTargets}
-        LIBRARY DESTINATION ${TARGET_LIB_OUTPUT_DIR}/$<CONFIG>
-        ARCHIVE DESTINATION ${TARGET_LIB_OUTPUT_DIR}/$<CONFIG>
-        RUNTIME DESTINATION ${TARGET_BIN_OUTPUT_DIR}/$<CONFIG>
-        INCLUDES DESTINATION ${TARGET_INCLUDE_OUTPUT_DIR}
+        LIBRARY DESTINATION ${TARGET_LIB_INSTALL_DIR}/$<CONFIG>
+        ARCHIVE DESTINATION ${TARGET_LIB_INSTALL_DIR}/$<CONFIG>
+        RUNTIME DESTINATION ${TARGET_BIN_INSTALL_DIR}/$<CONFIG>
+        INCLUDES DESTINATION ${TARGET_INCLUDE_INSTALL_DIR}
     )
 
     include(CMakePackageConfigHelpers)
@@ -81,7 +75,7 @@ function(native_install_lib_package lib_name version)
     install(EXPORT ${ExportTargets}
         FILE ${ExportTargets}.cmake
         NAMESPACE fh::
-        DESTINATION ${TARGET_CMAKE_OUTPUT_DIR}
+        DESTINATION ${TARGET_CMAKE_INSTALL_DIR}
         COMPONENT "${lib_name}"
     )
 
@@ -89,15 +83,18 @@ function(native_install_lib_package lib_name version)
         "${CMAKE_CURRENT_BINARY_DIR}/${ExportConfig}.cmake"
         "${CMAKE_CURRENT_BINARY_DIR}/${ExportConfigVersion}.cmake"
         COMPONENT "${lib_name}"
-        DESTINATION ${TARGET_CMAKE_OUTPUT_DIR}
+        DESTINATION ${TARGET_CMAKE_INSTALL_DIR}
     )
-
+    install(TARGETS ${lib_name} 
+        COMPONENT "${lib_name}"
+        DESTINATION ${TARGET_LIB_INSTALL_DIR}/$<CONFIG>
+    )
 endfunction()
 
 function(native_copy_extra_dependencies target_name lib_name)
     add_custom_command(TARGET ${target_name}
         POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different "${Custom_SystemRoot}/lib/${lib_name}/bin/$<CONFIG>" "$<TARGET_FILE_DIR:${target_name}>"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different "${Custom_SystemRoot}/bin/${lib_name}/$<CONFIG>" "$<TARGET_FILE_DIR:${target_name}>"
         COMMAND_EXPAND_LISTS
         VERBATIM
     )
