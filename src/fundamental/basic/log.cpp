@@ -391,7 +391,7 @@ LoggerStream::LoggerStream(Logger* logger, LogLevel level, const char* fileName,
 }
 LoggerStream::~LoggerStream() {
 #ifndef DISABLE_FLOG
-    loggerRef->Logger::LogOutput(level_, ss_.str());
+    if (enable_output) loggerRef->Logger::LogOutput(level_, ss_.str());
 #endif
 }
 } // namespace Fundamental

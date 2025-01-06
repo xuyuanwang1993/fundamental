@@ -152,10 +152,32 @@ public:
         return ss_;
     }
 
+    template <typename T>
+    LoggerStream& operator<<(const T&) {
+        // do nothing
+        return *this;
+    }
+
+    template <typename T>
+    LoggerStream& operator>>(T&) {
+        // do nothing
+        return *this;
+    }
+
+    LoggerStream& operator<<(std::ostream& (*)(std::ostream&)) {
+        // do nothing
+        return *this;
+    }
+    LoggerStream& null_stream() {
+        enable_output = false;
+        return *this;
+    }
+
 private:
     Logger* const loggerRef = nullptr;
     const LogLevel level_;
     std::stringstream ss_;
+    bool enable_output = true;
 };
 } // namespace Fundamental
 #define STR_H(x)      #x
@@ -203,8 +225,14 @@ private:
 #define FFAIL(...) FLOG_DEBUGINFO(Fundamental::Logger::s_defaultLogger, Fundamental::LogLevel::critical, ##__VA_ARGS__)
 #define FWARN(...) FLOG_DEBUGINFO(Fundamental::Logger::s_defaultLogger, Fundamental::LogLevel::warn, ##__VA_ARGS__)
 
-#define FDEBUGS Fundamental::LoggerStream(Fundamental::Logger::s_defaultLogger, Fundamental::LogLevel::debug).stream()
-#define FINFOS  Fundamental::LoggerStream(Fundamental::Logger::s_defaultLogger, Fundamental::LogLevel::info).stream()
+#ifdef DEBUG
+    #define FDEBUGS                                                                                                    \
+        Fundamental::LoggerStream(Fundamental::Logger::s_defaultLogger, Fundamental::LogLevel::debug).stream()
+#else
+    #define FDEBUGS Fundamental::LoggerStream(Fundamental::Logger::s_defaultLogger, Fundamental::LogLevel::debug).null_stream()
+#endif
+
+#define FINFOS Fundamental::LoggerStream(Fundamental::Logger::s_defaultLogger, Fundamental::LogLevel::info).stream()
 #define FERRS                                                                                                          \
     Fundamental::LoggerStream(Fundamental::Logger::s_defaultLogger, Fundamental::LogLevel::err, __FILE__, __func__,    \
                               __LINE__)                                                                                \
@@ -244,8 +272,12 @@ private:
 #define FFAIL_I(logger, ...) FLOG_DEBUGINFO(logger, Fundamental::LogLevel::critical, ##__VA_ARGS__)
 #define FWARN_I(logger, ...) FLOG_DEBUGINFO(logger, Fundamental::LogLevel::warn, ##__VA_ARGS__)
 
-#define FDEBUGS_I(logger) Fundamental::LoggerStream(logger, Fundamental::LogLevel::debug).stream()
-#define FINFOS_I(logger)  Fundamental::LoggerStream(logger, Fundamental::LogLevel::info).stream()
+#ifdef DEBUG
+    #define FDEBUGS_I(logger) Fundamental::LoggerStream(logger, Fundamental::LogLevel::debug).stream()
+#else
+    #define FDEBUGS_I(logger) Fundamental::LoggerStream(logger, Fundamental::LogLevel::debug).null_stream()
+#endif
+#define FINFOS_I(logger) Fundamental::LoggerStream(logger, Fundamental::LogLevel::info).stream()
 #define FERRS_I(logger)                                                                                                \
     Fundamental::LoggerStream(logger, Fundamental::LogLevel::err, __FILE__, __func__, __LINE__).stream()
 #define FFAILS_I(logger)                                                                                               \
