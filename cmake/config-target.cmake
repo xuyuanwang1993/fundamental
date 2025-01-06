@@ -96,13 +96,13 @@ target_enable_clang_tidy(BuildSettings)
 
 
 function(config_enable_sanitize_address_check target_name)
-target_compile_options(${target_name} INTERFACE
-    "$<$<CONFIG:Debug>:-fsanitize=address"
-)
+    target_compile_options(${target_name} INTERFACE
+        "$<$<CONFIG:Debug>:-fsanitize=address"
+    )
 
-target_link_options(${target_name} INTERFACE
-    "$<$<CONFIG:Debug>:-fsanitize=address>"
-)
+    target_link_options(${target_name} INTERFACE
+        "$<$<CONFIG:Debug>:-fsanitize=address>"
+    )
 
 endfunction()
 
@@ -146,3 +146,11 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
         set(CLANG_STATIC_LINKER_FLAGS "-stdlib=libc++ -static-libc++")
     endif()
 endif()
+
+function(enable_origin_rpath app_target_name)
+    set_target_properties(${app_target_name} PROPERTIES
+        INSTALL_RPATH "$ORIGIN"
+        BUILD_WITH_INSTALL_RPATH TRUE
+    )
+endfunction()
+

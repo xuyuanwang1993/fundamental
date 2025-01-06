@@ -100,3 +100,20 @@ function(native_copy_extra_dependencies target_name lib_name)
     )
 
 endfunction()
+
+
+function(read_lib_path lib_name out_path)
+    get_target_property(QUERY_LIB_LOCATION ${lib_name} IMPORTED_LOCATION)
+    if(QUERY_LIB_LOCATION STREQUAL "QUERY_LIB_LOCATION-NOTFOUND")
+
+        string(TOUPPER "${CMAKE_BUILD_TYPE}" TEMP_CONFIG_TYPE)
+        get_target_property(QUERY_LIB_LOCATION ${lib_name} IMPORTED_LOCATION_${TEMP_CONFIG_TYPE})
+    endif()
+
+    set(${out_path}
+        "${QUERY_LIB_LOCATION}"
+        PARENT_SCOPE)
+endfunction(read_lib_path)
+
+
+
