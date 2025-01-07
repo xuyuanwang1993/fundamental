@@ -19,17 +19,19 @@ if(F_BUILD_STATIC)
     add_subdirectory(TestBasic)
     add_subdirectory(TestMemoryPool)
     add_subdirectory(TestTimerTracker)
+    if(IMPORT_GTEST)
+        add_subdirectory(GtestSample)
+        add_subdirectory(TestParallel)
+    endif()
+
+    if(IMPORT_BENCHMARK)
+        add_subdirectory(BenchmarkSample)
+    endif()
+
+    add_subdirectory(TestCRTP)
 endif()
 
 if(F_BUILD_SHARED)
     add_subdirectory(TestRttr)
 endif()
 
-if(IMPORT_GTEST)
-    add_subdirectory(GtestSample)
-    add_subdirectory(TestParallel)
-endif()
-
-if(IMPORT_BENCHMARK)
-    add_subdirectory(BenchmarkSample)
-endif()
