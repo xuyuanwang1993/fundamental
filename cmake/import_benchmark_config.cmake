@@ -7,6 +7,12 @@ if(IMPORT_BENCHMARK)
     GIT_REPOSITORY http://192.168.50.101:8787/rdd/benchmark.git
     GIT_TAG f4f93b5553ced834b2120048f65690cddb4b7a2f
   )
+  option(BENCHMARK_ENABLE_TESTING "Enable testing of the benchmark library." OFF)
+  option(BENCHMARK_ENABLE_GTEST_TESTS "Enable building the unit tests which depend on gtest" OFF)
+  option(BENCHMARK_USE_BUNDLED_GTEST "Use bundled GoogleTest. If disabled, the find_package(GTest) will be used." OFF)
+  option(BENCHMARK_ENABLE_INSTALL "Enable installation of benchmark. (Projects embedding benchmark may want to turn this OFF.)" OFF)
+  option(BENCHMARK_ENABLE_DOXYGEN "Build documentation with Doxygen." OFF)
+  option(BENCHMARK_INSTALL_DOCS "Enable installation of documentation." OFF)
   FetchContent_MakeAvailable(benchmark)
 
   function(declare_benchmark_exe target_name)
