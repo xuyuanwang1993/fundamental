@@ -7,6 +7,8 @@ FetchContent_Declare(
   GIT_TAG        58d77fa8070e8cec2dc1ed015d66b454c8d78850 # release-1.12.1
 )
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+option(BUILD_GMOCK "Builds the googlemock subproject" OFF)
+option(INSTALL_GTEST "Enable installation of googletest. (Projects embedding googletest may want to turn this OFF.)" OFF)
 FetchContent_MakeAvailable(googletest)
 enable_testing()
 include(GoogleTest)

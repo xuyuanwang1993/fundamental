@@ -9,6 +9,7 @@ add_subdirectory(eventpp-source)
 
 set(SPDLOG_BUILD_TESTING OFF)
 set(SPDLOG_BUILD_EXAMPLES OFF)
+option(SPDLOG_ENABLE_INSTALL "Enable installation of spdlog. (Projects embedding spdlog may want to turn this OFF.)" OFF)
 add_subdirectory(spdlog-source)
 
 set(BUILD_RTTR_DYNAMIC ON)
