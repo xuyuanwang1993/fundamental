@@ -41,3 +41,4 @@ target_compile_definitions(${app_target_name}
         APP_NAME="${app_target_name}"
 )
 
+config_enable_sanitize_address_check(${app_target_name})
