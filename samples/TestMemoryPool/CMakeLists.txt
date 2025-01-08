@@ -31,6 +31,7 @@ PRIVATE
 target_link_libraries(${app_target_name} 
 PRIVATE
     BuildSettings
+    stdc++
     ${GLOB_NAMESPACE}fundamental${STATIC_LIB_SUFFIX}
 )
 

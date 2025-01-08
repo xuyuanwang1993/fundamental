@@ -91,28 +91,25 @@ struct TestMem {
     TestMem() {
         bytes[0] = s_loop_value++;
         memset(bytes + 1, '1', 31);
-        FDEBUG("TestMem constructor {}", static_cast<int>(bytes[0]));
+        FINFO("TestMem constructor {}", static_cast<int>(bytes[0]));
     };
     ~TestMem() {
-        FDEBUG("TestMem destructor {}", static_cast<int>(bytes[0]));
+        FINFO("TestMem destructor {}", static_cast<int>(bytes[0]));
     }
 };
 void TestObjectPool() {
     using SafePool = Fundamental::ThreadSafeObjectPoolAllocator<TestMem>;
-    static_assert(std::is_same_v<SafePool::PoolSourceType_, std::pmr::synchronized_pool_resource>);
-    using UnsafePool = Fundamental::ThreadUnSafeObjectPoolAllocator<TestMem>;
-    static_assert(std::is_same_v<UnsafePool::PoolSourceType_, std::pmr::unsynchronized_pool_resource>);
 
     SafePool pool;
     for (int i = 0; i < 10; ++i) {
         try {
-            FDEBUG("allocate {}", i);
+            FINFO("allocate {}", i);
             auto* p = pool.allocate(1);
-            FDEBUG("construct {}", i);
+            FINFO("construct {}", i);
             pool.construct(p);
-            FDEBUG("destroy {}", i);
+            FINFO("destroy {}", i);
             pool.destroy(p);
-            FDEBUG("deallocate {}", i);
+            FINFO("deallocate {}", i);
             pool.deallocate(p, 1);
         } catch (const std::exception& e) {
             std::cerr << e.what() << '\n';
@@ -120,15 +117,19 @@ void TestObjectPool() {
     }
     {
         std::vector<TestMem, SafePool> testVec;
-        FDEBUG("resize 10");
+        FINFO("resize 10");
         testVec.resize(10);
-        FDEBUG("shrink_to_fit");
+        FINFO("clear");
+        testVec.clear();
+        FINFO("resize 0");
+        testVec.resize(0);
+        FINFO("shrink_to_fit");
         testVec.shrink_to_fit();
     }
     {
-        FDEBUG("new object");
+        FINFO("new object");
         auto testobject = pool.NewObject();
-        FDEBUG("delete object");
+        FINFO("delete object");
         pool.DeleteObject(testobject);
     }
 }

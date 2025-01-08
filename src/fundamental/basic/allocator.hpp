@@ -28,22 +28,23 @@ decltype(auto) MakeMonoBufferMemorySource(Args&&... args) {
     return MakeSharedMemorySource<std::pmr::monotonic_buffer_resource>(std::forward<Args>(args)...);
 }
 namespace internal {
-template <size_t ObjectSize>
-inline constexpr decltype(auto) GetPoolOption() {
-    return std::pmr::pool_options { 4, ObjectSize * 4 };
+template <size_t ObjectSize, bool ThreadSafe,
+          typename PoolSourceType = std::conditional_t<ThreadSafe, std::pmr::synchronized_pool_resource,
+                                                       std::pmr::unsynchronized_pool_resource>>
+inline std::pmr::memory_resource* GetObjectPoolSource() {
+    static std::pmr::memory_resource* s_object_pool_source =
+        new PoolSourceType(std::pmr::pool_options { 16, ObjectSize * 16 });
+    return s_object_pool_source;
 }
 } // namespace internal
 
 // fixed-size object allocator
-template <typename ObjectType, bool ThreadSafe,
-          typename PoolSourceType = std::conditional_t<ThreadSafe, std::pmr::synchronized_pool_resource,
-                                                       std::pmr::unsynchronized_pool_resource>>
+template <typename ObjectType, bool ThreadSafe, size_t blockSize = sizeof(ObjectType)>
 struct ObjectPoolAllocator : std::pmr::polymorphic_allocator<ObjectType> {
-    using PoolSourceType_ = PoolSourceType;
-    std::shared_ptr<std::pmr::memory_resource> source;
     ObjectPoolAllocator() :
-    std::pmr::polymorphic_allocator<ObjectType>(new PoolSourceType(internal::GetPoolOption<sizeof(ObjectType)>())),
-    source(std::shared_ptr<std::pmr::memory_resource>(std::pmr::polymorphic_allocator<ObjectType>::resource())) {
+    std::pmr::polymorphic_allocator<ObjectType>(internal::GetObjectPoolSource<blockSize, ThreadSafe>()) {
+    }
+    ~ObjectPoolAllocator() {
     }
 #ifdef AllocatorTracker
     [[nodiscard]]
@@ -51,13 +52,13 @@ struct ObjectPoolAllocator : std::pmr::polymorphic_allocator<ObjectType> {
         if ((__gnu_cxx::__int_traits<size_t>::__max / sizeof(ObjectType)) < __n) std::__throw_bad_array_new_length();
         std::cout << "allocate align_size:" << alignof(ObjectType) << " total:" << __n * sizeof(ObjectType)
                   << " count:" << __n << std::endl;
-        return static_cast<ObjectType*>(source->allocate(__n * sizeof(ObjectType), alignof(ObjectType)));
+        return static_cast<ObjectType*>(std::pmr::polymorphic_allocator<ObjectType>::allocate(__n));
     }
 
     void deallocate(ObjectType* __p, size_t __n) noexcept __attribute__((__nonnull__)) {
         std::cout << "deallocate align_size:" << alignof(ObjectType) << " total:" << __n * sizeof(ObjectType)
                   << " count:" << __n << std::endl;
-        source->deallocate(__p, __n * sizeof(ObjectType), alignof(ObjectType));
+        std::pmr::polymorphic_allocator<ObjectType>::deallocate(__p, __n);
     }
 #endif
 

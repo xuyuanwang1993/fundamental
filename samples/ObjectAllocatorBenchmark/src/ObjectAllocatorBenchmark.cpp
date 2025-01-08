@@ -5,50 +5,66 @@
 #include "fundamental/basic/utils.hpp"
 #include <chrono>
 #include <iostream>
+#include <list>
 #include <memory>
-#include <vector>
+#include <string>
 
 #include "benchmark/benchmark.h"
 
+template <std::size_t blockSize>
 struct TestObject {
-    int x;
-    double y;
-    std::uint8_t k;
-    std::uint8_t a[33];
+    std::int32_t x;
+    std::uint8_t data[blockSize];
     TestObject() {
-        benchmark::DoNotOptimize(x = 1);
+        benchmark::DoNotOptimize(data[1] = 0);
     }
-
     ~TestObject() {
-        benchmark::DoNotOptimize(y = 0);
+        benchmark::DoNotOptimize(data[blockSize - 1] = 1);
     }
-};
-class ObjectAllocatorBenchmark : public benchmark::Fixture {
-public:
-    std::vector<TestObject> vec_normal;
-    std::vector<TestObject, Fundamental::ThreadSafeObjectPoolAllocator<TestObject>> vec_use_pool;
 };
 
-BENCHMARK_F(ObjectAllocatorBenchmark, normal)
-(benchmark::State& state) {
+template <std::size_t blockSize>
+static void TestNormal(benchmark::State& state) {
+    std::list<TestObject<blockSize>> l;
     for (auto _ : state) {
-        vec_normal.emplace_back();
+        for (std::int64_t i = 0; i < state.range(0); ++i) {
+            l.emplace_back();
+        }
+        while (!l.empty())
+            l.pop_front();
     }
-    if (vec_normal.size() > 10000) {
-        vec_normal.clear();
-        vec_normal.shrink_to_fit();
-    }
-};
-BENCHMARK_F(ObjectAllocatorBenchmark, pool)
-(benchmark::State& state) {
+}
+
+template <std::size_t blockSize>
+static void TestPool(benchmark::State& state) {
+    std::list<TestObject<blockSize>, Fundamental::ThreadUnSafeObjectPoolAllocator<TestObject<blockSize>>> l;
     for (auto _ : state) {
-        vec_use_pool.emplace_back();
+        for (std::int64_t i = 0; i < state.range(0); ++i) {
+            l.emplace_back();
+        }
+        while (!l.empty())
+            l.pop_front();
     }
-    if (vec_use_pool.size() > 10000) {
-        vec_use_pool.clear();
-        vec_use_pool.shrink_to_fit();
-    }
-};
+}
+
+BENCHMARK_TEMPLATE(TestNormal, 1024)->RangeMultiplier(16)->Range(1, 256);
+BENCHMARK_TEMPLATE(TestPool, 1024)->RangeMultiplier(16)->Range(1, 256);
+
+BENCHMARK_TEMPLATE(TestNormal, 4096)->Arg(1)->Arg(10);
+BENCHMARK_TEMPLATE(TestPool, 4096)->Arg(1)->Arg(10);
+
+BENCHMARK_TEMPLATE(TestNormal, 4096 * 4)->Arg(1)->Arg(10);
+BENCHMARK_TEMPLATE(TestPool, 4096 * 4)->Arg(1)->Arg(10);
+
+BENCHMARK_TEMPLATE(TestNormal, 4096 * 16)->Arg(1)->Arg(10);
+BENCHMARK_TEMPLATE(TestPool, 4096 * 16)->Arg(1)->Arg(10);
+
+BENCHMARK_TEMPLATE(TestNormal, 4096 * 128)->Arg(1)->Arg(10);
+BENCHMARK_TEMPLATE(TestPool, 4096 * 128)->Arg(1)->Arg(10);
+
+BENCHMARK_TEMPLATE(TestNormal, 4096 * 512)->Arg(1)->Arg(10)->Arg(100);
+BENCHMARK_TEMPLATE(TestPool, 4096 * 512)->Arg(1)->Arg(10)->Arg(100);
+
 int main(int argc, char* argv[]) {
     char arg0_default[] = "benchmark";
     char* args_default  = arg0_default;
