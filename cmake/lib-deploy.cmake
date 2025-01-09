@@ -1,3 +1,9 @@
+if(__lib_deploy__)
+    return()
+endif()
+set(__lib_deploy__ TRUE CACHE INTERNAL "__lib_deploy__ include flag")
+
+
 function(native_copy_dlls app_target_name)
     add_custom_command(TARGET ${app_target_name} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy -t $<TARGET_FILE_DIR:${app_target_name}> $<TARGET_RUNTIME_DLLS:${app_target_name}>

@@ -1,3 +1,9 @@
+if(__import_benchmark_config__)
+    return()
+endif()
+set(__import_benchmark_config__ TRUE CACHE INTERNAL "__import_benchmark_config__ include flag")
+
+
 option(IMPORT_BENCHMARK "import benchmark" ON)
 option(BENCHMARK_ENABLE_TESTING "Enable testing of the benchmark library." OFF)
 if(IMPORT_BENCHMARK)

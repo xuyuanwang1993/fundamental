@@ -1,3 +1,8 @@
+if(__patch_helper__)
+    return()
+endif()
+set(__patch_helper__ TRUE CACHE INTERNAL "__patch_helper__ include flag")
+
 # apply patches to a directory.
 # 
 # Parameters:

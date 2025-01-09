@@ -1,4 +1,9 @@
 
+if(__reflect_helper__)
+    return()
+endif()
+set(__reflect_helper__ TRUE CACHE INTERNAL "__reflect_helper__ include flag")
+
 function(fetch_reflection_src GroupName DstSrcs)
 set(__REFLECTIONT_PROPERTY_NAME__ "__Reflect_group_${GroupName}__")
 get_property(srcs GLOBAL PROPERTY ${__REFLECTIONT_PROPERTY_NAME__})

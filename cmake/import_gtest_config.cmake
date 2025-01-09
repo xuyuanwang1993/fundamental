@@ -1,3 +1,9 @@
+if(__import_gtest_config__)
+    return()
+endif()
+set(__import_gtest_config__ TRUE CACHE INTERNAL "__import_gtest_config__ include flag")
+
+
 option(IMPORT_GTEST "import gtest" ON)
 if(IMPORT_GTEST)
 include(FetchContent)
