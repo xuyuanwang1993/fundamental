@@ -3,7 +3,18 @@ cmake_minimum_required(VERSION 3.16)
 set(project_name fh-fundamental)
 project(${project_name} VERSION 0.1 LANGUAGES CXX)
 
-option(FUNDAMENTAL_ENABLE_TESTING "Enable testing of the fundamental library." ON)
+set(FUNDAMENTAL_MAIN_PROJECT OFF)
+if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
+    set(FUNDAMENTAL_MAIN_PROJECT ON)
+endif()
+
+if(FUNDAMENTAL_MAIN_PROJECT)
+    option(FUNDAMENTAL_ENABLE_TESTING "Enable testing of the fundamental library." ON)
+else()
+    option(FUNDAMENTAL_ENABLE_TESTING "Enable testing of the fundamental library." OFF)
+endif()
+
+option(FUNDAMENTAL_IMPORT_SRC "import fundamental lib source" ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Enbale code IDE to use folders, this will enable source_group(TREE,...)
@@ -12,7 +23,7 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 #add cmake search directory
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 set(FUNDAMENTAL_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake CACHE INTERNAL "")
-
+set(FUNDAMENTAL_SCRIPTS_PATH ${CMAKE_CURRENT_SOURCE_DIR}/scripts CACHE INTERNAL "")
 #build with -fpic
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 # Disable the CTest targets
@@ -26,13 +37,16 @@ include(cmake/config-target.cmake)
 include(cmake/import_gtest_config.cmake)
 include(cmake/import_benchmark_config.cmake)
 include(cmake/reflect-helper.cmake)
-add_subdirectory(third-parties)
-add_subdirectory(src)
 
-if(FUNDAMENTAL_ENABLE_TESTING)
-    add_subdirectory(samples)
+if(FUNDAMENTAL_IMPORT_SRC)
+    add_subdirectory(third-parties)
+    add_subdirectory(src)
+
+    if(FUNDAMENTAL_ENABLE_TESTING)
+        add_subdirectory(samples)
+    endif()
+
 endif()
-
 
 
 
