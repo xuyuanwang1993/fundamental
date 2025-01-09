@@ -1,7 +1,7 @@
 if(__lib_deploy__)
     return()
 endif()
-set(__lib_deploy__ TRUE CACHE INTERNAL "__lib_deploy__ include flag")
+set(__lib_deploy__ TRUE)
 
 
 function(native_copy_dlls app_target_name)

@@ -1,7 +1,7 @@
 if(__import_benchmark_config__)
     return()
 endif()
-set(__import_benchmark_config__ TRUE CACHE INTERNAL "__import_benchmark_config__ include flag")
+set(__import_benchmark_config__ TRUE )
 
 
 option(IMPORT_BENCHMARK "import benchmark" ON)
