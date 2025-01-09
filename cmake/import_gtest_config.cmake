@@ -1,7 +1,7 @@
 if(__import_gtest_config__)
     return()
 endif()
-set(__import_gtest_config__ TRUE CACHE INTERNAL "__import_gtest_config__ include flag")
+set(__import_gtest_config__ TRUE )
 
 
 option(IMPORT_GTEST "import gtest" ON)

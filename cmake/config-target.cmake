@@ -1,7 +1,7 @@
 if(__FUNDAMENTAL_CONFIG_TARGET__)
     return()
 endif()
-set(__FUNDAMENTAL_CONFIG_TARGET__ TRUE CACHE INTERNAL "__FUNDAMENTAL_CONFIG_TARGET__ include flag")
+set(__FUNDAMENTAL_CONFIG_TARGET__ TRUE )
 
 include(clang-tidy-helper)
 option(F_BUILD_STATIC "build static fundamental lib" ON)
@@ -18,7 +18,9 @@ endif()
 #make these values invisible
 mark_as_advanced(F_BUILD_STATIC)
 
-
+if(TARGET BuildSettings)
+    return()
+endif()
 add_library(BuildSettings INTERFACE)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
