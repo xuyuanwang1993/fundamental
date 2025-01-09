@@ -1,7 +1,8 @@
-if(__FUNDAMENTAL__)
+if(__FUNDAMENTAL_CONFIG_TARGET__)
     return()
 endif()
-set(__FUNDAMENTAL__ TRUE)
+set(__FUNDAMENTAL_CONFIG_TARGET__ TRUE CACHE INTERNAL "__FUNDAMENTAL_CONFIG_TARGET__ include flag")
+
 include(clang-tidy-helper)
 option(F_BUILD_STATIC "build static fundamental lib" ON)
 option(F_BUILD_SHARED "build dynamic fundamental lib" OFF)
