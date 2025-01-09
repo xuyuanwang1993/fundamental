@@ -30,6 +30,7 @@ if(F_BUILD_STATIC)
 
     add_subdirectory(TestCRTP)
     add_subdirectory(ObjectAllocatorBenchmark)
+    add_subdirectory(GroupXorBenchMark)
 endif()
 
 if(F_BUILD_SHARED)
