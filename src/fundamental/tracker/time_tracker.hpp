@@ -41,14 +41,13 @@ struct TimeTrackerUnit {
 
 using TimeTrackerMsgOutputer = std::function<void(const std::string_view&)>;
 
-template <typename ChronoTimeType_ = std::chrono::milliseconds>
+template <typename ChronoTimeType_ = std::chrono::milliseconds, typename StringType = std::string_view>
 struct TimeTracker {
     using ChronoTimeType = ChronoTimeType_;
     using UnitHelper     = TimeTrackerUnit<ChronoTimeType_>;
-    explicit TimeTracker(std::string_view tag, std::string_view msg, std::int64_t warningThreshold = 0,
-                         bool enable_debug = false, TimeTrackerMsgOutputer outputer = nullptr) :
-    warningThreshold(warningThreshold),
-    enable_debug(enable_debug), outputer(outputer), tag(tag), msg(msg) {
+    explicit TimeTracker(StringType tag, StringType msg, std::int64_t warningThreshold = 0, bool enable_debug = false,
+                         TimeTrackerMsgOutputer outputer = nullptr) :
+    warningThreshold(warningThreshold), enable_debug(enable_debug), outputer(outputer), tag(tag), msg(msg) {
         ReStartTracker();
     }
     ~TimeTracker() {
@@ -107,15 +106,16 @@ struct TimeTracker {
     const TimeTrackerMsgOutputer outputer = nullptr;
     std::chrono::high_resolution_clock::time_point m_previousTime;
     std::atomic_bool need_print_ = true;
-    std::string_view tag;
-    std::string_view msg;
+    StringType tag;
+    StringType msg;
 };
-
+template <typename ChronoTimeType_ = std::chrono::milliseconds>
+using STimeTracker = TimeTracker<ChronoTimeType_, std::string>;
 } // namespace Fundamental
 #if (defined(DEBUG) && !defined(NDEBUG))
-#pragma message("#####################ENABLE TIME TRACKER FOR DEBUG MODE####################")
+    #pragma message("#####################ENABLE TIME TRACKER FOR DEBUG MODE####################")
 #elif defined(FORCE_TIME_TRACKER)
-#pragma message("#####################FORCE TIME TRACKER ####################")
+    #pragma message("#####################FORCE TIME TRACKER ####################")
 #endif
 
 #if (defined(DEBUG) && !defined(NDEBUG)) || defined(FORCE_TIME_TRACKER)
