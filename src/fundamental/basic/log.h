@@ -120,9 +120,9 @@ inline std::string StringFormat() {
 
 template <typename T>
 inline std::string StringFormat(const T& data) {
-    spdlog::details::log_msg msg;
-    msg.raw << data;
-    return std::string(msg.formatted.data(), msg.formatted.size());
+    std::stringstream ss_;
+    ss_ << data;
+    return ss_.str();
 }
 
 inline std::string StringFormat(const char* data) {

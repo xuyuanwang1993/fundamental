@@ -1,11 +1,14 @@
 
+#undef NDEBUG
 #include "fundamental/basic/filesystem_utils.hpp"
 #include "fundamental/basic/log.h"
+
 #include <chrono>
 #include <iostream>
 void TestDefaultLogger();
 void TestMutiInstance(int index);
 void TestFormatter(const std::string& format_str);
+void TestStringFormat();
 int main(int argc, char** argv) {
     TestDefaultLogger();
     TestMutiInstance(1);
@@ -14,6 +17,7 @@ int main(int argc, char** argv) {
     TestFormatter("%^[%L]%$[%t] %v");
     TestFormatter("%v");
     TestFormatter("%l %v");
+    TestStringFormat();
     return 0;
 }
 void TestDefaultLogger() {
@@ -124,4 +128,12 @@ void TestMutiInstance(int index) {
 void TestFormatter(const std::string& format_str) {
     Fundamental::Logger newLogger(format_str);
     FINFOS_I(&newLogger) << "test_format " << format_str;
+}
+
+void TestStringFormat() {
+    //
+    { FASSERT(Fundamental::StringFormat("test") == "test"); }
+    { FASSERT(Fundamental::StringFormat(1) == "1"); }
+    { FASSERT(Fundamental::StringFormat("{}", 1) == "1"); }
+    { FASSERT(Fundamental::StringFormat("{}{}", 1, "test") == "1test"); }
 }
