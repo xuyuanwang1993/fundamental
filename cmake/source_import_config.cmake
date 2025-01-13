@@ -1,0 +1,27 @@
+if(__source_import_config__)
+    return()
+endif()
+set(__source_import_config__ TRUE)
+if(NOT FUNDAMENTAL_IMPORT_SRC)
+    return()
+endif()
+
+if(FUNDAMENTAL_MAIN_PROJECT)
+    option(FUNDAMENTAL_BUILD_NETWORK "enable build of fundamental network library." ON)
+else()
+    option(FUNDAMENTAL_BUILD_NETWORK "enable build of fundamental network library." OFF)
+endif()
+
+
+if(FUNDAMENTAL_MAIN_PROJECT)
+    option(FUNDAMENTAL_BUILD_RTTR "enable build of fundamental rttr module." ON)
+    option(FUNDAMENTAL_BUILD_EVENTS "enable build of fundamental events module." ON)
+else()
+    option(FUNDAMENTAL_BUILD_RTTR "enable build of fundamental rttr module." ${FUNDAMENTAL_BUILD_NETWORK})
+    option(FUNDAMENTAL_BUILD_EVENTS "enable build of fundamental events module." ${FUNDAMENTAL_BUILD_NETWORK})
+endif()
+
+message(STATUS "FUNDAMENTAL_MAIN_PROJECT=${FUNDAMENTAL_MAIN_PROJECT}")
+message(STATUS "FUNDAMENTAL_BUILD_NETWORK=${FUNDAMENTAL_BUILD_NETWORK}")
+message(STATUS "FUNDAMENTAL_BUILD_EVENTS=${FUNDAMENTAL_BUILD_EVENTS}")
+message(STATUS "FUNDAMENTAL_BUILD_RTTR=${FUNDAMENTAL_BUILD_RTTR}")

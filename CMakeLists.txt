@@ -33,6 +33,10 @@ set_property(GLOBAL PROPERTY CTEST_TARGETS_ADDED 1)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 # find_package() uses <PackageName>_ROOT variables
 cmake_policy(SET CMP0074 NEW)
+
+# other source import config definitions
+# if you import fundametal as a subsource project,you should change the option value to minimize the dependencies
+include(cmake/source_import_config.cmake)
 include(cmake/config-target.cmake)
 include(cmake/import_gtest_config.cmake)
 include(cmake/import_benchmark_config.cmake)
