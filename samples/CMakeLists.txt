@@ -28,11 +28,11 @@ if(F_BUILD_STATIC)
 
     if(IMPORT_BENCHMARK)
         add_subdirectory(BenchmarkSample)
+        add_subdirectory(TestCRTP)
+        add_subdirectory(ObjectAllocatorBenchmark)
+        add_subdirectory(GroupXorBenchMark)
     endif()
 
-    add_subdirectory(TestCRTP)
-    add_subdirectory(ObjectAllocatorBenchmark)
-    add_subdirectory(GroupXorBenchMark)
 endif()
 
 if(F_BUILD_SHARED)
