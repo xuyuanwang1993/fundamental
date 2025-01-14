@@ -279,7 +279,7 @@ void Logger::Initialize(LoggerInitOptions options, Logger* logger) {
             fileName = logOutputPath + "/" + logOutputProgramName + "_" + std::to_string(Utils::GetProcessId()) +
                        options.logOutputFileExt.value_or(LoggerInitOptions::kDefaultLogOutputFileExt);
         }
-        { // init file writer
+        if (!fileName.empty()) { // init file writer
             logger->nativeLogSink = std::make_shared<details::NativeLogSink>(
                 logger, fileName, options.rotationHour.value_or(LoggerInitOptions::kDefaultRotationHour),
                 options.rotationMin.value_or(LoggerInitOptions::kDefaultRotationMin),
@@ -289,12 +289,15 @@ void Logger::Initialize(LoggerInitOptions options, Logger* logger) {
             logger->nativeLogSink->StartFileOutputThread();
             initList.emplace_back(logger->nativeLogSink);
         }
+        auto prefer_log_level = options.minimumLevel.value_or(LoggerInitOptions::kDefaultLogLevel);
+        if (initList.empty()) {
+            prefer_log_level = Fundamental::LogLevel::off;
+        }
         if (logger->loggerStorage) spdlog::drop(logger->loggerStorage->name());
         logger->loggerStorage = spdlog::create(options.loggerName.empty() ? LoggerInitOptions::kDefaultCustomLoggerName
                                                                           : options.loggerName,
                                                initList.begin(), initList.end());
-        logger->loggerStorage->set_level(
-            static_cast<spdlog::level::level_enum>(options.minimumLevel.value_or(LoggerInitOptions::kDefaultLogLevel)));
+        logger->loggerStorage->set_level(static_cast<spdlog::level::level_enum>(prefer_log_level));
         logger->loggerStorage->set_pattern(options.logFormat.value_or(LoggerInitOptions::kDefaultLogFormat));
         if (options.errorHandler) {
             logger->loggerStorage->set_error_handler(options.errorHandler);
