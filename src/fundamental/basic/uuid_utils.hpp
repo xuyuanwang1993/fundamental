@@ -16,14 +16,11 @@
 #include <string_view>
 #include <type_traits>
 
-namespace Fundamental
-{
+namespace Fundamental {
 
-namespace detail
-{
+namespace detail {
 template <typename TChar>
-[[nodiscard]] constexpr inline unsigned char hex2char(TChar const ch) noexcept
-{
+[[nodiscard]] constexpr inline unsigned char hex2char(TChar const ch) noexcept {
     if (ch >= static_cast<TChar>('0') && ch <= static_cast<TChar>('9'))
         return static_cast<unsigned char>(ch - static_cast<TChar>('0'));
     if (ch >= static_cast<TChar>('a') && ch <= static_cast<TChar>('f'))
@@ -34,50 +31,40 @@ template <typename TChar>
 }
 
 template <typename TChar>
-[[nodiscard]] constexpr inline bool is_hex(TChar const ch) noexcept
-{
+[[nodiscard]] constexpr inline bool is_hex(TChar const ch) noexcept {
     return (ch >= static_cast<TChar>('0') && ch <= static_cast<TChar>('9')) ||
            (ch >= static_cast<TChar>('a') && ch <= static_cast<TChar>('f')) ||
            (ch >= static_cast<TChar>('A') && ch <= static_cast<TChar>('F'));
 }
 
 template <typename TChar>
-[[nodiscard]] constexpr std::basic_string_view<TChar> to_string_view(TChar const* str) noexcept
-{
-    if (str)
-        return str;
+[[nodiscard]] constexpr std::basic_string_view<TChar> to_string_view(TChar const* str) noexcept {
+    if (str) return str;
     return {};
 }
 
 template <typename StringType>
-[[nodiscard]] constexpr std::basic_string_view<
-    typename StringType::value_type,
-    typename StringType::traits_type>
-to_string_view(StringType const& str) noexcept
-{
+[[nodiscard]] constexpr std::basic_string_view<typename StringType::value_type, typename StringType::traits_type>
+to_string_view(StringType const& str) noexcept {
     return str;
 }
 
-class sha1
-{
+class sha1 {
 public:
     using digest32_t = uint32_t[5];
     using digest8_t  = uint8_t[20];
 
     static constexpr unsigned int block_bytes = 64;
 
-    [[nodiscard]] inline static uint32_t left_rotate(uint32_t value, size_t const count) noexcept
-    {
+    [[nodiscard]] inline static uint32_t left_rotate(uint32_t value, size_t const count) noexcept {
         return (value << count) ^ (value >> (32 - count));
     }
 
-    sha1()
-    {
+    sha1() {
         reset();
     }
 
-    void reset() noexcept
-    {
+    void reset() noexcept {
         m_digest[0]      = 0x67452301;
         m_digest[1]      = 0xEFCDAB89;
         m_digest[2]      = 0x98BADCFE;
@@ -87,53 +74,41 @@ public:
         m_byteCount      = 0;
     }
 
-    void process_byte(uint8_t octet)
-    {
+    void process_byte(uint8_t octet) {
         this->m_block[this->m_blockByteIndex++] = octet;
         ++this->m_byteCount;
-        if (m_blockByteIndex == block_bytes)
-        {
+        if (m_blockByteIndex == block_bytes) {
             this->m_blockByteIndex = 0;
             process_block();
         }
     }
 
-    void process_block(void const* const start, void const* const end)
-    {
+    void process_block(void const* const start, void const* const end) {
         const uint8_t* begin  = static_cast<const uint8_t*>(start);
         const uint8_t* finish = static_cast<const uint8_t*>(end);
-        while (begin != finish)
-        {
+        while (begin != finish) {
             process_byte(*begin);
             begin++;
         }
     }
 
-    void process_bytes(void const* const data, size_t const len)
-    {
+    void process_bytes(void const* const data, size_t const len) {
         const uint8_t* block = static_cast<const uint8_t*>(data);
         process_block(block, block + len);
     }
 
-    uint32_t const* get_digest(digest32_t digest)
-    {
+    uint32_t const* get_digest(digest32_t digest) {
         size_t const bitCount = this->m_byteCount * 8;
         process_byte(0x80);
-        if (this->m_blockByteIndex > 56)
-        {
-            while (m_blockByteIndex != 0)
-            {
+        if (this->m_blockByteIndex > 56) {
+            while (m_blockByteIndex != 0) {
                 process_byte(0);
             }
-            while (m_blockByteIndex < 56)
-            {
+            while (m_blockByteIndex < 56) {
                 process_byte(0);
             }
-        }
-        else
-        {
-            while (m_blockByteIndex < 56)
-            {
+        } else {
+            while (m_blockByteIndex < 56) {
                 process_byte(0);
             }
         }
@@ -144,14 +119,13 @@ public:
         process_byte(static_cast<unsigned char>((bitCount >> 24) & 0xFF));
         process_byte(static_cast<unsigned char>((bitCount >> 16) & 0xFF));
         process_byte(static_cast<unsigned char>((bitCount >> 8) & 0xFF));
-        process_byte(static_cast<unsigned char>((bitCount)&0xFF));
+        process_byte(static_cast<unsigned char>((bitCount) & 0xFF));
 
         memcpy(digest, m_digest, 5 * sizeof(uint32_t));
         return digest;
     }
 
-    uint8_t const* get_digest_bytes(digest8_t digest)
-    {
+    uint8_t const* get_digest_bytes(digest8_t digest) {
         digest32_t d32;
         get_digest(d32);
         size_t di    = 0;
@@ -184,18 +158,15 @@ public:
     }
 
 private:
-    void process_block()
-    {
+    void process_block() {
         uint32_t w[80];
-        for (size_t i = 0; i < 16; i++)
-        {
+        for (size_t i = 0; i < 16; i++) {
             w[i] = static_cast<uint32_t>(m_block[i * 4 + 0] << 24);
             w[i] |= static_cast<uint32_t>(m_block[i * 4 + 1] << 16);
             w[i] |= static_cast<uint32_t>(m_block[i * 4 + 2] << 8);
             w[i] |= static_cast<uint32_t>(m_block[i * 4 + 3]);
         }
-        for (size_t i = 16; i < 80; i++)
-        {
+        for (size_t i = 16; i < 80; i++) {
             w[i] = left_rotate((w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16]), 1);
         }
 
@@ -205,28 +176,20 @@ private:
         uint32_t d = m_digest[3];
         uint32_t e = m_digest[4];
 
-        for (std::size_t i = 0; i < 80; ++i)
-        {
+        for (std::size_t i = 0; i < 80; ++i) {
             uint32_t f = 0;
             uint32_t k = 0;
 
-            if (i < 20)
-            {
+            if (i < 20) {
                 f = (b & c) | (~b & d);
                 k = 0x5A827999;
-            }
-            else if (i < 40)
-            {
+            } else if (i < 40) {
                 f = b ^ c ^ d;
                 k = 0x6ED9EBA1;
-            }
-            else if (i < 60)
-            {
+            } else if (i < 60) {
                 f = (b & c) | (b & d) | (c & d);
                 k = 0x8F1BBCDC;
-            }
-            else
-            {
+            } else {
                 f = b ^ c ^ d;
                 k = 0xCA62C1D6;
             }
@@ -274,10 +237,10 @@ inline constexpr wchar_t guid_encoder<wchar_t>[17] = L"0123456789abcdef";
 // --------------------------------------------------------------------------------------------------------------------------
 // time_low	                  unsigned long	   0 - 3	   The low field of the timestamp.
 // time_mid	                  unsigned short	   4 - 5	   The middle field of the timestamp.
-// time_hi_and_version	      unsigned short	   6 - 7	   The high field of the timestamp multiplexed with the version number.
-// clock_seq_hi_and_reserved	unsigned small	   8	      The high field of the clock sequence multiplexed with the variant.
-// clock_seq_low	            unsigned small	   9	      The low field of the clock sequence.
-// node	                     character	      10 - 15	The spatially unique node identifier.
+// time_hi_and_version	      unsigned short	   6 - 7	   The high field of the timestamp multiplexed with the
+// version number. clock_seq_hi_and_reserved	unsigned small	   8	      The high field of the clock sequence
+// multiplexed with the variant. clock_seq_low	            unsigned small	   9	      The low field of the clock
+// sequence. node	                     character	      10 - 15	The spatially unique node identifier.
 // --------------------------------------------------------------------------------------------------------------------------
 // 0                   1                   2                   3
 //  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -296,14 +259,12 @@ inline constexpr wchar_t guid_encoder<wchar_t>[17] = L"0123456789abcdef";
 // --------------------------------------------------------------------------------------------------------------------------
 
 // indicated by a bit pattern in octet 8, marked with N in xxxxxxxx-xxxx-xxxx-Nxxx-xxxxxxxxxxxx
-enum class uuid_variant
-{
+enum class uuid_variant {
     // NCS backward compatibility (with the obsolete Apollo Network Computing System 1.5 UUID format)
     // N bit pattern: 0xxx
-    // > the first 6 octets of the UUID are a 48-bit timestamp (the number of 4 microsecond units of time since 1 Jan 1980 UTC);
-    // > the next 2 octets are reserved;
-    // > the next octet is the "address family";
-    // > the final 7 octets are a 56-bit host ID in the form specified by the address family
+    // > the first 6 octets of the UUID are a 48-bit timestamp (the number of 4 microsecond units of time since 1 Jan
+    // 1980 UTC); > the next 2 octets are reserved; > the next octet is the "address family"; > the final 7 octets are a
+    // 56-bit host ID in the form specified by the address family
     ncs,
 
     // RFC 4122/DCE 1.1
@@ -323,8 +284,7 @@ enum class uuid_variant
 };
 
 // indicated by a bit pattern in octet 6, marked with M in xxxxxxxx-xxxx-Mxxx-xxxx-xxxxxxxxxxxx
-enum class uuid_version
-{
+enum class uuid_version {
     none                = 0, // only possible for nil or invalid uuids
     time_based          = 1, // The time-based version specified in RFC 4122
     dce_security        = 2, // DCE Security version, with embedded POSIX UIDs.
@@ -335,40 +295,31 @@ enum class uuid_version
 
 // Forward declare uuid & to_string so that we can declare to_string as a friend later.
 class uuid;
-template <class CharT     = char,
-          class Traits    = std::char_traits<CharT>,
-          class Allocator = std::allocator<CharT>>
+template <class CharT = char, class Traits = std::char_traits<CharT>, class Allocator = std::allocator<CharT>>
 std::basic_string<CharT, Traits, Allocator> to_string(uuid const& id);
 
 // --------------------------------------------------------------------------------------------------------------------------
 // uuid class
 // --------------------------------------------------------------------------------------------------------------------------
-class uuid
-{
+class uuid {
 public:
     using value_type = uint8_t;
 
     constexpr uuid() noexcept = default;
 
-    uuid(value_type (&arr)[16]) noexcept
-    {
+    uuid(value_type (&arr)[16]) noexcept {
         std::copy(std::cbegin(arr), std::cend(arr), std::begin(data));
     }
 
-    constexpr uuid(std::array<value_type, 16> const& arr) noexcept :
-    data { arr }
-    {
+    constexpr uuid(std::array<value_type, 16> const& arr) noexcept : data { arr } {
     }
 
     template <typename ForwardIterator>
-    explicit uuid(ForwardIterator first, ForwardIterator last)
-    {
-        if (std::distance(first, last) == 16)
-            std::copy(first, last, std::begin(data));
+    explicit uuid(ForwardIterator first, ForwardIterator last) {
+        if (std::distance(first, last) == 16) std::copy(first, last, std::begin(data));
     }
 
-    [[nodiscard]] constexpr uuid_variant variant() const noexcept
-    {
+    [[nodiscard]] constexpr uuid_variant variant() const noexcept {
         if ((data[8] & 0x80) == 0x00)
             return uuid_variant::ncs;
         else if ((data[8] & 0xC0) == 0x80)
@@ -379,8 +330,7 @@ public:
             return uuid_variant::reserved;
     }
 
-    [[nodiscard]] constexpr uuid_version version() const noexcept
-    {
+    [[nodiscard]] constexpr uuid_version version() const noexcept {
         if ((data[6] & 0xF0) == 0x10)
             return uuid_version::time_based;
         else if ((data[6] & 0xF0) == 0x20)
@@ -395,63 +345,48 @@ public:
             return uuid_version::none;
     }
 
-    [[nodiscard]] constexpr bool is_nil() const noexcept
-    {
+    [[nodiscard]] constexpr bool is_nil() const noexcept {
         for (size_t i = 0; i < data.size(); ++i)
-            if (data[i] != 0)
-                return false;
+            if (data[i] != 0) return false;
         return true;
     }
 
-    void swap(uuid& other) noexcept
-    {
+    void swap(uuid& other) noexcept {
         data.swap(other.data);
     }
 
-    [[nodiscard]] const std::uint8_t* const as_bytes() const
-    {
+    [[nodiscard]] const std::uint8_t* as_bytes() const {
         return data.data();
     }
 
     template <typename StringType>
-    [[nodiscard]] constexpr static bool is_valid_uuid(StringType const& in_str) noexcept
-    {
+    [[nodiscard]] constexpr static bool is_valid_uuid(StringType const& in_str) noexcept {
         auto str         = detail::to_string_view(in_str);
         bool firstDigit  = true;
         size_t hasBraces = 0;
         size_t index     = 0;
 
-        if (str.empty())
-            return false;
+        if (str.empty()) return false;
 
-        if (str.front() == '{')
-            hasBraces = 1;
-        if (hasBraces && str.back() != '}')
-            return false;
+        if (str.front() == '{') hasBraces = 1;
+        if (hasBraces && str.back() != '}') return false;
 
-        for (size_t i = hasBraces; i < str.size() - hasBraces; ++i)
-        {
-            if (str[i] == '-')
-                continue;
+        for (size_t i = hasBraces; i < str.size() - hasBraces; ++i) {
+            if (str[i] == '-') continue;
 
-            if (index >= 16 || !detail::is_hex(str[i]))
-            {
+            if (index >= 16 || !detail::is_hex(str[i])) {
                 return false;
             }
 
-            if (firstDigit)
-            {
+            if (firstDigit) {
                 firstDigit = false;
-            }
-            else
-            {
+            } else {
                 index++;
                 firstDigit = true;
             }
         }
 
-        if (index < 16)
-        {
+        if (index < 16) {
             return false;
         }
 
@@ -459,8 +394,7 @@ public:
     }
 
     template <typename StringType>
-    [[nodiscard]] constexpr static std::optional<uuid> from_string(StringType const& in_str) noexcept
-    {
+    [[nodiscard]] constexpr static std::optional<uuid> from_string(StringType const& in_str) noexcept {
         auto str         = detail::to_string_view(in_str);
         bool firstDigit  = true;
         size_t hasBraces = 0;
@@ -468,39 +402,29 @@ public:
 
         std::array<uint8_t, 16> data { { 0 } };
 
-        if (str.empty())
-            return {};
+        if (str.empty()) return {};
 
-        if (str.front() == '{')
-            hasBraces = 1;
-        if (hasBraces && str.back() != '}')
-            return {};
+        if (str.front() == '{') hasBraces = 1;
+        if (hasBraces && str.back() != '}') return {};
 
-        for (size_t i = hasBraces; i < str.size() - hasBraces; ++i)
-        {
-            if (str[i] == '-')
-                continue;
+        for (size_t i = hasBraces; i < str.size() - hasBraces; ++i) {
+            if (str[i] == '-') continue;
 
-            if (index >= 16 || !detail::is_hex(str[i]))
-            {
+            if (index >= 16 || !detail::is_hex(str[i])) {
                 return {};
             }
 
-            if (firstDigit)
-            {
+            if (firstDigit) {
                 data[index] = static_cast<uint8_t>(detail::hex2char(str[i]) << 4);
                 firstDigit  = false;
-            }
-            else
-            {
+            } else {
                 data[index] = static_cast<uint8_t>(data[index] | detail::hex2char(str[i]));
                 index++;
                 firstDigit = true;
             }
         }
 
-        if (index < 16)
-        {
+        if (index < 16) {
             return {};
         }
 
@@ -528,32 +452,24 @@ static constexpr auto kInvalidUUid = uuid {};
 // operators and non-member functions
 // --------------------------------------------------------------------------------------------------------------------------
 
-[[nodiscard]] inline bool operator==(uuid const& lhs, uuid const& rhs) noexcept
-{
+[[nodiscard]] inline bool operator==(uuid const& lhs, uuid const& rhs) noexcept {
     return lhs.data == rhs.data;
 }
 
-[[nodiscard]] inline bool operator!=(uuid const& lhs, uuid const& rhs) noexcept
-{
+[[nodiscard]] inline bool operator!=(uuid const& lhs, uuid const& rhs) noexcept {
     return !(lhs == rhs);
 }
 
-[[nodiscard]] inline bool operator<(uuid const& lhs, uuid const& rhs) noexcept
-{
+[[nodiscard]] inline bool operator<(uuid const& lhs, uuid const& rhs) noexcept {
     return lhs.data < rhs.data;
 }
 
-template <class CharT,
-          class Traits,
-          class Allocator>
-[[nodiscard]] inline std::basic_string<CharT, Traits, Allocator> to_string(uuid const& id)
-{
+template <class CharT, class Traits, class Allocator>
+[[nodiscard]] inline std::basic_string<CharT, Traits, Allocator> to_string(uuid const& id) {
     std::basic_string<CharT, Traits, Allocator> uustr { detail::empty_guid<CharT> };
 
-    for (size_t i = 0, index = 0; i < 36; ++i)
-    {
-        if (i == 8 || i == 13 || i == 18 || i == 23)
-        {
+    for (size_t i = 0, index = 0; i < 36; ++i) {
+        if (i == 8 || i == 13 || i == 18 || i == 23) {
             continue;
         }
         uustr[i]   = detail::guid_encoder<CharT>[id.data[index] >> 4 & 0x0f];
@@ -565,14 +481,12 @@ template <class CharT,
 }
 
 template <class Elem, class Traits>
-std::basic_ostream<Elem, Traits>& operator<<(std::basic_ostream<Elem, Traits>& s, uuid const& id)
-{
+std::basic_ostream<Elem, Traits>& operator<<(std::basic_ostream<Elem, Traits>& s, uuid const& id) {
     s << to_string(id);
     return s;
 }
 
-inline void swap(Fundamental::uuid& lhs, Fundamental::uuid& rhs) noexcept
-{
+inline void swap(Fundamental::uuid& lhs, Fundamental::uuid& rhs) noexcept {
     lhs.swap(rhs);
 }
 
@@ -581,38 +495,37 @@ inline void swap(Fundamental::uuid& lhs, Fundamental::uuid& rhs) noexcept
 // --------------------------------------------------------------------------------------------------------------------------
 
 // Name string is a fully-qualified domain name
-static constexpr uuid uuid_namespace_dns { { 0x6b, 0xa7, 0xb8, 0x10, 0x9d, 0xad, 0x11, 0xd1, 0x80, 0xb4, 0x00, 0xc0, 0x4f, 0xd4, 0x30, 0xc8 } };
+static constexpr uuid uuid_namespace_dns { { 0x6b, 0xa7, 0xb8, 0x10, 0x9d, 0xad, 0x11, 0xd1, 0x80, 0xb4, 0x00, 0xc0,
+                                             0x4f, 0xd4, 0x30, 0xc8 } };
 
 // Name string is a URL
-static uuid uuid_namespace_url { { 0x6b, 0xa7, 0xb8, 0x11, 0x9d, 0xad, 0x11, 0xd1, 0x80, 0xb4, 0x00, 0xc0, 0x4f, 0xd4, 0x30, 0xc8 } };
+static uuid uuid_namespace_url { { 0x6b, 0xa7, 0xb8, 0x11, 0x9d, 0xad, 0x11, 0xd1, 0x80, 0xb4, 0x00, 0xc0, 0x4f, 0xd4,
+                                   0x30, 0xc8 } };
 
 // Name string is an ISO OID (See https://oidref.com/, https://en.wikipedia.org/wiki/Object_identifier)
-static uuid uuid_namespace_oid { { 0x6b, 0xa7, 0xb8, 0x12, 0x9d, 0xad, 0x11, 0xd1, 0x80, 0xb4, 0x00, 0xc0, 0x4f, 0xd4, 0x30, 0xc8 } };
+static uuid uuid_namespace_oid { { 0x6b, 0xa7, 0xb8, 0x12, 0x9d, 0xad, 0x11, 0xd1, 0x80, 0xb4, 0x00, 0xc0, 0x4f, 0xd4,
+                                   0x30, 0xc8 } };
 
-// Name string is an X.500 DN, in DER or a text output format (See https://en.wikipedia.org/wiki/X.500, https://en.wikipedia.org/wiki/Abstract_Syntax_Notation_One)
-static uuid uuid_namespace_x500 { { 0x6b, 0xa7, 0xb8, 0x14, 0x9d, 0xad, 0x11, 0xd1, 0x80, 0xb4, 0x00, 0xc0, 0x4f, 0xd4, 0x30, 0xc8 } };
+// Name string is an X.500 DN, in DER or a text output format (See https://en.wikipedia.org/wiki/X.500,
+// https://en.wikipedia.org/wiki/Abstract_Syntax_Notation_One)
+static uuid uuid_namespace_x500 { { 0x6b, 0xa7, 0xb8, 0x14, 0x9d, 0xad, 0x11, 0xd1, 0x80, 0xb4, 0x00, 0xc0, 0x4f, 0xd4,
+                                    0x30, 0xc8 } };
 
 // --------------------------------------------------------------------------------------------------------------------------
 // uuid generators
 // --------------------------------------------------------------------------------------------------------------------------
 
 template <typename UniformRandomNumberGenerator>
-class basic_uuid_random_generator
-{
+class basic_uuid_random_generator {
 public:
     using engine_type = UniformRandomNumberGenerator;
 
-    explicit basic_uuid_random_generator(engine_type& gen) :
-    generator(&gen, [](auto) {})
-    {
+    explicit basic_uuid_random_generator(engine_type& gen) : generator(&gen, [](auto) {}) {
     }
-    explicit basic_uuid_random_generator(engine_type* gen) :
-    generator(gen, [](auto) {})
-    {
+    explicit basic_uuid_random_generator(engine_type* gen) : generator(gen, [](auto) {}) {
     }
 
-    [[nodiscard]] uuid operator()()
-    {
+    [[nodiscard]] uuid operator()() {
         alignas(uint32_t) uint8_t bytes[16];
         for (int i = 0; i < 16; i += 4)
             *reinterpret_cast<uint32_t*>(bytes + i) = distribution(*generator);
@@ -635,26 +548,20 @@ private:
 
 using uuid_random_generator = basic_uuid_random_generator<std::mt19937>;
 
-class uuid_name_generator
-{
+class uuid_name_generator {
 public:
-    explicit uuid_name_generator(uuid const& namespace_uuid) noexcept
-    :
-    nsuuid(namespace_uuid)
-    {
+    explicit uuid_name_generator(uuid const& namespace_uuid) noexcept : nsuuid(namespace_uuid) {
     }
 
     template <typename StringType>
-    [[nodiscard]] uuid operator()(StringType const& name)
-    {
+    [[nodiscard]] uuid operator()(StringType const& name) {
         reset();
         process_characters(detail::to_string_view(name));
         return make_uuid();
     }
 
 private:
-    void reset()
-    {
+    void reset() {
         hasher.reset();
         std::byte bytes[16];
         auto nsbytes = nsuuid.as_bytes();
@@ -663,13 +570,10 @@ private:
     }
 
     template <typename CharT, typename Traits>
-    void process_characters(std::basic_string_view<CharT, Traits> const str)
-    {
-        for (uint32_t c : str)
-        {
+    void process_characters(std::basic_string_view<CharT, Traits> const str) {
+        for (uint32_t c : str) {
             hasher.process_byte(static_cast<uint8_t>(c & 0xFF));
-            if constexpr (!std::is_same_v<CharT, char>)
-            {
+            if constexpr (!std::is_same_v<CharT, char>) {
                 hasher.process_byte(static_cast<uint8_t>((c >> 8) & 0xFF));
                 hasher.process_byte(static_cast<uint8_t>((c >> 16) & 0xFF));
                 hasher.process_byte(static_cast<uint8_t>((c >> 24) & 0xFF));
@@ -677,8 +581,7 @@ private:
         }
     }
 
-    [[nodiscard]] uuid make_uuid()
-    {
+    [[nodiscard]] uuid make_uuid() {
         detail::sha1::digest8_t digest;
         hasher.get_digest_bytes(digest);
 
@@ -698,8 +601,7 @@ private:
     detail::sha1 hasher;
 };
 
-[[nodiscard]] inline Fundamental::uuid GenerateUUID()
-{
+[[nodiscard]] inline Fundamental::uuid GenerateUUID() {
     static std::random_device rd;
     auto seed_data = std::array<int, std::mt19937::state_size> {};
     std::generate(std::begin(seed_data), std::end(seed_data), std::ref(rd));
@@ -714,41 +616,25 @@ private:
 
 } // namespace Fundamental
 
-namespace std
-{
+namespace std {
 template <>
-struct hash<Fundamental::uuid>
-{
+struct hash<Fundamental::uuid> {
     using argument_type = Fundamental::uuid;
     using result_type   = std::size_t;
 
-    [[nodiscard]] result_type operator()(argument_type const& uuid) const
-    {
-        uint64_t l =
-            static_cast<uint64_t>(uuid.data[0]) << 56 |
-            static_cast<uint64_t>(uuid.data[1]) << 48 |
-            static_cast<uint64_t>(uuid.data[2]) << 40 |
-            static_cast<uint64_t>(uuid.data[3]) << 32 |
-            static_cast<uint64_t>(uuid.data[4]) << 24 |
-            static_cast<uint64_t>(uuid.data[5]) << 16 |
-            static_cast<uint64_t>(uuid.data[6]) << 8 |
-            static_cast<uint64_t>(uuid.data[7]);
-        uint64_t h =
-            static_cast<uint64_t>(uuid.data[8]) << 56 |
-            static_cast<uint64_t>(uuid.data[9]) << 48 |
-            static_cast<uint64_t>(uuid.data[10]) << 40 |
-            static_cast<uint64_t>(uuid.data[11]) << 32 |
-            static_cast<uint64_t>(uuid.data[12]) << 24 |
-            static_cast<uint64_t>(uuid.data[13]) << 16 |
-            static_cast<uint64_t>(uuid.data[14]) << 8 |
-            static_cast<uint64_t>(uuid.data[15]);
+    [[nodiscard]] result_type operator()(argument_type const& uuid) const {
+        uint64_t l = static_cast<uint64_t>(uuid.data[0]) << 56 | static_cast<uint64_t>(uuid.data[1]) << 48 |
+                     static_cast<uint64_t>(uuid.data[2]) << 40 | static_cast<uint64_t>(uuid.data[3]) << 32 |
+                     static_cast<uint64_t>(uuid.data[4]) << 24 | static_cast<uint64_t>(uuid.data[5]) << 16 |
+                     static_cast<uint64_t>(uuid.data[6]) << 8 | static_cast<uint64_t>(uuid.data[7]);
+        uint64_t h = static_cast<uint64_t>(uuid.data[8]) << 56 | static_cast<uint64_t>(uuid.data[9]) << 48 |
+                     static_cast<uint64_t>(uuid.data[10]) << 40 | static_cast<uint64_t>(uuid.data[11]) << 32 |
+                     static_cast<uint64_t>(uuid.data[12]) << 24 | static_cast<uint64_t>(uuid.data[13]) << 16 |
+                     static_cast<uint64_t>(uuid.data[14]) << 8 | static_cast<uint64_t>(uuid.data[15]);
 
-        if constexpr (sizeof(result_type) > 4)
-        {
+        if constexpr (sizeof(result_type) > 4) {
             return result_type(l ^ h);
-        }
-        else
-        {
+        } else {
             uint64_t hash64 = l ^ h;
             return result_type(uint32_t(hash64 >> 32) ^ uint32_t(hash64));
         }
