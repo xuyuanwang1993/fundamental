@@ -40,4 +40,6 @@ if(F_BUILD_SHARED)
         add_subdirectory(TestRttr)
     endif()
 endif()
-
+if(Test_INSTALL)
+add_subdirectory(TestSysLibInstall)
+endif()
