@@ -28,7 +28,7 @@ inline std::size_t GetParallelWorkerNums() {
 template <typename Iterator, typename ProcessF>
 inline void ParallelRun(Iterator inputIt, Iterator endIt, ProcessF f, std::size_t groupSize = 1) {
     internal::_InitThreadPool();
-    auto total_size = 0;
+    std::size_t total_size = 0;
     if constexpr (std::is_integral_v<std::decay_t<Iterator>>) {
         total_size = endIt - inputIt;
     } else {
