@@ -32,7 +32,7 @@ function(native_install_lib_package lib_name version)
     install(TARGETS ${lib_name} EXPORT ${ExportTargets}
         RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}/${lib_name}/$<CONFIG>"
         LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}/${lib_name}/$<CONFIG>"
-        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}${lib_name}/$<CONFIG>"
+        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}/${lib_name}/$<CONFIG>"
     )
     write_basic_package_version_file(
         ${ExportConfigVersion}.cmake
@@ -49,7 +49,7 @@ function(native_install_lib_package lib_name version)
     install(EXPORT ${ExportTargets}
         FILE ${ExportTargets}.cmake
         NAMESPACE fh::
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/${lib_name}/cmake
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${lib_name}
         COMPONENT "${lib_name}"
     )
 
@@ -57,11 +57,11 @@ function(native_install_lib_package lib_name version)
         "${CMAKE_CURRENT_BINARY_DIR}/${ExportConfig}.cmake"
         "${CMAKE_CURRENT_BINARY_DIR}/${ExportConfigVersion}.cmake"
         COMPONENT "${lib_name}"
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/${lib_name}/cmake
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${lib_name}
     )
     install(TARGETS ${lib_name}
         COMPONENT "${lib_name}"
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}${lib_name}/$<CONFIG>
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/${lib_name}/$<CONFIG>
     )
 endfunction()
 
