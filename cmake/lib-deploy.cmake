@@ -12,9 +12,9 @@ function(native_copy_dlls app_target_name)
 endfunction(native_copy_dlls)
 
 function(make_deploy_real_path INPUT_PATH)
-    file(REAL_PATH ${${INPUT_PATH}} ACTUAL_PATH)
+    get_filename_component(ABSOLUTE_PATH "${${INPUT_PATH}}" ABSOLUTE)
     set(${INPUT_PATH}
-        "${ACTUAL_PATH}"
+        "${ABSOLUTE_PATH}"
         PARENT_SCOPE)
 endfunction()
 
@@ -29,8 +29,7 @@ endif()
 make_deploy_real_path(TEMP_SYS_ROOT)
 set(Custom_SystemRoot
     "${TEMP_SYS_ROOT}"
-    CACHE STRING "custom system root")
-set(CMAKE_INSTALL_PREFIX "${Custom_SystemRoot}")
+    CACHE STRING "custom system root" FORCE)
 message(STATUS "use Custom_SystemRoot=${Custom_SystemRoot}")
 
 
@@ -57,10 +56,11 @@ function(native_install_lib_package lib_name version)
     set(ExportConfigVersion "${lib_name}ConfigVersion")
     set(ExportConfig "${lib_name}Config")
     install(TARGETS ${lib_name} EXPORT ${ExportTargets}
-        LIBRARY DESTINATION ${TARGET_LIB_INSTALL_DIR}/$<CONFIG>
-        ARCHIVE DESTINATION ${TARGET_LIB_INSTALL_DIR}/$<CONFIG>
-        RUNTIME DESTINATION ${TARGET_BIN_INSTALL_DIR}/$<CONFIG>
-        INCLUDES DESTINATION ${TARGET_INCLUDE_INSTALL_DIR}
+        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+        LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        PRIVATE_HEADER DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+        PUBLIC_HEADER DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
     )
 
     include(CMakePackageConfigHelpers)
@@ -91,7 +91,7 @@ function(native_install_lib_package lib_name version)
         COMPONENT "${lib_name}"
         DESTINATION ${TARGET_CMAKE_INSTALL_DIR}
     )
-    install(TARGETS ${lib_name} 
+    install(TARGETS ${lib_name}
         COMPONENT "${lib_name}"
         DESTINATION ${TARGET_LIB_INSTALL_DIR}/$<CONFIG>
     )
