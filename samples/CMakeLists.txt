@@ -19,11 +19,13 @@ if(F_BUILD_STATIC)
     endif()
 
     add_subdirectory(TestBasic)
+    
     add_subdirectory(TestMemoryPool)
     add_subdirectory(TestTimerTracker)
     if(IMPORT_GTEST)
         add_subdirectory(GtestSample)
         add_subdirectory(TestParallel)
+        add_subdirectory(TestRandomGenerator)
     endif()
 
     if(IMPORT_BENCHMARK)
