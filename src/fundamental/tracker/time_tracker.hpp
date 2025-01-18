@@ -54,7 +54,7 @@ struct TimeTracker {
         StopTracker();
     }
     void ReStartTracker() {
-        m_previousTime = std::chrono::high_resolution_clock::now();
+        m_previousTime = std::chrono::steady_clock::now();
         need_print_.exchange(true);
         if (enable_debug) {
             std::stringstream ss;
@@ -73,7 +73,7 @@ struct TimeTracker {
     void StopTracker() {
         bool expected = true;
         if (need_print_.compare_exchange_strong(expected, false)) {
-            auto elapsedTime       = std::chrono::high_resolution_clock::now() - m_previousTime;
+            auto elapsedTime       = std::chrono::steady_clock::now() - m_previousTime;
             std::int64_t time_diff = std::chrono::duration_cast<ChronoTimeType>(elapsedTime).count();
             double elapsedTimeSec  = std::chrono::duration_cast<std::chrono::duration<double>>(elapsedTime).count();
             std::string print_str;
@@ -104,7 +104,7 @@ struct TimeTracker {
     const std::int64_t warningThreshold   = 0;
     const bool enable_debug               = false;
     const TimeTrackerMsgOutputer outputer = nullptr;
-    std::chrono::high_resolution_clock::time_point m_previousTime;
+    std::chrono::steady_clock::time_point m_previousTime;
     std::atomic_bool need_print_ = true;
     StringType tag;
     StringType msg;
