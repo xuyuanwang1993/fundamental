@@ -17,7 +17,7 @@ namespace proxy {
 /// Represents a single Connection from a client.
 class Connection : public ConnectionInterface<ProxyRequestHandler>, public std::enable_shared_from_this<Connection> {
     static constexpr std::size_t kMaxRecvRequestFrameTimeSec = 30;
-    friend struct ProxyRequestHandler;
+    friend class ProxyRequestHandler;
 
 public:
     /// Construct a Connection with the given socket.

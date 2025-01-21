@@ -31,7 +31,6 @@ struct AgentConnection::details {
         using SizeType = decltype(request.payload)::SizeType;
         Fundamental::BufferReader<SizeType> reader;
         reader.SetBuffer(request.payload.GetData(), request.payload.GetSize());
-        AgentSniffRequest requestData;
         response.cmd = request.cmd;
 
         auto ipInfo = connection->socket_.remote_endpoint().address().to_string();

@@ -40,7 +40,6 @@ static void NativeBindEventListener();
 static void StressTesting(std::size_t eventNum);
 int main(int argc, char* argv[])
 {
-    using EventType = Events::NativeNotifyEvents;
     // init native
     g_nativeEventSystem = new Fundamental::EventSystem();
     NativeBindEventListener();
@@ -133,14 +132,12 @@ void NativeBindEventListener()
 }
 void StressTesting(std::size_t eventNum)
 {
-    using EventType = Events::NativeNotifyEvents;
     // init native
     g_nativeEventSystem = new Fundamental::EventSystem();
     std::size_t count   = 0;
     std::condition_variable exitCV;
     std::mutex syncMutex;
     {
-        using BindEventType  = Events::NativeNotifyEvents;
         auto eventListenFunc = [&](const Fundamental::EventPointerType& ptr) {
             ++count;
             if (count == eventNum)

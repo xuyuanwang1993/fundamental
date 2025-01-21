@@ -73,6 +73,8 @@ int main(int argc, char** argv) {
     auto& c = t2;
     c->SetX();
     auto& b = TestS::Instance();
+    F_UNUSED(b);
     auto& n = s_normal;
+    F_UNUSED(n);
     return 0;
 }
