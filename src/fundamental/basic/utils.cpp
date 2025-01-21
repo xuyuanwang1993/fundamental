@@ -60,7 +60,7 @@ std::string BufferDumpAscii(const void* buffer, std::size_t size) {
     const std::uint8_t* ptr = static_cast<const std::uint8_t*>(buffer);
     for (std::size_t i = 0; i < size; ++i) {
         char c = ptr[i];
-        if (c >= 32 || c <= 126) ss << c;
+        if (c >= 32 && c <= 126) ss << c;
     }
     return ss.str();
 }

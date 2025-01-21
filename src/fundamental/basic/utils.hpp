@@ -6,6 +6,8 @@
 #include <string>
 #include <unordered_map>
 
+#define F_UNUSED(x) (void)x
+
 namespace Fundamental {
 
 struct NonCopyable {

@@ -57,7 +57,7 @@ void io_context_pool::start() {
 #if defined(SIGQUIT)
     signals_.add(SIGQUIT);
 #endif // defined(SIGQUIT)
-    signals_.async_wait([this](std::error_code ec, int signo) {
+    signals_.async_wait([](std::error_code ec, int signo) {
         FINFO("quit  because of  signal:{} ec:{}", signo, ec.message());
         Fundamental::Application::Instance().Exit();
         FINFO("quit finished");

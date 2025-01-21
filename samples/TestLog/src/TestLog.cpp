@@ -61,7 +61,7 @@ void TestDefaultLogger() {
     FERR("{}", "TEST");
     FFAIL("{}", "TEST");
     FFAIL("TEST111111111");
-    int counts = 100;
+    int counts = 2;
     while (counts-- > 0) {
         FERR("---bad------{}{}", counts);
         FINFO("---------{}", counts);
@@ -116,7 +116,7 @@ void TestMutiInstance(int index) {
     FERR_I(&newLogger, "{}", "TEST");
     FFAIL_I(&newLogger, "{}", "TEST");
     FFAIL_I(&newLogger, "TEST111111111");
-    int counts = 100;
+    int counts = 2;
     while (counts-- > 0) {
         FERR_I(&newLogger, "---bad------{}{}", counts);
         FINFO_I(&newLogger, "---------{}", counts);

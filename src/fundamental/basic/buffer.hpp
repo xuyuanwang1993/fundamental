@@ -22,17 +22,13 @@ static constexpr auto kHostEndian = []() constexpr -> Endian {
 #else
     return Endian::BigEndian;
 #endif
-}
-();
+}();
 template <Endian targetEndian>
 inline constexpr bool NeedConvertEndian() {
     return targetEndian != kHostEndian;
 }
 
-static constexpr auto kNeedConvertForTransfer = []() constexpr -> bool {
-    return kHostEndian == Endian::BigEndian;
-}
-();
+static constexpr auto kNeedConvertForTransfer = []() constexpr -> bool { return kHostEndian == Endian::BigEndian; }();
 
 // NOTE: This buffer owns the life time of a block of raw memory.
 template <typename _SizeType = std::size_t>
@@ -170,7 +166,7 @@ private:
 };
 
 template <typename _SizeType>
-Buffer<_SizeType>::Buffer(Buffer&& other) noexcept : m_pRaw(other.m_pRaw), m_byteSize(other.m_byteSize) {
+Buffer<_SizeType>::Buffer(Buffer&& other) noexcept : m_byteSize(other.m_byteSize), m_pRaw(other.m_pRaw) {
     if (&other == this) return;
     other.Reset();
 }

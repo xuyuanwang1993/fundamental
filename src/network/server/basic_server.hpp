@@ -17,6 +17,7 @@ struct ConnectionInterface : public Fundamental::NonCopyable {
     explicit ConnectionInterface(asio::ip::tcp::socket socket, RequestHandler& handler_ref);
     /// @brief called when a new connection set up
     virtual void Start() = 0;
+    virtual ~ConnectionInterface() = default;
     /// Socket for the connection.
     asio::ip::tcp::socket socket_;
 

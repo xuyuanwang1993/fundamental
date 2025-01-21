@@ -7,10 +7,11 @@
 
 #include <gtest/gtest.h>
 
-template <typename T, bool Signed = std::is_signed_v<T>>
+template <typename T>
 class RandomTypeTest : public ::testing::Test {
 public:
     using TestType          = T;
+    constexpr static bool Signed = std::is_signed_v<T>;
     constexpr static T kMin = static_cast<T>(10 * (Signed ? (-1) : 1));
     constexpr static T kMax = static_cast<T>(20);
     RandomTypeTest() : gen(Fundamental::RandomGenerator<T>(Fundamental::DefaultGenerator(), kMin, kMax)) {

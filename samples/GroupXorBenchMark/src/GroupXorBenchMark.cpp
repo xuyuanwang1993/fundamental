@@ -29,7 +29,7 @@ inline void TestGroupXor(uint8_t* out, const uint8_t* a, const uint8_t* b, std::
     auto pb                       = (const std::size_t*)b;
     std::size_t count             = len / stepLen;
     std::size_t mod               = len % stepLen;
-    for (std::size_t i; i < count; ++i) {
+    for (std::size_t i=0; i < count; ++i) {
         pOut[i] = pa[i] ^ pb[i];
     }
     std::size_t offset = len - mod;

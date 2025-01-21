@@ -99,7 +99,6 @@ TEST_F(TestParallel, TestException)
 {
     std::vector<std::int32_t> nums;
     nums.resize(1000);
-    std::size_t sum = (0 + 999) * 1000 / 2;
     for (std::size_t i = 0; i < 1000; ++i)
     {
         nums[i] = i;
@@ -115,7 +114,6 @@ TEST_F(TestParallel, TestEnv)
 {
     std::vector<std::int32_t> nums;
     nums.resize(1000);
-    std::size_t sum = (0 + 999) * 1000 / 2;
     for (std::size_t i = 0; i < 1000; ++i)
     {
         nums[i] = i;
