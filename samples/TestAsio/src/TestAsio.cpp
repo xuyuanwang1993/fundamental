@@ -11,17 +11,13 @@
 #include <iostream>
 #include <memory>
 #include <utility>
-int main(int argc, char* argv[])
-{
+int main(int argc, char* argv[]) {
     auto p = ::getenv("CLIENT");
-    if (!p)
-    {
+    if (!p) {
         FINFO("you can set env \"CLIENT\" to perform as a client role");
-        try
-        {
+        try {
             // Check command line arguments.
-            if (argc != 4)
-            {
+            if (argc != 4) {
                 std::cerr << "Usage: echo_server <address> <port> <threads>\n";
                 std::cerr << "  For IPv4, try:\n";
                 std::cerr << "    receiver 0.0.0.0 54885 1 .\n";
@@ -32,24 +28,25 @@ int main(int argc, char* argv[])
             network::io_context_pool::s_excutorNums = std::stoi(argv[3]);
             network::io_context_pool::Instance().start();
             // Initialise the server.
-            network::echo::EchoServer s(argv[1], argv[2]);
+            using asio::ip::tcp;
+            tcp::resolver resolver(network::io_context_pool::Instance().get_io_context());
+            auto endpoints = resolver.resolve(argv[1], argv[2]);
+            if (endpoints.empty()) {
+                FERR("resolve failed");
+                return 1;
+            }
+            network::echo::EchoServer s(*endpoints.begin());
             s.Start();
             Fundamental::Application::Instance().Loop();
-        }
-        catch (std::exception& e)
-        {
+        } catch (std::exception& e) {
             FERR("exception: {}", e.what());
         }
 
         return 0;
-    }
-    else
-    {
+    } else {
         using asio::ip::tcp;
-        try
-        {
-            if (argc != 3)
-            {
+        try {
+            if (argc != 3) {
                 std::cerr << "Usage: echo_client <host> <port>\n";
                 return 1;
             }
@@ -62,8 +59,7 @@ int main(int argc, char* argv[])
             auto endpoints = resolver.resolve(host, port);
 
             network::echo::echo_client c(io_context, endpoints);
-            if (::getenv("USE_TRAFFIC_PROXY"))
-            {
+            if (::getenv("USE_TRAFFIC_PROXY")) {
                 network::proxy::ProxyFrame frame_;
                 network::proxy::TrafficProxyRequest request;
                 request.proxyServiceName = "test_tcp";
@@ -73,7 +69,7 @@ int main(int argc, char* argv[])
                 auto buffers_ = frame_.ToAsioBuffers();
                 std::vector<std::uint8_t> f;
                 for (auto& i : buffers_)
-                    f.insert(f.end(), (const std::uint8_t *)i.data(), (const std::uint8_t *)i.data() + i.size());
+                    f.insert(f.end(), (const std::uint8_t*)i.data(), (const std::uint8_t*)i.data() + i.size());
                 c.SetTrafficProxyData(std::move(f));
             }
             std::thread t([&io_context]() { io_context.run(); });
@@ -81,31 +77,27 @@ int main(int argc, char* argv[])
             char line[maxSize - 1];
             bool isRunning = true;
             c.wait_connect();
-            while (c.connected() && isRunning && std::cin.getline(line, maxSize + 1))
-            {
+            while (c.connected() && isRunning && std::cin.getline(line, maxSize + 1)) {
                 network::echo::EchoMsg msg;
                 auto len = std::strlen(line);
-                if (0 == len)
-                    continue;
+                if (0 == len) continue;
                 FINFO("read size:{}", len);
-                if (strncmp(line, "#", 1) == 0)
-                {
+                if (strncmp(line, "#", 1) == 0) {
                     FWARN("disconnected request");
                     len       = 0;
                     isRunning = false;
                 }
                 auto bufLen = len + network::echo::EchoMsg::kTimeStampSize;
                 msg.msg.resize(bufLen);
-                msg.header.v    = htobe32(bufLen);
-                msg.TimeStamp() = htobe64((Fundamental::Timer::GetTimeNow<std::chrono::seconds, std::chrono::system_clock>()));
+                msg.header.v = htobe32(bufLen);
+                msg.TimeStamp() =
+                    htobe64((Fundamental::Timer::GetTimeNow<std::chrono::seconds, std::chrono::system_clock>()));
                 std::memcpy(msg.Data(), line, len);
                 c.write(msg);
             }
             t.join();
             c.close();
-        }
-        catch (std::exception& e)
-        {
+        } catch (std::exception& e) {
             FERR("exception: {}", e.what());
         }
 

@@ -38,7 +38,14 @@ int main(int argc, char* argv[])
             network::io_context_pool::Instance().start();
             InitTrafficProxyManager();
             // Initialise the server.
-            network::proxy::ProxyServer s(argv[1], argv[2]);
+            using asio::ip::tcp;
+            tcp::resolver resolver(network::io_context_pool::Instance().get_io_context());
+            auto endpoints = resolver.resolve(argv[1], argv[2]);
+            if (endpoints.empty()) {
+                FERR("resolve failed");
+                return 1;
+            }
+            network::proxy::ProxyServer s(*endpoints.begin());
             s.GetHandler().RegisterProtocal(network::proxy::kAgentOpcode, network::proxy::AgentConnection::MakeShared);
             s.GetHandler().RegisterProtocal(network::proxy::kTrafficProxyOpcode, network::proxy::TrafficProxyConnection::MakeShared);
             s.Start();
