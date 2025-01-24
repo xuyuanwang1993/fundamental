@@ -182,7 +182,7 @@ private:
 } // namespace Fundamental
 
 template <std::size_t level, char SlashChar, bool with_discard_flag, std::size_t N>
-constexpr std::array<char, N> __get_short_file_name__(const char (&file_name)[N]) {
+inline constexpr std::array<char, N> __get_short_file_name__(const char (&file_name)[N]) {
     static_assert(level > 0);
     std::array<char, N> short_name {};
     if (N <= level) {
