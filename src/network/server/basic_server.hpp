@@ -12,14 +12,18 @@ struct RequestHandlerDummy {};
 // when data is coming we should parse the reuqest data first util a valid reuqest recv finished
 // then we need a handler to process the request
 
-template <typename RequestHandler>
+template <typename RequestHandler, typename StreamSocketType = asio::ip::tcp>
 struct ConnectionInterface : public Fundamental::NonCopyable {
-    explicit ConnectionInterface(asio::ip::tcp::socket socket, RequestHandler& handler_ref);
+    using ConnectionSocket   = typename StreamSocketType::socket;
+    using ConnectionAcceptor = typename StreamSocketType::acceptor;
+    using ConnectionEndpoint = typename StreamSocketType::endpoint;
+    explicit ConnectionInterface(ConnectionSocket socket, RequestHandler& handler_ref) :
+    socket_(std::move(socket)), request_handler_(handler_ref) {};
     /// @brief called when a new connection set up
-    virtual void Start() = 0;
+    virtual void Start()           = 0;
     virtual ~ConnectionInterface() = default;
     /// Socket for the connection.
-    asio::ip::tcp::socket socket_;
+    ConnectionSocket socket_;
 
     /// The handler used to process the incoming msgContext.
     RequestHandler& request_handler_;
@@ -29,9 +33,15 @@ struct ConnectionInterface : public Fundamental::NonCopyable {
 template <typename Connection, typename RequestHandler>
 class Server : public Fundamental::NonCopyable {
 public:
+    using ConnectionSocket   = typename Connection::ConnectionSocket;
+    using ConnectionAcceptor = typename Connection::ConnectionAcceptor;
+    using ConnectionEndpoint = typename Connection::ConnectionEndpoint;
+
+public:
     /// Construct the server to listen on the specified TCP address and port, and
     /// serve up files from the given directory.
-    explicit Server(const std::string& address, const std::string& port);
+    explicit Server(const ConnectionEndpoint& endpoint) :
+    acceptor_(io_context_pool::Instance().get_io_context()), endpoint_(endpoint) {};
 
     /// start accept.
     /// exception on failure
@@ -46,35 +56,24 @@ public:
 protected:
     void DoAccept();
 
-    void DoAwaitStop();
     std::atomic_bool has_started_ = false;
 
     /// Acceptor used to listen for incoming connections.
-    asio::ip::tcp::acceptor acceptor_;
-
+    ConnectionAcceptor acceptor_;
     /// The handler for all incoming requests.
     RequestHandler request_handler_;
-    //
-    std::string address;
-    //
-    std::string port;
+    ConnectionEndpoint endpoint_;
 };
-
-template <typename Connection, typename RequestHandler>
-inline Server<Connection, RequestHandler>::Server(const std::string& address, const std::string& port) :
-acceptor_(io_context_pool::Instance().get_io_context()), address(address), port(port) {
-}
 
 template <typename Connection, typename RequestHandler>
 inline void Server<Connection, RequestHandler>::Start() {
     bool expected_value = false;
     if (!has_started_.compare_exchange_strong(expected_value, true)) return;
-    // Open the acceptor with the option to reuse the address (i.e. SO_REUSEADDR).
-    asio::ip::tcp::resolver resolver(acceptor_.get_executor());
-    asio::ip::tcp::endpoint endpoint = *resolver.resolve(address, port).begin();
-    acceptor_.open(endpoint.protocol());
-    acceptor_.set_option(asio::ip::tcp::acceptor::reuse_address(true));
-    acceptor_.bind(endpoint);
+    acceptor_.open(endpoint_.protocol());
+    if constexpr (std::is_same_v<ConnectionAcceptor, asio::ip::tcp::acceptor>) {
+        acceptor_.set_option(asio::ip::tcp::acceptor::reuse_address(true));
+    }
+    acceptor_.bind(endpoint_);
     acceptor_.listen();
 
     DoAccept();
@@ -109,13 +108,4 @@ inline void Server<Connection, RequestHandler>::DoAccept() {
                            });
 }
 
-template <typename Connection, typename RequestHandler>
-inline void Server<Connection, RequestHandler>::DoAwaitStop() {
-}
-template <typename RequestHandler>
-inline ConnectionInterface<RequestHandler>::ConnectionInterface(asio::ip::tcp::socket socket,
-                                                                RequestHandler& handler_ref) :
-socket_(std::move(socket)),
-request_handler_(handler_ref) {
-}
 } // namespace network
