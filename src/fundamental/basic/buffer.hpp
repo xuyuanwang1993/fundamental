@@ -1,10 +1,11 @@
 #pragma once
-#include "endian.h"
-#include "utils.hpp"
+#include "fundamental/basic/utils.hpp"
+
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <endian.h>
 #include <sstream>
 #include <stdexcept>
 #include <string>
