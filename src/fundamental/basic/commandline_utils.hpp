@@ -78,7 +78,7 @@ inline bool commandline_utils::AddOption(const std::string& name, const std::str
                                          const std::string& param_description) {
     auto iter = options.find(name);
     if (iter != options.end()) {
-        std::cerr << "Option " << name << " already exists." << std::endl;
+        std::cerr << "option " << name << " already exists." << std::endl;
         return false;
     }
     if (option_value != kNoShortOption && !std::isprint(option_value)) {
@@ -153,8 +153,6 @@ inline bool commandline_utils::ParseCommandLine() {
             }
 
             auto& current_option = option_iter->second;
-            std::cout << current_option.name << " " << (optarg ? optarg : "none arg") << " " << current_option.type
-                      << std::endl;
             if (!current_option.paser_values.has_value()) {
                 current_option.paser_values = std::vector<std::string>();
             }
