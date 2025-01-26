@@ -1,8 +1,10 @@
 #pragma once
 
+#include <cctype>
 #include <getopt.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <iostream>
 #include <map>
 #include <optional>
@@ -12,20 +14,28 @@
 #include <vector>
 
 namespace Fundamental {
-class commandline_utils {
+
+// to support custom type, you can specialize this template in namespace Fundamental like below
+// or support the following constructor T(const std::string&)
+template <typename T>
+inline T from_string(const std::string& v) {
+    return T(v);
+}
+
+class arg_parser {
 public:
     enum param_type : std::int32_t {
         with_none_param,
         required_param,
         optional_param
     };
-    struct paser_option {
+    struct parser_entry {
         std::string name;
         std::int32_t option_value;
         param_type type;
         std::string opt_usage;
         std::string param_description;
-        std::optional<std::vector<std::string>> paser_values;
+        std::optional<std::vector<std::string>> parser_values;
     };
     static constexpr std::int8_t kReservedShortOption[] = { '?' /*for invalid option*/, ':' /*missing param*/ };
     static constexpr std::int32_t kNoShortOption        = -1;
@@ -35,8 +45,8 @@ public:
     static constexpr const char* kVersionOptionName     = "version";
 
 public:
-    commandline_utils(int argc, char* argv[], const std::string& version = "1.0.0");
-    ~commandline_utils();
+    arg_parser(int argc, char* argv[], const std::string& version = "1.0.0");
+    ~arg_parser();
     bool AddOption(const std::string& name, const std::string& opt_usage,
                    std::int32_t short_option_value = kNoShortOption, param_type type = with_none_param,
                    const std::string& param_description = "param");
@@ -48,6 +58,35 @@ public:
     std::optional<std::string> GetOptionValue(const std::string& name) const;
     const std::vector<std::string>& GetNonOptionValues() const;
     bool HasParam(const std::string& name = kHelperOptionName) const;
+    void DumpOptions() const;
+
+    template <typename T>
+    T GetValue(const std::string& name, const T& default_value = {}) const {
+        auto v = GetOptionValue(name);
+        if (!v.has_value()) return default_value;
+        try {
+            return from_string<T>(v.value());
+        } catch (const std::exception& e) {
+            std::cerr << "convert option:" << name << " value:" << v.value() << " failed:" << e.what() << std::endl;
+            return default_value;
+        }
+    }
+
+    template <typename T>
+    std::vector<T> GetValues(const std::string& name) const {
+        auto v = GetOptionValues(name);
+        if (!v.has_value()) return {};
+        auto values = v.value();
+        std::vector<T> ret;
+        for (const auto& value : values) {
+            try {
+                ret.push_back(from_string<T>(value));
+            } catch (const std::exception& e) {
+                std::cerr << "convert option:" << name << " value:" << value << " failed:" << e.what() << std::endl;
+            }
+        }
+        return ret;
+    }
 
 private:
     const int argc;
@@ -56,11 +95,11 @@ private:
     std::int32_t current_option_value = 128;
     std::string_view program_path;
     std::vector<std::string> no_option_params;
-    std::unordered_map<std::string, paser_option> options;
+    std::unordered_map<std::string, parser_entry> options;
     std::map<std::int32_t, std::string> short_options_dict;
 };
 
-commandline_utils::commandline_utils(int argc, char* argv[], const std::string& version) :
+arg_parser::arg_parser(int argc, char* argv[], const std::string& version) :
 argc(argc), argv(argv), version(version), program_path(argv[0]) {
     AddOption(kHelperOptionName, "show this help page", kHealperShortOption, with_none_param);
     AddOption(kVersionOptionName, "show version information", kVersionShortOption, with_none_param);
@@ -70,12 +109,11 @@ argc(argc), argv(argv), version(version), program_path(argv[0]) {
     }
 }
 
-commandline_utils::~commandline_utils() {
+arg_parser::~arg_parser() {
 }
 
-inline bool commandline_utils::AddOption(const std::string& name, const std::string& opt_usage,
-                                         std::int32_t option_value, param_type type,
-                                         const std::string& param_description) {
+inline bool arg_parser::AddOption(const std::string& name, const std::string& opt_usage, std::int32_t option_value,
+                                  param_type type, const std::string& param_description) {
     auto iter = options.find(name);
     if (iter != options.end()) {
         std::cerr << "option " << name << " already exists." << std::endl;
@@ -95,11 +133,11 @@ inline bool commandline_utils::AddOption(const std::string& name, const std::str
         option_value = current_option_value++;
     }
     short_options_dict.emplace(option_value, name);
-    options.emplace(name, paser_option { name, option_value, type, opt_usage, param_description, std::nullopt });
+    options.emplace(name, parser_entry { name, option_value, type, opt_usage, param_description, std::nullopt });
     return true;
 }
 
-inline bool commandline_utils::ParseCommandLine() {
+inline bool arg_parser::ParseCommandLine() {
 
     std::vector<option> long_options;
     std::string short_options;
@@ -153,12 +191,12 @@ inline bool commandline_utils::ParseCommandLine() {
             }
 
             auto& current_option = option_iter->second;
-            if (!current_option.paser_values.has_value()) {
-                current_option.paser_values = std::vector<std::string>();
+            if (!current_option.parser_values.has_value()) {
+                current_option.parser_values = std::vector<std::string>();
             }
             switch (current_option.type) {
             case optional_param: {
-                if (optarg) current_option.paser_values.value().push_back(optarg);
+                if (optarg) current_option.parser_values.value().push_back(optarg);
             } break;
             case required_param: {
                 if (!optarg) {
@@ -166,7 +204,7 @@ inline bool commandline_utils::ParseCommandLine() {
                     return false;
                 }
 
-                current_option.paser_values.value().push_back(optarg);
+                current_option.parser_values.value().push_back(optarg);
             } break;
             default: break;
             }
@@ -180,13 +218,12 @@ inline bool commandline_utils::ParseCommandLine() {
     return true;
 }
 
-inline void commandline_utils::ShowHelp() {
+inline void arg_parser::ShowHelp() {
     std::cout << "Usage for program:" << program_path << " version:" << version << std::endl;
     std::cout << "Notice:For options with optional arguments,the argument must either immediately follow the short "
                  "option or be connected with =."
               << std::endl;
-    std::cout << "For long options, the argument can only be connected with =." << std::endl;
-    std::cout << "For example: -a[arg] or -a[=arg] or --long-option[=arg]" << std::endl;
+    std::cout << "For example: -a[arg]  or --long-option[=arg]" << std::endl;
     for (const auto& [name, option] : options) {
         if (option.option_value < 128) {
             std::cout << "\t-" << (char)(option.option_value) << ",";
@@ -203,28 +240,150 @@ inline void commandline_utils::ShowHelp() {
     }
 }
 
-inline std::optional<std::vector<std::string>> commandline_utils::GetOptionValues(const std::string& name) const {
+inline std::optional<std::vector<std::string>> arg_parser::GetOptionValues(const std::string& name) const {
     auto iter = options.find(name);
-    return iter == options.end() ? std::nullopt : iter->second.paser_values;
+    return iter == options.end() ? std::nullopt : iter->second.parser_values;
 }
 
-inline std::optional<std::string> commandline_utils::GetOptionValue(const std::string& name) const {
+inline std::optional<std::string> arg_parser::GetOptionValue(const std::string& name) const {
     auto iter = options.find(name);
-    if (iter == options.end() || !iter->second.paser_values.has_value()) return std::nullopt;
-    auto& value = iter->second.paser_values.value();
+    if (iter == options.end() || !iter->second.parser_values.has_value()) return std::nullopt;
+    auto& value = iter->second.parser_values.value();
     return value.empty() ? "" : value[0];
 }
 
-inline const std::vector<std::string>& commandline_utils::GetNonOptionValues() const {
+inline const std::vector<std::string>& arg_parser::GetNonOptionValues() const {
     return no_option_params;
 }
 
-inline bool commandline_utils::HasParam(const std::string& name) const {
+inline bool arg_parser::HasParam(const std::string& name) const {
     return GetOptionValue(name).has_value();
 }
 
-inline void commandline_utils::ShowVersion() {
+inline void arg_parser::DumpOptions() const {
+    std::cout << "Dump all parsered args for program:" << program_path << std::endl;
+    for (const auto& [name, option] : options) {
+        if (option.option_value < 128) {
+            std::cout << "-" << (char)(option.option_value) << ",";
+        } else {
+            std::cout << "--";
+        }
+        std::cout << "--" << name;
+        std::cout << "\t";
+        if (option.parser_values.has_value())
+            std::cout << "{set}";
+        else
+            std::cout << "{not set}";
+        if (option.type == required_param) {
+            if (option.parser_values.has_value()) {
+                std::cout << " <";
+                auto& values = option.parser_values.value();
+                for (size_t i = 0; i < values.size(); i++) {
+                    if (i != 0) {
+                        std::cout << " ";
+                    }
+                    std::cout << values[i];
+                }
+                std::cout << ">";
+            }
+        } else if (option.type == optional_param) {
+            if (option.parser_values.has_value()) {
+                std::cout << " [";
+                auto& values = option.parser_values.value();
+                for (size_t i = 0; i < values.size(); i++) {
+                    if (i != 0) {
+                        std::cout << " ";
+                    }
+                    std::cout << values[i];
+                }
+                std::cout << "]";
+            }
+        }
+        std::cout << std::endl;
+    }
+    std::cout << "Dump non option params:";
+    for (size_t i = 0; i < no_option_params.size(); i++) {
+        if (i != 0) {
+            std::cout << " ";
+        }
+
+        std::cout << no_option_params[i];
+    }
+    std::cout << std::endl;
+}
+
+inline void arg_parser::ShowVersion() {
     std::cout << "Version: " << version << std::endl;
+}
+
+template <typename T>
+inline std::string to_lower(
+    const T& str_) { // both std::string and std::basic_string_view<char> (for magic_enum) are using to_lower
+    std::string str(str_.size(), '\0');
+    std::transform(str_.begin(), str_.end(), str.begin(), ::tolower);
+    return str;
+}
+
+template <>
+inline std::string from_string(const std::string& v) {
+    return v;
+}
+template <>
+inline char from_string(const std::string& v) {
+    return v.empty()      ? throw std::invalid_argument("empty string")
+           : v.size() > 1 ? v.substr(0, 2) == "0x" ? (char)std::stoul(v, nullptr, 16) : (char)std::stoi(v)
+                          : v[0];
+}
+template <>
+inline int from_string(const std::string& v) {
+    return std::stoi(v);
+}
+template <>
+inline short from_string(const std::string& v) {
+    return std::stoi(v);
+}
+template <>
+inline long from_string(const std::string& v) {
+    return std::stol(v);
+}
+template <>
+inline long long from_string(const std::string& v) {
+    return std::stol(v);
+}
+
+template <>
+inline bool from_string(const std::string& v) {
+    return to_lower(v) == "true" || v == "1";
+}
+
+template <>
+inline float from_string(const std::string& v) {
+    return std::stof(v);
+}
+
+template <>
+inline double from_string(const std::string& v) {
+    return std::stod(v);
+}
+template <>
+inline unsigned char from_string(const std::string& v) {
+    return from_string<char>(v);
+}
+template <>
+inline unsigned int from_string(const std::string& v) {
+    return std::stoul(v);
+}
+template <>
+inline unsigned short from_string(const std::string& v) {
+    return std::stoul(v);
+}
+template <>
+inline unsigned long from_string(const std::string& v) {
+    return std::stoul(v);
+}
+template <>
+inline unsigned long long from_string(const std::string& v) {
+    return std::stoul(v);
 }
 
 } // namespace Fundamental
