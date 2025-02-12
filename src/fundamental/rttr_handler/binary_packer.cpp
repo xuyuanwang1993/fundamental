@@ -9,7 +9,6 @@ using rttr::variant_sequential_view;
 static_assert(sizeof(float) == 4, "only support float size 4");
 static_assert(sizeof(double) == 8, "only support double size 8");
 namespace internal {
-void do_binary_pack(const rttr::variant& var, std::vector<std::uint8_t>& out, bool& type_flag);
 void binary_pack_array(const variant_sequential_view& view, std::vector<std::uint8_t>& out, bool& type_flag);
 void binary_pack_object_recursively(const rttr::variant& var, std::vector<std::uint8_t>& out, bool& type_flag);
 bool binary_unpack_object_recursively(const std::uint8_t*& data, std::size_t& len, rttr::instance dst_obj,
@@ -20,7 +19,6 @@ bool binary_unpack_array(const std::uint8_t*& data, std::size_t& len, rttr::vari
 bool binary_unpack_set(const std::uint8_t*& data, std::size_t& len, rttr::variant& var, bool ignore_invalid_properties);
 bool binary_unpack_map(const std::uint8_t*& data, std::size_t& len, rttr::variant& var, bool ignore_invalid_properties);
 bool binary_unpack_string(const std::uint8_t*& data, std::size_t& len, std::string& out_str);
-bool binary_unpack_skip_item(const std::uint8_t*& data, std::size_t& len);
 bool binary_unpack_skip_buf(const std::uint8_t*& data, std::size_t& len, std::size_t skip_len);
 template <typename T>
 void pack_basic_value(std::vector<std::uint8_t>& out, const T& value) {
@@ -598,10 +596,4 @@ bool binary_unpack_skip_buf(const std::uint8_t*& data, std::size_t& len, std::si
 }
 } // namespace internal
 
-[[nodiscard]] std::vector<std::uint8_t> binary_pack(const rttr::variant& var) {
-    std::vector<std::uint8_t> out;
-    bool flag = false;
-    internal::do_binary_pack(var, out, flag);
-    return out;
-}
 } // namespace Fundamental::io
