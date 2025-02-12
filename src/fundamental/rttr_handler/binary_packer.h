@@ -33,7 +33,7 @@ enum PackerDataType : std::uint8_t {
 
 namespace internal {
 bool do_binary_unpack(const std::uint8_t*& data, std::size_t& len, rttr::variant& var, rttr::instance dst_obj,
-                      PackerDataType type);
+                      PackerDataType type, bool ignore_invalid_properties);
 
 template <typename T>
 inline bool unpack_basic_value(const std::uint8_t*& data, std::size_t& len, T& value) {
@@ -61,14 +61,14 @@ inline bool unpack_basic_value(const std::uint8_t*& data, std::size_t& len, T& v
 
 // return false when unpack failed
 template <typename T>
-inline bool binary_unpack(const void* data, std::size_t len, T& out) {
+inline bool binary_unpack(const void* data, std::size_t len, T& out, bool ignore_invalid_properties = true) {
     auto type = rttr::type::get<T>();
     if (!type.is_valid()) return false;
     rttr::variant var(out);
     auto* p_data             = static_cast<const std::uint8_t*>(data);
     PackerDataType data_type = unknown_pack_data;
     if (!internal::unpack_basic_value(p_data, len, data_type)) return false;
-    if (!internal::do_binary_unpack(p_data, len, var, out, data_type)) return false;
+    if (!internal::do_binary_unpack(p_data, len, var, out, data_type,ignore_invalid_properties)) return false;
     if (data_type != object_pack_data) out = var.get_value<T>();
     return true;
 }

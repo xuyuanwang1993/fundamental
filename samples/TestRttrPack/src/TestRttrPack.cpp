@@ -85,11 +85,22 @@ struct CustomObject {
     std::vector<color> cs;
     std::vector<nlohmann::json> objects;
     std::list<int> is;
+    
     bool operator==(const CustomObject& other) const noexcept {
         return cs == other.cs && objects == other.objects && is == other.is;
     }
     bool operator!=(const CustomObject& other) const noexcept {
         return cs != other.cs || objects != other.objects || is != other.is;
+    }
+};
+
+struct CustomObject2 {
+    std::list<int> is;
+    bool operator==(const CustomObject& other) const noexcept {
+        return is == other.is;
+    }
+    bool operator!=(const CustomObject& other) const noexcept {
+        return is != other.is;
     }
 };
 
@@ -132,6 +143,12 @@ RTTR_REGISTRATION {
             .property("is", &register_type::is)
             .property("objects", &register_type::objects);
     }
+    {
+        using register_type = CustomObject2;
+        rttr::registration::class_<register_type>("CustomObject2")
+            .constructor()(rttr::policy::ctor::as_object)
+            .property("is", &register_type::is);
+    }
 }
 int main(int argc, char* argv[]) {
     using namespace Fundamental::io;
@@ -148,6 +165,9 @@ int main(int argc, char* argv[]) {
         CustomObject gen;
         FINFOS << binary_unpack(data.data(), data.size(), gen);
         FASSERT(origin == gen);
+        CustomObject2 gen2;
+        FINFOS << binary_unpack(data.data(), data.size(), gen2);
+        FASSERT(origin.is == gen2.is);
     }
 
     {
@@ -392,4 +412,3 @@ int main(int argc, char* argv[]) {
 
     return 0;
 }
-
