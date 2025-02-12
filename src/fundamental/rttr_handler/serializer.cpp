@@ -29,7 +29,7 @@ bool write_atomic_types_to_json(const type& t, const variant& var, Fundamental::
         if (t == type::get<bool>())
             json_obj = var.to_bool();
         else if (t == type::get<char>())
-            json_obj = var.to_bool();
+            json_obj = var.to_int8();
         else if (t == type::get<int8_t>())
             json_obj = var.to_int8();
         else if (t == type::get<int16_t>())
