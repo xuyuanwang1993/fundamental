@@ -78,6 +78,9 @@ public:
         std::unique_lock<std::mutex> lock(sub_mtx_);
         return token_list_;
     }
+    void post_stop() {
+        stop();
+    }
 
 private:
     void do_accept() {
@@ -166,7 +169,8 @@ private:
             if (sub_map_.empty()) return;
         }
 
-        std::shared_ptr<std::string> shared_data = get_shared_data<T>(std::move(data));
+        auto b = rpc_service::msgpack_codec::pack(data);
+        std::string s_data(b.data(), b.data() + b.size());
         std::unique_lock<std::mutex> lock(sub_mtx_);
         auto range = sub_map_.equal_range(key + token);
         if (range.first != range.second) {
@@ -176,26 +180,12 @@ private:
                     continue;
                 }
 
-                conn->publish(key + token, *shared_data);
+                conn->publish(key + token, s_data);
             }
         } else {
             error_callback(asio::error::make_error_code(asio::error::invalid_argument),
                            "The subscriber of the key: " + key + " does not exist.");
         }
-    }
-
-    template <typename T>
-    typename std::enable_if<std::is_assignable<std::string, T>::value, std::shared_ptr<std::string>>::type
-    get_shared_data(std::string data) {
-        return std::make_shared<std::string>(std::move(data));
-    }
-
-    template <typename T>
-    typename std::enable_if<!std::is_assignable<std::string, T>::value, std::shared_ptr<std::string>>::type
-    get_shared_data(T data) {
-        msgpack_codec codec;
-        auto buf = codec.pack(std::move(data));
-        return std::make_shared<std::string>(buf.data(), buf.size());
     }
 
     void do_await_stop() {

@@ -77,17 +77,14 @@ const constexpr size_t DEFAULT_TIMEOUT = 5000; // milliseconds
 
 class rpc_client : private asio::noncopyable {
 public:
-    rpc_client() :
-    socket_(ios_), work_(std::make_shared<asio::io_context::execution_context>(ios_)), deadline_(ios_),
-    body_(INIT_BUF_SIZE) {
+    rpc_client() : socket_(ios_), work_(asio::make_work_guard(ios_)), deadline_(ios_), body_(INIT_BUF_SIZE) {
         thd_ = std::make_shared<std::thread>([this] { ios_.run(); });
     }
 
     rpc_client(client_language_t client_language,
                std::function<void(long, const std::string&)> on_result_received_callback) :
-    socket_(ios_), work_(std::make_shared<asio::io_context::execution_context>(ios_)), deadline_(ios_),
-    body_(INIT_BUF_SIZE), client_language_(client_language),
-    on_result_received_callback_(std::move(on_result_received_callback)) {
+    socket_(ios_), work_(asio::make_work_guard(ios_)), deadline_(ios_), body_(INIT_BUF_SIZE),
+    client_language_(client_language), on_result_received_callback_(std::move(on_result_received_callback)) {
         thd_ = std::make_shared<std::thread>([this] { ios_.run(); });
     }
 
@@ -97,8 +94,8 @@ public:
     rpc_client(client_language_t client_language,
                std::function<void(long, const std::string&)> on_result_received_callback, std::string host,
                unsigned short port) :
-    socket_(ios_), work_(std::make_shared<asio::io_context::execution_context>(ios_)), deadline_(ios_),
-    host_(std::move(host)), port_(port), body_(INIT_BUF_SIZE), client_language_(client_language),
+    socket_(ios_), work_(asio::make_work_guard(ios_)), host_(std::move(host)), port_(port), deadline_(ios_),
+    body_(INIT_BUF_SIZE), client_language_(client_language),
     on_result_received_callback_(std::move(on_result_received_callback)) {
         thd_ = std::make_shared<std::thread>([this] { ios_.run(); });
     }
@@ -137,7 +134,7 @@ public:
         return wait_conn(timeout);
     }
 
-    bool connect(const std::string& host, unsigned short port,  size_t timeout = 3) {
+    bool connect(const std::string& host, unsigned short port, size_t timeout = 3) {
         if (port_ == 0) {
             host_ = host;
             port_ = port;
@@ -162,7 +159,7 @@ public:
 
         has_wait_ = true;
         std::unique_lock<std::mutex> lock(conn_mtx_);
-        bool result =
+        [[maybe_unused]] bool result =
             conn_cond_.wait_for(lock, std::chrono::seconds(timeout), [this] { return has_connected_.load(); });
         has_wait_ = false;
         return has_connected_;
@@ -256,7 +253,7 @@ public:
         }
 
         rpc_service::msgpack_codec codec;
-        auto ret = codec.pack_args(std::forward<Args>(args)...);
+        auto ret = codec.pack(std::forward<Args>(args)...);
         write(fu_id, request_type::req_res, std::move(ret), MD5::MD5Hash32(rpc_name.data()));
         return future_result<req_result> { fu_id, std::move(future) };
     }
@@ -281,13 +278,14 @@ public:
         }
 
         rpc_service::msgpack_codec codec;
-        auto ret = codec.pack_args(std::forward<Args>(args)...);
+        auto ret = codec.pack(std::forward<Args>(args)...);
         write(cb_id, request_type::req_res, std::move(ret), MD5::MD5Hash32(rpc_name.data()));
     }
 
     void stop() {
         if (thd_ != nullptr) {
-            work_ = nullptr;
+            // release work_
+            work_.~executor_work_guard();
             if (thd_->joinable()) {
                 thd_->join();
             }
@@ -322,20 +320,19 @@ public:
         key_token_set_.emplace(std::move(key), std::move(token));
     }
 
-    template <typename T, size_t TIMEOUT = 3>
-    void publish(std::string key, T&& t) {
+    template <typename... Args, size_t TIMEOUT = 3>
+    void publish(std::string key, const Args&... args) {
         rpc_service::msgpack_codec codec;
-        auto buf = codec.pack(std::move(t));
+        auto buf = codec.pack(std::forward<Args>(args)...);
         call<TIMEOUT>("publish", std::move(key), "", std::string(buf.data(), buf.size()));
     }
 
-    template <typename T, size_t TIMEOUT = 3>
-    void publish_by_token(std::string key, std::string token, T&& t) {
+    template <typename... Args, size_t TIMEOUT = 3>
+    void publish_by_token(std::string key, std::string token, const Args&... args) {
         rpc_service::msgpack_codec codec;
-        auto buf = codec.pack(std::move(t));
+        auto buf = codec.pack(std::forward<Args>(args)...);
         call<TIMEOUT>("publish_by_token", std::move(key), std::move(token), std::string(buf.data(), buf.size()));
     }
-
 
 private:
     void async_connect() {
@@ -384,7 +381,7 @@ private:
         deadline_.async_wait([this, timeout](const asio::error_code& ec) {
             if (!ec) {
                 if (has_connected_) {
-                    write(0, request_type::req_res, rpc_service::buffer_type(0), 0);
+                    write(0, request_type::req_res, rpc_service::rpc_buffer_type(0), 0);
                 }
             }
 
@@ -392,10 +389,10 @@ private:
         });
     }
 
-    void write(std::uint64_t req_id, request_type type, rpc_service::buffer_type&& message, uint32_t func_id) {
+    void write(std::uint64_t req_id, request_type type, rpc_service::rpc_buffer_type&& message, uint32_t func_id) {
         size_t size = message.size();
         assert(size < MAX_BUF_LEN);
-        client_message_type msg { req_id, type, { message.release(), size }, func_id };
+        client_message_type msg { req_id, type, std::move(message), func_id };
 
         std::unique_lock<std::mutex> lock(write_mtx_);
         outbox_.emplace_back(std::move(msg));
@@ -409,7 +406,7 @@ private:
 
     void write() {
         auto& msg   = outbox_[0];
-        write_size_ = (uint32_t)msg.content.length();
+        write_size_ = (uint32_t)msg.content.size();
         std::array<asio::const_buffer, 2> write_buffers;
         header_          = { MAGIC_NUM, msg.req_type, write_size_, msg.req_id, msg.func_id };
         write_buffers[0] = asio::buffer(&header_, sizeof(rpc_header));
@@ -429,7 +426,6 @@ private:
                 return;
             }
 
-            ::free((char*)outbox_.front().content.data());
             outbox_.pop_front();
 
             if (!outbox_.empty()) {
@@ -519,7 +515,7 @@ private:
 
     void send_subscribe(const std::string& key, const std::string& token) {
         rpc_service::msgpack_codec codec;
-        auto ret = codec.pack_args(key, token);
+        auto ret = codec.pack(key, token);
         write(0, request_type::sub_pub, std::move(ret), MD5::MD5Hash32(key.data()));
     }
 
@@ -581,8 +577,8 @@ private:
     void callback_sub(const asio::error_code& ec, string_view result) {
         rpc_service::msgpack_codec codec;
         try {
-            auto tp    = codec.unpack<std::tuple<int, std::string, std::string>>(result.data(), result.size());
-            auto code  = std::get<0>(tp);
+            auto tp    = codec.unpack_tuple<std::tuple<int, std::string, std::string>>(result.data(), result.size());
+            [[maybe_unused]] auto code  = std::get<0>(tp);
             auto& key  = std::get<1>(tp);
             auto& data = std::get<2>(tp);
 
@@ -681,7 +677,6 @@ private:
         err_cb_ = [this](asio::error_code) { async_connect(); };
     }
 
-
     template <typename Handler>
     void async_read_head(Handler handler) {
         asio::async_read(socket_, asio::buffer(head_, HEAD_LEN), std::move(handler));
@@ -699,7 +694,7 @@ private:
 
     asio::io_context ios_;
     asio::ip::tcp::socket socket_;
-    std::shared_ptr<asio::io_context::execution_context> work_;
+    asio::executor_work_guard<asio::io_context::executor_type> work_;
     std::shared_ptr<std::thread> thd_ = nullptr;
 
     std::string host_;
@@ -717,7 +712,7 @@ private:
     struct client_message_type {
         std::uint64_t req_id;
         request_type req_type;
-        string_view content;
+        rpc_service::rpc_buffer_type content;
         uint32_t func_id;
     };
     std::deque<client_message_type> outbox_;

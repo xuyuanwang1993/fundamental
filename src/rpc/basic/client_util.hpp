@@ -14,7 +14,7 @@ inline bool has_error(string_view result) {
     }
 
     rpc_service::msgpack_codec codec;
-    auto tp = codec.unpack<std::tuple<int>>(result.data(), result.size());
+    auto tp = codec.unpack_tuple<std::tuple<std::int32_t>>(result.data(), result.size());
 
     return std::get<0>(tp) != 0;
 }
@@ -22,14 +22,14 @@ inline bool has_error(string_view result) {
 template <typename T>
 inline T get_result(string_view result) {
     rpc_service::msgpack_codec codec;
-    auto tp = codec.unpack<std::tuple<int, T>>(result.data(), result.size());
-    return std::get<1>(tp);
+    auto tp = codec.unpack_tuple<std::tuple<T>>(result.data(), result.size(), 1);
+    return std::get<0>(tp);
 }
 
 inline std::string get_error_msg(string_view result) {
     rpc_service::msgpack_codec codec;
-    auto tp = codec.unpack<std::tuple<int, std::string>>(result.data(), result.size());
-    return std::get<1>(tp);
+    auto tp = codec.unpack_tuple<std::tuple<std::string>>(result.data(), result.size());
+    return std::get<0>(tp);
 }
 
 template <typename T>

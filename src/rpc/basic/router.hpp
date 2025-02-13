@@ -4,7 +4,6 @@
 #include "codec.h"
 #include "md5.hpp"
 #include "meta_util.hpp"
-#include "string_view.hpp"
 #include "use_asio.hpp"
 #include <functional>
 #include <string>
@@ -149,7 +148,6 @@ private:
        std::tuple<Args...> tp) {
     auto r = call_helper(f, std::make_index_sequence<sizeof...(Args)>{},
                          std::move(tp), ptr);
-    msgpack_codec codec;
     result = msgpack_codec::pack_args_str(result_code::OK, r);
   }
 
@@ -194,7 +192,7 @@ private:
       using args_tuple = typename function_traits<Function>::bare_tuple_type;
       msgpack_codec codec;
       try {
-        auto tp = codec.unpack<args_tuple>(str.data(), str.size());
+        auto tp = codec.unpack_tuple<args_tuple>(str.data(), str.size());
         helper_t<args_tuple, is_pub>{tp}();
         call(f, conn, result, std::move(tp));
       } catch (std::invalid_argument &e) {
@@ -213,7 +211,7 @@ private:
       using args_tuple = typename function_traits<Function>::bare_tuple_type;
       msgpack_codec codec;
       try {
-        auto tp = codec.unpack<args_tuple>(str.data(), str.size());
+        auto tp = codec.unpack_tuple<args_tuple>(str.data(), str.size());
         helper_t<args_tuple, is_pub>{tp}();
         call_member(f, self, conn, result, std::move(tp));
       } catch (std::invalid_argument &e) {

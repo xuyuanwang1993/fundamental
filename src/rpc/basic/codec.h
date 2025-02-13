@@ -3,47 +3,44 @@
 
 #include "fundamental/rttr_handler/binary_packer.h"
 
-#include<vector>
+#include <vector>
 
 namespace network {
 namespace rpc_service {
 
-using buffer_type = std::vector<std::uint8_t>;
+using rpc_buffer_type = std::vector<std::uint8_t>;
 struct msgpack_codec {
 
     template <typename... Args>
-    static buffer_type pack_args(Args&&... args) {
-        buffer_type buffer(init_size);
-        msgpack::pack(buffer, std::forward_as_tuple(std::forward<Args>(args)...));
+    static rpc_buffer_type pack(Args&&... args) {
+        rpc_buffer_type buffer;
+        Fundamental::io::binary_batch_pack(buffer,std::forward<Args>(args)...);
         return buffer;
     }
 
     template <typename Arg, typename... Args, typename = typename std::enable_if<std::is_enum<Arg>::value>::type>
     static std::string pack_args_str(Arg arg, Args&&... args) {
-        buffer_type buffer(init_size);
-        msgpack::pack(buffer, std::forward_as_tuple((int)arg, std::forward<Args>(args)...));
-        return std::string(buffer.data(), buffer.size());
+        rpc_buffer_type buffer;
+        Fundamental::io::binary_batch_pack(buffer,(std::int32_t)arg,std::forward<Args>(args)...);
+        return std::string(buffer.data(), buffer.data() + buffer.size());
     }
 
     template <typename T>
-    buffer_type pack(T&& t) const {
-        buffer_type buffer;
-        msgpack::pack(buffer, std::forward<T>(t));
-        return buffer;
-    }
-
-    template <typename T>
-    T unpack(char const* data, size_t length) {
-        try {
-            msgpack::unpack(msg_, data, length);
-            return msg_.get().as<T>();
-        } catch (...) {
+    static T unpack(const void* data, size_t length, std::size_t skip_index = 0) {
+        T ret {};
+        if (!Fundamental::io::binary_unpack(data, length, ret, true, skip_index)) {
             throw std::invalid_argument("unpack failed: Args not match!");
         }
+        return ret;
     }
-
-private:
-    msgpack::unpacked msg_;
+    template <typename Tuple>
+    static Tuple unpack_tuple(const void* data, size_t length, std::size_t skip_index = 0) {
+        Tuple ret;
+        if (!Fundamental::io::binary_unpack_tuple(data, length, ret, true, skip_index)) {
+            throw std::invalid_argument("unpack failed: Args not match!");
+        }
+        return ret;
+    }
 };
 } // namespace rpc_service
 } // namespace network

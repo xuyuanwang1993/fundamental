@@ -74,7 +74,7 @@ public:
 
     template <typename T>
     T get_user_data() {
-        return nonstd::any_cast<T>(user_data_);
+        return std::any_cast<T>(user_data_);
     }
 
     const std::vector<char>& body() const {
@@ -189,7 +189,7 @@ private:
                 } else if (req_type_ == request_type::sub_pub) {
                     try {
                         msgpack_codec codec;
-                        auto p = codec.unpack<std::tuple<std::string, std::string>>(body_.data(), length);
+                        auto p = codec.unpack_tuple<std::tuple<std::string, std::string>>(body_.data(), length);
                         callback_(std::move(std::get<0>(p)), std::move(std::get<1>(p)), this->shared_from_this());
                     } catch (const std::exception& ex) {
                         print(ex);
