@@ -50,7 +50,6 @@ person get_person(rpc_conn conn) {
 }
 
 void upload(rpc_conn conn, const std::string& filename, const std::string& content) {
-    std::cout << content.size() << std::endl;
     std::ofstream file(filename, std::ios::binary);
     file.write(content.data(), content.size());
 }
@@ -67,7 +66,6 @@ std::string download(rpc_conn conn, const std::string& filename) {
     std::string content;
     content.resize(file_len);
     file.read(&content[0], file_len);
-    std::cout << file_len << std::endl;
 
     return content;
 }
@@ -101,11 +99,6 @@ int get_int(rpc_conn conn, int val) {
     return val;
 }
 
-void benchmark_test() {
-    rpc_server server(9000, std::thread::hardware_concurrency());
-    server.register_handler("echo", echo);
-    server.run();
-}
 
 dummy1 get_dummy(rpc_conn conn, dummy1 d) {
     return d;
@@ -114,7 +107,7 @@ static bool stop = false;
 static std::unique_ptr<std::thread> s_thread;
 rpc_server* p_server = nullptr;
 void server_task() {
-    //  benchmark_test();
+
     rpc_server server(9000, std::thread::hardware_concurrency(), 3600);
     p_server = &server;
     dummy d;

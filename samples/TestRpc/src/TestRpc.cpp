@@ -1,7 +1,9 @@
 
 #include "test_server.h"
 
+#include "fundamental/basic/filesystem_utils.hpp"
 #include "fundamental/basic/log.h"
+
 #include "rpc/basic/rpc_client.hpp"
 #include <chrono>
 #include <fstream>
@@ -31,227 +33,161 @@ TEST(rpc_test, test_add) {
             EXPECT_EQ(op1 + op2, result);
         }
         // test return value type not matched
-        EXPECT_ANY_THROW((client.call<2000, std::string>("add", op2, op1)));
+        EXPECT_THROW((client.call<2000, std::string>("add", op2, op1)), std::invalid_argument);
     } catch (const std::exception& e) {
-        std::cout << "test_add exception:" << e.what() << std::endl;
+        std::cout << __func__ << ":" << e.what() << std::endl;
     }
 }
-#if 0
+
 TEST(rpc_test, test_translate) {
     try {
         rpc_client client("127.0.0.1", 9000);
         bool r = client.connect();
         if (!r) {
-            std::cout << "connect timeout" << std::endl;
+            EXPECT_TRUE(false && "connect timeout");
             return;
         }
 
         auto result = client.call<std::string>("translate", "hello");
-        std::cout << result << std::endl;
+        EXPECT_TRUE(result == "HELLO");
     } catch (const std::exception& e) {
-        std::cout << e.what() << std::endl;
+        std::cout << __func__ << ":" << e.what() << std::endl;
     }
 }
+
 TEST(rpc_test, test_hello) {
     try {
         rpc_client client("127.0.0.1", 9000);
         bool r = client.connect();
         if (!r) {
-            std::cout << "connect timeout" << std::endl;
+            EXPECT_TRUE(false && "connect timeout");
             return;
         }
-
         client.call("hello", "purecpp");
     } catch (const std::exception& e) {
-        std::cout << e.what() << std::endl;
+        std::cout << __func__ << ":" << e.what() << std::endl;
     }
 }
+
 TEST(rpc_test, test_get_person_name) {
     try {
         rpc_client client("127.0.0.1", 9000);
         bool r = client.connect();
         if (!r) {
-            std::cout << "connect timeout" << std::endl;
+            EXPECT_TRUE(false && "connect timeout");
             return;
         }
-
-        auto result = client.call<std::string>("get_person_name", person { 1, "tom", 20 });
-        std::cout << result << std::endl;
+        std::string name = "tom";
+        auto result      = client.call<std::string>("get_person_name", person { 1, name, 20 });
+        EXPECT_EQ(name, result);
     } catch (const std::exception& e) {
-        std::cout << e.what() << std::endl;
+        std::cout << __func__ << ":" << e.what() << std::endl;
     }
 }
+#if 0
 TEST(rpc_test, test_get_person) {
     try {
         rpc_client client("127.0.0.1", 9000);
         bool r = client.connect();
         if (!r) {
-            std::cout << "connect timeout" << std::endl;
+            EXPECT_TRUE(false && "connect timeout");
             return;
         }
 
         auto result = client.call<person>("get_person");
-        std::cout << result.name << std::endl;
+        EXPECT_EQ("tom", result.name);
     } catch (const std::exception& e) {
-        std::cout << e.what() << std::endl;
+        std::cout << __func__ << ":" << e.what() << std::endl;
     }
 }
+
 TEST(rpc_test, test_async_client) {
     rpc_client client("127.0.0.1", 9000);
     bool r = client.connect();
     if (!r) {
-        std::cout << "connect timeout" << std::endl;
+        EXPECT_TRUE(false && "connect timeout");
         return;
     }
 
     client.set_error_callback([](asio::error_code ec) { std::cout << ec.message() << std::endl; });
 
     auto f = client.async_call<FUTURE>("get_person");
-    if (f.wait_for(std::chrono::milliseconds(50)) == std::future_status::timeout) {
-        std::cout << "timeout" << std::endl;
-    } else {
-        auto p = f.get().as<person>();
-        std::cout << p.name << std::endl;
-    }
 
+    EXPECT_EQ("tom", f.get().as<person>().name);
     auto fu = client.async_call<FUTURE>("hello", "purecpp");
     fu.get().as(); // no return
 
-    // sync call
-    client.call("hello", "purecpp");
-    auto p = client.call<person>("get_person");
-
-    std::string str;
-    std::cin >> str;
 }
+#endif
+static std::vector<std::uint8_t> s_file_data(1024 * 1024, 'a');
 TEST(rpc_test, test_upload) {
     rpc_client client("127.0.0.1", 9000);
     bool r = client.connect(1);
     if (!r) {
-        std::cout << "connect timeout" << std::endl;
+        EXPECT_TRUE(false && "connect timeout");
         return;
     }
+    std::string file_path = "test.file";
 
-    std::ifstream file("E:/acl.7z", std::ios::binary);
+    EXPECT_TRUE(Fundamental::fs::WriteFile(file_path, s_file_data.data(), s_file_data.size()));
+    std::ifstream file(file_path, std::ios::binary);
     file.seekg(0, std::ios::end);
     size_t file_len = file.tellg();
     file.seekg(0, std::ios::beg);
     std::string conent;
     conent.resize(file_len);
     file.read(&conent[0], file_len);
-    std::cout << file_len << std::endl;
 
     {
         auto f = client.async_call<FUTURE>("upload", "test", conent);
-        if (f.wait_for(std::chrono::milliseconds(500)) == std::future_status::timeout) {
-            std::cout << "timeout" << std::endl;
-        } else {
-            f.get().as();
-            std::cout << "ok" << std::endl;
-        }
+        EXPECT_NO_THROW((f.get().as()));
     }
     {
         auto f = client.async_call<FUTURE>("upload", "test1", conent);
-        if (f.wait_for(std::chrono::milliseconds(500)) == std::future_status::timeout) {
-            std::cout << "timeout" << std::endl;
-        } else {
-            f.get().as();
-            std::cout << "ok" << std::endl;
-        }
+        EXPECT_NO_THROW((f.get().as()));
     }
 }
+
 TEST(rpc_test, test_download) {
     rpc_client client("127.0.0.1", 9000);
     bool r = client.connect(1);
     if (!r) {
-        std::cout << "connect timeout" << std::endl;
+        EXPECT_TRUE(false && "connect timeout");
         return;
     }
 
-    auto f = client.async_call<FUTURE>("download", "test");
-    if (f.wait_for(std::chrono::milliseconds(500)) == std::future_status::timeout) {
-        std::cout << "timeout" << std::endl;
-    } else {
-        auto content = f.get().as<std::string>();
-        std::cout << content.size() << std::endl;
-        std::ofstream file("test", std::ios::binary);
-        file.write(content.data(), content.size());
-    }
+    auto f       = client.async_call<FUTURE>("download", "test");
+    auto content = f.get().as<std::string>();
+    EXPECT_TRUE(s_file_data.size() == content.size() && ::memcmp(s_file_data.data(), content.data(), content.size()) == 0);
 }
+
 TEST(rpc_test, test_echo) {
     rpc_client client("127.0.0.1", 9000);
     bool r = client.connect();
     if (!r) {
-        std::cout << "connect timeout" << std::endl;
+        EXPECT_TRUE(false && "connect timeout");
         return;
     }
 
     {
         dummy1 d1 { 42, "test" };
         auto result = client.call<dummy1>("get_dummy", d1);
-        std::cout << result.id << std::endl;
+        EXPECT_TRUE(d1.id==result.id);
+        EXPECT_TRUE(d1.str==result.str);
     }
 
     {
         auto result = client.call<std::string>("echo", "test");
-        std::cout << result << std::endl;
+        EXPECT_EQ(result,"test");
     }
 
     {
         auto result = client.call<std::string>("delay_echo", "test");
-        std::cout << result << std::endl;
+        EXPECT_EQ(result,"test");
     }
 }
 
-TEST(rpc_test, test_performance1) {
-    rpc_client client("127.0.0.1", 9000);
-    bool r = client.connect();
-    if (!r) {
-        std::cout << "connect timeout" << std::endl;
-        return;
-    }
 
-    person p { 1, "tom", 20 };
-
-    for (size_t i = 0; i < 100000000; i++) {
-        auto future = client.async_call<FUTURE>("get_name", p);
-        auto status = future.wait_for(std::chrono::seconds(2));
-        if (status == std::future_status::deferred) {
-            std::cout << "deferred\n";
-        } else if (status == std::future_status::timeout) {
-            std::cout << "timeout\n";
-        } else if (status == std::future_status::ready) {
-        }
-    }
-
-    std::cout << "finish\n";
-
-    std::string str;
-    std::cin >> str;
-}
-
-TEST(rpc_test, test_performance2) {
-    rpc_client client("127.0.0.1", 9000);
-    bool r = client.connect();
-    if (!r) {
-        std::cout << "connect timeout" << std::endl;
-        return;
-    }
-
-    person p { 1, "tom", 20 };
-
-    try {
-        for (size_t i = 0; i < 100000000; i++) {
-            client.call<std::string>("get_name", p);
-        }
-        std::cout << "finish\n";
-    } catch (const std::exception& ex) {
-        std::cout << ex.what() << '\n';
-    }
-
-    std::string str;
-    std::cin >> str;
-}
 TEST(rpc_test, test_call_with_timeout) {
     rpc_client client;
     client.async_connect("127.0.0.1", 9000);
@@ -270,6 +206,7 @@ TEST(rpc_test, test_call_with_timeout) {
     std::string str;
     std::cin >> str;
 }
+#if 0
 TEST(rpc_test, test_connect) {
     rpc_client client;
     client.enable_auto_reconnect(); // automatic reconnect
