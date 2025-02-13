@@ -99,7 +99,7 @@ private:
     std::map<std::int32_t, std::string> short_options_dict;
 };
 
-arg_parser::arg_parser(int argc, char* argv[], const std::string& version) :
+inline arg_parser::arg_parser(int argc, char* argv[], const std::string& version) :
 argc(argc), argv(argv), version(version), program_path(argv[0]) {
     AddOption(kHelperOptionName, "show this help page", kHealperShortOption, with_none_param);
     AddOption(kVersionOptionName, "show version information", kVersionShortOption, with_none_param);
@@ -109,7 +109,7 @@ argc(argc), argv(argv), version(version), program_path(argv[0]) {
     }
 }
 
-arg_parser::~arg_parser() {
+inline arg_parser::~arg_parser() {
 }
 
 inline bool arg_parser::AddOption(const std::string& name, const std::string& opt_usage, std::int32_t option_value,
