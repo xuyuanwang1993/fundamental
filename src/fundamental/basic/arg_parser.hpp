@@ -265,9 +265,7 @@ inline void arg_parser::DumpOptions() const {
     for (const auto& [name, option] : options) {
         if (option.option_value < 128) {
             std::cout << "-" << (char)(option.option_value) << ",";
-        } else {
-            std::cout << "--";
-        }
+        } 
         std::cout << "--" << name;
         std::cout << "\t";
         if (option.parser_values.has_value())
