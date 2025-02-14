@@ -9,14 +9,14 @@ Timer::Timer() {
 }
 void Timer::Reset() {
     std::scoped_lock lock(m_timePointMutex);
-    m_previousTime = std::chrono::high_resolution_clock::now();
+    m_previousTime = std::chrono::steady_clock::now();
 }
 
 template <Timer::TimeScale TimeScaleValue>
 double Timer::GetDuration() const {
-    auto currentTime = std::chrono::high_resolution_clock::now();
+    auto currentTime = std::chrono::steady_clock::now();
 
-    std::chrono::high_resolution_clock::time_point previousTime;
+    std::chrono::steady_clock::time_point previousTime;
     {
         std::scoped_lock lock(m_timePointMutex);
         previousTime = m_previousTime;
