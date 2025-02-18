@@ -66,7 +66,7 @@ struct DelayTaskSession {
     void SetNextTimeout(std::int64_t currentTimePoint) {
         nextTimeout = currentTimePoint + interval;
     }
-
+    std::intptr_t owner = 0;
     DelayQueue::TaskType task;
     std::int64_t interval    = 0;
     std::int64_t nextTimeout = 0;
@@ -83,7 +83,7 @@ struct DelayQueue::Imp {
         if (intervalMs < 0 || !task) return DelayQueue::kInvalidHandle;
         if (stateCb) stateCb();
         std::scoped_lock<std::mutex> locker(dataMutex);
-        auto* session = new details::DelayTaskSession { task, intervalMs, 0, isSingle, false, autoManager };
+        auto* session = new details::DelayTaskSession { Owner(), task, intervalMs, 0, isSingle, false, autoManager };
         taskStorage.emplace(session);
         return reinterpret_cast<HandleType>(session);
     }
@@ -113,6 +113,7 @@ struct DelayQueue::Imp {
     }
 
     inline bool RestartDelayTask(HandleType handle) {
+        if (stateCb) stateCb();
         std::scoped_lock<std::mutex> locker(dataMutex);
         if (!ValidateInternal(handle)) return false;
         auto* session = Cast(handle);
@@ -201,13 +202,18 @@ struct DelayQueue::Imp {
             i();
     }
     // internal
+    inline std::intptr_t Owner() const {
+        return reinterpret_cast<std::intptr_t>(this);
+    }
+
     inline details::DelayTaskSession* Cast(HandleType handle) {
         return reinterpret_cast<details::DelayTaskSession*>(handle);
     }
 
     inline bool ValidateInternal(HandleType handle) {
         if (handle == DelayQueue::kInvalidHandle) return false;
-        if (taskStorage.find(Cast(handle)) == taskStorage.end()) return false;
+        auto* s = Cast(handle);
+        if (s->owner != Owner() || taskStorage.find(s) == taskStorage.end()) return false;
         return true;
     }
 
