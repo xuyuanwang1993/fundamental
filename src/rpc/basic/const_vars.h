@@ -40,7 +40,7 @@ struct rpc_header {
 };
 #pragma pack()
 
-static const size_t MAX_BUF_LEN   = 1048576 * 10;
+static const size_t MAX_BUF_LEN   = 1024LLU * 1024 * 1024 * 2;
 static const size_t HEAD_LEN      = sizeof(rpc_header);
 static const size_t INIT_BUF_SIZE = 2 * 1024;
 } // namespace network
