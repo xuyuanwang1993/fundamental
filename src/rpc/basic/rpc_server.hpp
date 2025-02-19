@@ -74,6 +74,10 @@ public:
         publish(key, std::move(token), std::move(data));
     }
 
+    void forward_publish_msg(const std::string& key, std::string_view msg, std::string token = "") {
+        forward_msg(key, std::move(token), std::string(msg));
+    }
+
     std::set<std::string> get_token_list() {
         std::unique_lock<std::mutex> lock(sub_mtx_);
         return token_list_;
@@ -162,15 +166,7 @@ private:
             err_cb_(ec, msg);
         }
     }
-    template <typename T>
-    void publish(std::string key, std::string token, T data) {
-        {
-            std::unique_lock<std::mutex> lock(sub_mtx_);
-            if (sub_map_.empty()) return;
-        }
-
-        auto b = rpc_service::msgpack_codec::pack(data);
-        std::string s_data(b.data(), b.data() + b.size());
+    void forward_msg(std::string key, std::string token, std::string data) {
         std::unique_lock<std::mutex> lock(sub_mtx_);
         auto range = sub_map_.equal_range(key + token);
         if (range.first != range.second) {
@@ -180,12 +176,24 @@ private:
                     continue;
                 }
 
-                conn->publish(key + token, s_data);
+                conn->publish(key + token, data);
             }
         } else {
-            error_callback(asio::error::make_error_code(asio::error::invalid_argument),
-                           "The subscriber of the key: " + key + " does not exist.");
+            if (!sub_map_.empty())
+                error_callback(asio::error::make_error_code(asio::error::invalid_argument),
+                               "The subscriber of the key: " + key + " does not exist.");
         }
+    }
+    template <typename T>
+    void publish(std::string key, std::string token, T data) {
+        {
+            std::unique_lock<std::mutex> lock(sub_mtx_);
+            if (sub_map_.empty()) return;
+        }
+
+        auto b = rpc_service::msgpack_codec::pack(data);
+        std::string s_data(b.data(), b.data() + b.size());
+        forward_msg(std::move(key), std::move(token), std::move(s_data));
     }
 
     void do_await_stop() {

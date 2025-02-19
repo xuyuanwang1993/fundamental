@@ -8,6 +8,8 @@
 #include <rttr/registration>
 #include <thread>
 
+#include "fundamental/basic/log.h"
+#include "fundamental/delay_queue/delay_queue.h"
 using namespace network;
 using namespace rpc_service;
 
@@ -29,6 +31,8 @@ struct dummy {
     }
 };
 
+static Fundamental::DelayQueue s_delay_queue;
+
 std::string translate(rpc_conn conn, const std::string& orignal) {
     std::string temp = orignal;
     for (auto& c : temp) {
@@ -38,7 +42,7 @@ std::string translate(rpc_conn conn, const std::string& orignal) {
 }
 
 void hello(rpc_conn conn, const std::string& str) {
-    std::cout << "hello " << str << std::endl;
+    FINFOS << "hello from client:" << str;
 }
 
 std::string get_person_name(rpc_conn conn, const person& p) {
@@ -77,28 +81,31 @@ std::string get_name(rpc_conn conn, const person& p) {
 // if you want to response later, you can use async model, you can control when
 // to response
 void delay_echo(rpc_conn conn, const std::string& src) {
+    FINFO("delay echo request:{}",src);
     auto sp = conn.lock();
     sp->set_delay(true);
     auto req_id = sp->request_id(); // note: you need keep the request id at that
-    // time, and pass it into the async thread
-    std::thread thd([conn, req_id, src] {
-        std::this_thread::sleep_for(std::chrono::seconds(1));
-        auto conn_sp = conn.lock();
-        if (conn_sp) {
-            conn_sp->pack_and_response(req_id, std::move(src));
-        }
-    });
-    thd.detach();
+
+    auto h = s_delay_queue.AddDelayTask(
+        50,
+        [conn, req_id, src] {
+            auto conn_sp = conn.lock();
+            if (conn_sp) {
+                conn_sp->pack_and_response(req_id, std::move(src));
+            }
+        },
+        true);
+    s_delay_queue.StartDelayTask(h);
 }
 
 std::string echo(rpc_conn conn, const std::string& src) {
+    FINFO("echo request:{}",src);
     return src;
 }
 
 int get_int(rpc_conn conn, int val) {
     return val;
 }
-
 
 dummy1 get_dummy(rpc_conn conn, dummy1 d) {
     return d;
@@ -126,13 +133,15 @@ void server_task() {
     server.register_handler("echo", echo);
     server.register_handler("get_int", get_int);
 
-    server.register_handler("publish_by_token",
-                            [&server](rpc_conn conn, std::string key, std::string token, std::string val) {
-                                server.publish_by_token(std::move(key), std::move(token), std::move(val));
-                            });
+    server.register_handler(
+        "publish_by_token", [&server](rpc_conn conn, std::string key, std::string token, std::string val) {
+            FINFOS << "publish_by_token:" << key << ":" << token << " " << Fundamental::Utils::BufferToHex(val);
+            server.forward_publish_msg(std::move(key), std::move(val), std::move(token));
+        });
 
     server.register_handler("publish", [&server](rpc_conn conn, std::string key, std::string token, std::string val) {
-        server.publish(std::move(key), std::move(val));
+        FINFOS << "publish:" << key << ":" << token << " " << Fundamental::Utils::BufferToHex(val);
+        server.forward_publish_msg(std::move(key), std::move(val));
     });
     server.set_network_err_callback([](std::shared_ptr<connection> conn, std::string reason) {
         std::cout << "remote client address: " << conn->remote_address() << " networking error, reason: " << reason
@@ -140,21 +149,26 @@ void server_task() {
     });
 
     std::thread thd([&server] {
-        person p { 1, "tom", 20 };
+        person p { 10, "jack", 21 };
         while (!stop) {
-            server.publish("key", "hello subscriber");
+            server.publish("key", "hello subscriber from server");
             auto list = server.get_token_list();
             for (auto& token : list) {
                 server.publish_by_token("key", token, p);
-                server.publish_by_token("key1", token, "hello subscriber1");
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(50));
         }
     });
-
+    std::thread t2([]() {
+        while (!stop) {
+            std::this_thread::yield();
+            s_delay_queue.HandleEvent();
+        }
+    });
     server.run();
     stop = true;
     thd.join();
+    t2.join();
 }
 
 void run_server() {

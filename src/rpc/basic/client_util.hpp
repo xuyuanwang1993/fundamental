@@ -28,7 +28,7 @@ inline T get_result(string_view result) {
 
 inline std::string get_error_msg(string_view result) {
     rpc_service::msgpack_codec codec;
-    auto tp = codec.unpack_tuple<std::tuple<std::string>>(result.data(), result.size());
+    auto tp = codec.unpack_tuple<std::tuple<std::string>>(result.data(), result.size(),1);
     return std::get<0>(tp);
 }
 

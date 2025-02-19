@@ -4,11 +4,11 @@
 #include "const_vars.h"
 #include "router.hpp"
 #include "use_asio.hpp"
+#include <any>
 #include <array>
 #include <deque>
 #include <iostream>
 #include <memory>
-#include  <any>
 
 using asio::ip::tcp;
 
@@ -143,7 +143,10 @@ private:
                     read_body(header->func_id, body_len);
                     return;
                 }
-
+                if (header->func_id > 0) {
+                    handle_none_param_request(header->func_id);
+                    return;
+                }
                 if (body_len == 0) { // nobody, just head, maybe as heartbeat.
                     cancel_timer();
                     read_head();
@@ -179,13 +182,7 @@ private:
             if (!ec) {
                 read_head();
                 if (req_type_ == request_type::req_res) {
-                    route_result_t ret = router_.route<connection>(func_id, std::string_view { body_.data(), length },
-                                                                   this->shared_from_this());
-                    if (delay_) {
-                        delay_ = false;
-                    } else {
-                        response_interal(req_id_, std::make_shared<std::string>(std::move(ret.result)));
-                    }
+                    process_request(func_id, body_.data(), length);
                 } else if (req_type_ == request_type::sub_pub) {
                     try {
                         msgpack_codec codec;
@@ -205,7 +202,19 @@ private:
             }
         });
     }
-
+    void handle_none_param_request(uint32_t func_id) {
+        read_head();
+        process_request(func_id, nullptr, 0);
+    }
+    void process_request(uint32_t func_id, const char* data, std::size_t size) {
+        route_result_t ret =
+            router_.route<connection>(func_id, std::string_view { data, size }, this->shared_from_this());
+        if (delay_) {
+            delay_ = false;
+        } else {
+            response_interal(req_id_, std::make_shared<std::string>(std::move(ret.result)));
+        }
+    }
     void response_interal(uint64_t req_id, std::shared_ptr<std::string> data,
                           request_type req_type = request_type::req_res) {
         assert(data->size() < MAX_BUF_LEN);

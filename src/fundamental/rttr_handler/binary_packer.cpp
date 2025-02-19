@@ -115,6 +115,12 @@ bool binary_pack_basic_value(const type& t, const variant& var, std::vector<std:
     } else if (t == type::get<std::string>()) {
         if (!type_flag) pack_basic_value(out, string_pack_data);
         binary_pack_string(out, var.to_string());
+    } else if (t == type::get<const char*>()) {
+        if (!type_flag) pack_basic_value(out, string_pack_data);
+        auto str = var.get_value<const char*>();
+        if (!str) throw std::invalid_argument("str can't be null");
+        auto str_size = strlen(str);
+        binary_pack_string(out, std::string(str, str_size));
     } else {
         return false;
     }
@@ -194,6 +200,8 @@ void binary_pack_object_recursively(const rttr::variant& var, std::vector<std::u
         bool flag        = false;
         std::string data = var.to_string(&flag);
         if (!flag) {
+            auto v_type = var.get_type();
+            auto v_name = v_type.get_name();
             throw std::invalid_argument(Fundamental::StringFormat(
                 "type:{} convert to string failed,you should register convert func "
                 "std::string(const {} &,bool &) with type::register_converter_func",
