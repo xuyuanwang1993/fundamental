@@ -4,6 +4,7 @@
 #include "fundamental/basic/filesystem_utils.hpp"
 #include "fundamental/basic/log.h"
 #include "fundamental/delay_queue/delay_queue.h"
+#include "rpc/basic/custom_rpc_proxy.hpp"
 
 #include "rpc/basic/rpc_client.hpp"
 #include <chrono>
@@ -388,6 +389,32 @@ TEST(rpc_test, test_sub1) {
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
     } while (0);
     EXPECT_EQ(success, true);
+}
+
+TEST(rpc_test, test_proxy) {
+    Fundamental::Timer check_timer;
+    Fundamental::ScopeGuard check_guard(
+        [&]() { EXPECT_LE(check_timer.GetDuration<Fundamental::Timer::TimeScale::Millisecond>(), 100); });
+    rpc_client client("127.0.0.1", std::stoi(kProxyServicePort));
+    client.set_proxy(
+        std::make_shared<network::CustomRpcProxy>(kProxyServiceName, kProxyServiceField, kProxyServiceToken));
+    bool r = client.connect();
+    if (!r) {
+        EXPECT_TRUE(false && "connect timeout");
+        return;
+    }
+
+    {
+        dummy1 d1 { 42, "test" };
+        auto result = client.call<dummy1>("get_dummy", d1);
+        EXPECT_TRUE(d1.id == result.id);
+        EXPECT_TRUE(d1.str == result.str);
+    }
+
+    {
+        auto result = client.call<std::string>("echo", "test");
+        EXPECT_EQ(result, "test");
+    }
 }
 int main(int argc, char** argv) {
     Fundamental::Logger::LoggerInitOptions options;

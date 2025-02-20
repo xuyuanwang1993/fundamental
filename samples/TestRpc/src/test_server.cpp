@@ -8,8 +8,15 @@
 #include <rttr/registration>
 #include <thread>
 
+#include "fundamental/application/application.hpp"
 #include "fundamental/basic/log.h"
 #include "fundamental/delay_queue/delay_queue.h"
+#include "network/services/proxy_server/proxy_connection.hpp"
+#include "network/services/proxy_server/proxy_defines.h"
+#include "network/services/proxy_server/traffic_proxy_service/traffic_proxy_connection.hpp"
+#include "network/services/proxy_server/traffic_proxy_service/traffic_proxy_defines.h"
+#include "network/services/proxy_server/traffic_proxy_service/traffic_proxy_manager.hpp"
+
 using namespace network;
 using namespace rpc_service;
 
@@ -31,7 +38,7 @@ struct dummy {
     }
 };
 
-static Fundamental::DelayQueue s_delay_queue;
+static Fundamental::DelayQueue& s_delay_queue = *(Fundamental::Application::Instance().DelayQueue());
 
 std::string translate(rpc_conn conn, const std::string& orignal) {
     std::string temp = orignal;
@@ -81,7 +88,7 @@ std::string get_name(rpc_conn conn, const person& p) {
 // if you want to response later, you can use async model, you can control when
 // to response
 void delay_echo(rpc_conn conn, const std::string& src) {
-    FINFO("delay echo request:{}",src);
+    FINFO("delay echo request:{}", src);
     auto sp = conn.lock();
     sp->set_delay(true);
     auto req_id = sp->request_id(); // note: you need keep the request id at that
@@ -99,7 +106,7 @@ void delay_echo(rpc_conn conn, const std::string& src) {
 }
 
 std::string echo(rpc_conn conn, const std::string& src) {
-    FINFO("echo request:{}",src);
+    FINFO("echo request:{}", src);
     return src;
 }
 
@@ -160,11 +167,38 @@ void server_task() {
         }
     });
     std::thread t2([]() {
-        while (!stop) {
-            std::this_thread::yield();
-            s_delay_queue.HandleEvent();
+        network::io_context_pool::s_excutorNums = 10;
+        network::io_context_pool::Instance().start();
+        {
+            using namespace network::proxy;
+            auto& manager = TrafficProxyManager::Instance();
+            { // add http proxy
+                TrafficProxyHostInfo host;
+                host.token = kProxyServiceToken;
+                {
+                    TrafficProxyHost hostRecord;
+                    hostRecord.host    = "0.0.0.0";
+                    hostRecord.service = "9000";
+                    host.hosts.emplace(TrafficProxyDataType(kProxyServiceField), std::move(hostRecord));
+                }
+                manager.UpdateTrafficProxyHostInfo(TrafficProxyDataType(kProxyServiceName), std::move(host));
+            }
         }
+        // Initialise the server.
+        using asio::ip::tcp;
+        tcp::resolver resolver(network::io_context_pool::Instance().get_io_context());
+        auto endpoints = resolver.resolve("0.0.0.0", kProxyServicePort);
+        if (endpoints.empty()) {
+            FERR("resolve failed");
+            return;
+        }
+        network::proxy::ProxyServer s(*endpoints.begin());
+        s.GetHandler().RegisterProtocal(network::proxy::kTrafficProxyOpcode,
+                                        network::proxy::TrafficProxyConnection::MakeShared);
+        s.Start();
+        Fundamental::Application::Instance().Loop();
     });
+
     server.run();
     stop = true;
     thd.join();
@@ -177,6 +211,7 @@ void run_server() {
 
 void exit_server() {
     stop = false;
+    Fundamental::Application::Instance().Exit();
     if (p_server) p_server->post_stop();
     if (s_thread) s_thread->join();
 }

@@ -4,14 +4,19 @@
 #include "md5.hpp"
 #include "meta_util.hpp"
 #include "use_asio.hpp"
+
+
 #include <deque>
 #include <functional>
 #include <future>
 #include <iostream>
+#include <memory>
 #include <set>
 #include <string>
 #include <thread>
 #include <utility>
+
+#include "rpc_client_proxy.hpp"
 
 namespace network {
 
@@ -69,13 +74,15 @@ const constexpr size_t DEFAULT_TIMEOUT = 5000; // milliseconds
 
 class rpc_client : private asio::noncopyable {
 public:
-    rpc_client() : socket_(ios_), work_(asio::make_work_guard(ios_)), deadline_(ios_), body_(INIT_BUF_SIZE) {
+    rpc_client() :
+    socket_(ios_), work_(asio::make_work_guard(ios_)), reconnect_delay_timer_(ios_), deadline_(ios_),
+    body_(INIT_BUF_SIZE) {
         thd_ = std::make_shared<std::thread>([this] { ios_.run(); });
     }
 
     rpc_client(std::function<void(long, const std::string&)> on_result_received_callback) :
-    socket_(ios_), work_(asio::make_work_guard(ios_)), deadline_(ios_), body_(INIT_BUF_SIZE),
-    on_result_received_callback_(std::move(on_result_received_callback)) {
+    socket_(ios_), work_(asio::make_work_guard(ios_)), reconnect_delay_timer_(ios_), deadline_(ios_),
+    body_(INIT_BUF_SIZE), on_result_received_callback_(std::move(on_result_received_callback)) {
         thd_ = std::make_shared<std::thread>([this] { ios_.run(); });
     }
 
@@ -84,8 +91,9 @@ public:
 
     rpc_client(std::function<void(long, const std::string&)> on_result_received_callback, std::string host,
                unsigned short port) :
-    socket_(ios_), work_(asio::make_work_guard(ios_)), host_(std::move(host)), port_(port), deadline_(ios_),
-    body_(INIT_BUF_SIZE), on_result_received_callback_(std::move(on_result_received_callback)) {
+    socket_(ios_), work_(asio::make_work_guard(ios_)), host_(std::move(host)), port_(port),
+    reconnect_delay_timer_(ios_), deadline_(ios_), body_(INIT_BUF_SIZE),
+    on_result_received_callback_(std::move(on_result_received_callback)) {
         thd_ = std::make_shared<std::thread>([this] { ios_.run(); });
     }
 
@@ -94,6 +102,7 @@ public:
         asio::post(ios_, [this, &promise] {
             close();
             stop_client_ = true;
+            reconnect_delay_timer_.cancel();
             deadline_.cancel();
             promise.set_value();
         });
@@ -165,6 +174,10 @@ public:
         } else {
             deadline_.cancel();
         }
+    }
+
+    void set_proxy(std::shared_ptr<RpcClientProxyInterface> proxy) {
+        proxy_interface = proxy;
     }
 
     void update_addr(const std::string& host, unsigned short port) {
@@ -344,21 +357,43 @@ private:
                 if (reconnect_cnt_ > 0) {
                     reconnect_cnt_--;
                 }
-
                 async_reconnect();
             } else {
-                has_connected_ = true;
-                do_read();
-                resend_subscribe();
-                if (has_wait_) conn_cond_.notify_one();
+                handle_connect_success();
             }
         });
     }
-
+    void perform_proxy() {
+        proxy_interface->init([this]() { rpc_protocal_handle(); },
+                              [this](const asio::error_code& ec) { error_callback(ec); }, &socket_);
+        proxy_interface->perform();
+    }
+    void handle_connect_success() {
+        if (proxy_interface)
+            perform_proxy();
+        else {
+            rpc_protocal_handle();
+        }
+    }
+    void rpc_protocal_handle() {
+        has_connected_ = true;
+        do_read();
+        resend_subscribe();
+        if (has_wait_) conn_cond_.notify_one();
+    }
     void async_reconnect() {
+        if (stop_client_) {
+            return;
+        }
         reset_socket();
-        async_connect();
-        std::this_thread::sleep_for(std::chrono::milliseconds(connect_timeout_));
+        reconnect_delay_timer_.expires_after(std::chrono::milliseconds(connect_timeout_));
+        reconnect_delay_timer_.async_wait([this](const asio::error_code& ec) {
+            if (!ec) {
+                async_connect();
+                return;
+            }
+            error_callback(ec);
+        });
     }
 
     void reset_deadline_timer(size_t timeout) {
@@ -675,7 +710,8 @@ private:
     std::shared_ptr<std::thread> thd_ = nullptr;
 
     std::string host_;
-    unsigned short port_            = 0;
+    unsigned short port_ = 0;
+    asio::steady_timer reconnect_delay_timer_;
     size_t connect_timeout_         = 1000; // s
     int reconnect_cnt_              = -1;
     std::atomic_bool has_connected_ = { false };
@@ -715,5 +751,9 @@ private:
     std::set<std::pair<std::string, std::string>> key_token_set_;
 
     std::function<void(long, const std::string&)> on_result_received_callback_;
+    //
+    std::shared_ptr<RpcClientProxyInterface> proxy_interface;
 };
+
+
 } // namespace network
