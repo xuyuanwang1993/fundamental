@@ -5,7 +5,6 @@
 #include "meta_util.hpp"
 #include "use_asio.hpp"
 
-
 #include <deque>
 #include <functional>
 #include <future>
@@ -19,7 +18,7 @@
 #include "rpc_client_proxy.hpp"
 
 namespace network {
-
+namespace rpc_service {
 class req_result {
 public:
     req_result() = default;
@@ -186,11 +185,16 @@ public:
     }
 
     void close() {
-        asio::error_code ec;
 
         if (!has_connected_) return;
-
         has_connected_ = false;
+        asio::error_code ec;
+#ifndef RPC_DISABLE_SSL
+        if (ssl_stream_) {
+            ssl_stream_->shutdown(ec);
+            ssl_stream_ = nullptr;
+        }
+#endif
         socket_.shutdown(asio::ip::tcp::socket::shutdown_both, ec);
         socket_.close(ec);
         clear_cache();
@@ -337,7 +341,20 @@ public:
                       std::string(buf.data(), buf.data() + buf.size()));
     }
 
+    void enable_ssl(const std::string& ser_pem_path) {
+#ifndef RPC_DISABLE_SSL
+        pem_path = ser_pem_path;
+#endif
+    }
+
 private:
+    bool is_ssl() const {
+#ifndef RPC_DISABLE_SSL
+        return !pem_path.empty();
+#else
+        return false;
+#endif
+    }
     void async_connect() {
         assert(port_ != 0);
         auto addr = asio::ip::make_address(host_);
@@ -364,7 +381,7 @@ private:
         });
     }
     void perform_proxy() {
-        proxy_interface->init([this]() { rpc_protocal_handle(); },
+        proxy_interface->init([this]() { handle_transfer_ready(); },
                               [this](const asio::error_code& ec) { error_callback(ec); }, &socket_);
         proxy_interface->perform();
     }
@@ -372,10 +389,17 @@ private:
         if (proxy_interface)
             perform_proxy();
         else {
-            rpc_protocal_handle();
+            handle_transfer_ready();
         }
     }
-    void rpc_protocal_handle() {
+    void handle_transfer_ready() {
+        if (is_ssl()) {
+            ssl_handshake();
+        } else {
+            rpc_protocal_ready();
+        }
+    }
+    void rpc_protocal_ready() {
         has_connected_ = true;
         do_read();
         resend_subscribe();
@@ -623,6 +647,12 @@ private:
 
     void reset_socket() {
         asio::error_code igored_ec;
+#ifndef RPC_DISABLE_SSL
+        if (ssl_stream_) {
+            ssl_stream_->shutdown(igored_ec);
+            ssl_stream_ = nullptr;
+        }
+#endif
         socket_.close(igored_ec);
         socket_ = decltype(socket_)(ios_);
         if (!socket_.is_open()) {
@@ -688,20 +718,81 @@ private:
     void set_default_error_cb() {
         err_cb_ = [this](asio::error_code) { async_connect(); };
     }
+    bool verify_certificate(bool preverified, asio::ssl::verify_context& ctx) {
+        // The verify callback can be used to check whether the certificate that is
+        // being presented is valid for the peer. For example, RFC 2818 describes
+        // the steps involved in doing this for HTTPS. Consult the OpenSSL
+        // documentation for more details. Note that the callback is called once
+        // for each certificate in the certificate chain, starting from the root
+        // certificate authority.
 
+        // In this example we will simply print the certificate's subject name.
+        char subject_name[256];
+        X509* cert = X509_STORE_CTX_get_current_cert(ctx.native_handle());
+        X509_NAME_oneline(X509_get_subject_name(cert), subject_name, 256);
+#ifdef RPC_DEBUG
+        std::cout << "[rpc] ssl Verifying:" << subject_name << "\n";
+#endif
+        return preverified;
+    }
+    void ssl_handshake() {
+#ifndef RPC_DISABLE_SSL
+        asio::ssl::context ssl_context(asio::ssl::context::sslv23);
+        ssl_context.set_default_verify_paths();
+        asio::error_code ec;
+        ssl_context.set_options(asio::ssl::context::default_workarounds, ec);
+        ssl_context.load_verify_file(pem_path, ec);
+        if (ec) {
+            close();
+            error_callback(ec);
+            return;
+        }
+        ssl_stream_ = std::make_unique<asio::ssl::stream<asio::ip::tcp::socket&>>(socket_, ssl_context);
+        ssl_stream_->set_verify_mode(asio::ssl::verify_peer);
+        ssl_stream_->set_verify_callback(
+            std::bind(&rpc_client::verify_certificate, this, std::placeholders::_1, std::placeholders::_2));
+        ssl_stream_->async_handshake(asio::ssl::stream_base::client, [this](const asio::error_code& ec) {
+            if (!ec) {
+                rpc_protocal_ready();
+            } else {
+                close();
+                error_callback(ec);
+            }
+        });
+#endif
+    }
     template <typename Handler>
     void async_read_head(Handler handler) {
-        asio::async_read(socket_, asio::buffer(head_, HEAD_LEN), std::move(handler));
+        if (is_ssl()) {
+#ifndef RPC_DISABLE_SSL
+            asio::async_read(*ssl_stream_, asio::buffer(head_, HEAD_LEN), std::move(handler));
+#endif
+        } else {
+            asio::async_read(socket_, asio::buffer(head_, HEAD_LEN), std::move(handler));
+        }
     }
 
     template <typename Handler>
     void async_read(size_t size_to_read, Handler handler) {
-        asio::async_read(socket_, asio::buffer(body_.data(), size_to_read), std::move(handler));
+        if (is_ssl()) {
+#ifndef RPC_DISABLE_SSL
+            asio::async_read(*ssl_stream_, asio::buffer(body_.data(), size_to_read), std::move(handler));
+#endif
+        } else {
+
+            asio::async_read(socket_, asio::buffer(body_.data(), size_to_read), std::move(handler));
+        }
     }
 
     template <typename BufferType, typename Handler>
     void async_write(const BufferType& buffers, Handler handler) {
-        asio::async_write(socket_, buffers, std::move(handler));
+        if (is_ssl()) {
+#ifndef RPC_DISABLE_SSL
+            asio::async_write(*ssl_stream_, buffers, std::move(handler));
+#endif
+        } else {
+            asio::async_write(socket_, buffers, std::move(handler));
+        }
     }
 
     asio::io_context ios_;
@@ -753,7 +844,10 @@ private:
     std::function<void(long, const std::string&)> on_result_received_callback_;
     //
     std::shared_ptr<RpcClientProxyInterface> proxy_interface;
+#ifndef RPC_DISABLE_SSL
+    std::unique_ptr<asio::ssl::stream<asio::ip::tcp::socket&>> ssl_stream_ = nullptr;
+    std::string pem_path;
+#endif
 };
-
-
+} // namespace rpc_service
 } // namespace network

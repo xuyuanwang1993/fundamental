@@ -8,6 +8,7 @@ using string_view = std::string_view;
 #include "rpc/basic/codec.h"
 
 namespace network {
+namespace rpc_service {
 inline bool has_error(string_view result) {
     if (result.empty()) {
         return true;
@@ -28,7 +29,7 @@ inline T get_result(string_view result) {
 
 inline std::string get_error_msg(string_view result) {
     rpc_service::msgpack_codec codec;
-    auto tp = codec.unpack_tuple<std::tuple<std::string>>(result.data(), result.size(),1);
+    auto tp = codec.unpack_tuple<std::tuple<std::string>>(result.data(), result.size(), 1);
     return std::get<0>(tp);
 }
 
@@ -40,4 +41,5 @@ inline T as(string_view result) {
 
     return get_result<T>(result);
 }
+} // namespace rpc_service
 } // namespace network

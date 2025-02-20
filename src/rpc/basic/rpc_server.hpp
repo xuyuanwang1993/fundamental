@@ -5,6 +5,7 @@
 #include "io_service_pool.h"
 #include "router.hpp"
 #include <condition_variable>
+#include <filesystem>
 #include <mutex>
 #include <set>
 #include <thread>
@@ -14,6 +15,7 @@ using asio::ip::tcp;
 namespace network {
 namespace rpc_service {
 using rpc_conn = std::weak_ptr<connection>;
+
 class rpc_server : private asio::noncopyable {
 public:
     rpc_server(unsigned short port, size_t size, size_t timeout_seconds = 15, size_t check_seconds = 10) :
@@ -85,6 +87,21 @@ public:
     void post_stop() {
         stop();
     }
+    // this function will throw when param is invalid
+    void enable_ssl(rpc_server_ssl_config ssl_config) {
+#ifndef RPC_DISABLE_SSL
+        if (ssl_config.certificate_path.empty() || ssl_config.private_key_path.empty() ||
+            !std::filesystem::is_regular_file(ssl_config.certificate_path) ||
+            !std::filesystem::is_regular_file(ssl_config.private_key_path)) {
+            throw std::invalid_argument("rpc_server/ssl need valid certificate and key file");
+        }
+        if (!ssl_config.tmp_dh_path.empty() && !std::filesystem::is_regular_file(ssl_config.tmp_dh_path)) {
+            throw std::invalid_argument("tmp_dh_path is not existed");
+        }
+        std::swap(ssl_config_, ssl_config);
+        if (!ssl_config_.passwd_cb) ssl_config_.passwd_cb = [](std::string) -> std::string { return "123456"; };
+#endif
+    }
 
 private:
     void do_accept() {
@@ -106,6 +123,11 @@ private:
                 // LOG(INFO) << "acceptor error: " <<
                 // ec.message();
             } else {
+#ifndef RPC_DISABLE_SSL
+                if (!ssl_config_.certificate_path.empty()) {
+                    conn_->enable_ssl(ssl_config_);
+                }
+#endif
                 if (on_net_err_callback_) {
                     conn_->on_network_error(on_net_err_callback_);
                 }
@@ -254,6 +276,9 @@ private:
     bool stop_check_pub_sub_ = false;
     router router_;
     std::atomic_bool has_stoped_ = { false };
+#ifndef RPC_DISABLE_SSL
+    rpc_server_ssl_config ssl_config_;
+#endif
 };
 } // namespace rpc_service
   // namespace rpc_service

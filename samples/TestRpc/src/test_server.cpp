@@ -120,9 +120,10 @@ dummy1 get_dummy(rpc_conn conn, dummy1 d) {
 static bool stop = false;
 static std::unique_ptr<std::thread> s_thread;
 rpc_server* p_server = nullptr;
-void server_task() {
+void server_task(std::promise<void>& sync_p) {
 
     rpc_server server(9000, std::thread::hardware_concurrency(), 3600);
+    server.enable_ssl({ nullptr, "server.crt", "server.key", "dh2048.pem" });
     p_server = &server;
     dummy d;
     server.register_handler("add", &dummy::add, &d);
@@ -166,7 +167,7 @@ void server_task() {
             std::this_thread::sleep_for(std::chrono::milliseconds(50));
         }
     });
-    std::thread t2([]() {
+    std::thread t2([&]() {
         network::io_context_pool::s_excutorNums = 10;
         network::io_context_pool::Instance().start();
         {
@@ -196,6 +197,7 @@ void server_task() {
         s.GetHandler().RegisterProtocal(network::proxy::kTrafficProxyOpcode,
                                         network::proxy::TrafficProxyConnection::MakeShared);
         s.Start();
+        sync_p.set_value();
         Fundamental::Application::Instance().Loop();
     });
 
@@ -206,7 +208,9 @@ void server_task() {
 }
 
 void run_server() {
-    s_thread = std::make_unique<std::thread>(server_task);
+    std::promise<void> sync_p;
+    s_thread = std::make_unique<std::thread>([&]() { server_task(sync_p); });
+    sync_p.get_future().get();
 }
 
 void exit_server() {

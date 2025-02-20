@@ -4,7 +4,7 @@
 #include <functional>
 
 namespace network {
-
+namespace rpc_service {
 template <typename... Args, typename Func, std::size_t... Idx>
 void for_each(const std::tuple<Args...>& t, Func&& f, std::index_sequence<Idx...>) {
     (void)std::initializer_list<int> { (f(std::get<Idx>(t)), void(), 0)... };
@@ -100,6 +100,7 @@ using nth_type_of = std::tuple_element_t<N, std::tuple<Args...>>;
 
 template <typename... Args>
 using last_type_of = nth_type_of<sizeof...(Args) - 1, Args...>;
+} // namespace rpc_service
 } // namespace network
 
 #endif // REST_RPC_META_UTIL_HPP

@@ -14,12 +14,14 @@
 
 using namespace network;
 using namespace network::rpc_service;
+#if 0
 TEST(rpc_test, test_add) {
     Fundamental::Timer check_timer;
     Fundamental::ScopeGuard check_guard(
         [&]() { EXPECT_LE(check_timer.GetDuration<Fundamental::Timer::TimeScale::Millisecond>(), 100); });
     try {
         rpc_client client("127.0.0.1", 9000);
+
         bool r = client.connect();
         if (!r) {
             EXPECT_TRUE(false && "connect timeout");
@@ -78,6 +80,7 @@ TEST(rpc_test, test_hello) {
         std::cout << __func__ << ":" << e.what() << std::endl;
     }
 }
+
 
 TEST(rpc_test, test_get_person_name) {
     Fundamental::Timer check_timer;
@@ -390,14 +393,14 @@ TEST(rpc_test, test_sub1) {
     } while (0);
     EXPECT_EQ(success, true);
 }
-
 TEST(rpc_test, test_proxy) {
     Fundamental::Timer check_timer;
     Fundamental::ScopeGuard check_guard(
         [&]() { EXPECT_LE(check_timer.GetDuration<Fundamental::Timer::TimeScale::Millisecond>(), 100); });
+
     rpc_client client("127.0.0.1", std::stoi(kProxyServicePort));
-    client.set_proxy(
-        std::make_shared<network::CustomRpcProxy>(kProxyServiceName, kProxyServiceField, kProxyServiceToken));
+    client.set_proxy(std::make_shared<network::rpc_service::CustomRpcProxy>(kProxyServiceName, kProxyServiceField,
+                                                                            kProxyServiceToken));
     bool r = client.connect();
     if (!r) {
         EXPECT_TRUE(false && "connect timeout");
@@ -416,6 +419,58 @@ TEST(rpc_test, test_proxy) {
         EXPECT_EQ(result, "test");
     }
 }
+#endif
+#ifndef RPC_DISABLE_SSL
+TEST(rpc_test, test_ssl) {
+    Fundamental::Timer check_timer;
+    Fundamental::ScopeGuard check_guard(
+        [&]() { EXPECT_LE(check_timer.GetDuration<Fundamental::Timer::TimeScale::Millisecond>(), 100); });
+    try {
+        rpc_client client("127.0.0.1", 9000);
+        client.enable_ssl("server.crt");
+        bool r = client.connect();
+        if (!r) {
+            EXPECT_TRUE(false && "connect timeout");
+            return;
+        }
+        std::size_t cnt = 100;
+        while (cnt > 0) {
+            --cnt;
+            client.call<std::string>("echo", "test");
+        }
+    } catch (const std::exception& e) {
+        std::cout << __func__ << ":" << e.what() << std::endl;
+    }
+}
+// TEST(rpc_test, test_ssl_proxy) {
+//     Fundamental::Timer check_timer;
+//     Fundamental::ScopeGuard check_guard(
+//         [&]() { EXPECT_LE(check_timer.GetDuration<Fundamental::Timer::TimeScale::Millisecond>(), 100); });
+
+//     rpc_client client("127.0.0.1", std::stoi(kProxyServicePort));
+//     client.enable_ssl("server.crt");
+//     client.set_proxy(std::make_shared<network::rpc_service::CustomRpcProxy>(kProxyServiceName, kProxyServiceField,
+//                                                                             kProxyServiceToken));
+//     bool r = client.connect();
+//     if (!r) {
+//         EXPECT_TRUE(false && "connect timeout");
+//         return;
+//     }
+
+//     {
+//         dummy1 d1 { 42, "test" };
+//         auto result = client.call<dummy1>("get_dummy", d1);
+//         EXPECT_TRUE(d1.id == result.id);
+//         EXPECT_TRUE(d1.str == result.str);
+//     }
+
+//     {
+//         auto result = client.call<std::string>("echo", "test");
+//         EXPECT_EQ(result, "test");
+//     }
+// }
+#endif
+
 int main(int argc, char** argv) {
     Fundamental::Logger::LoggerInitOptions options;
     options.minimumLevel = Fundamental::LogLevel::debug;

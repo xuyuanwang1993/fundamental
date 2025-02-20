@@ -27,12 +27,13 @@ std::string echo(rpc_conn conn, const std::string& src) {
 
 static std::unique_ptr<std::thread> s_thread;
 rpc_server* p_server = nullptr;
-void server_task() {
+void server_task(std::promise<void>& sync_p) {
 
     rpc_server server(9000, std::thread::hardware_concurrency(), 3600);
+    server.enable_ssl({ nullptr, "server.crt", "server.key", "dh2048.pem" });
     p_server = &server;
     server.register_handler("echo", echo);
-        std::thread t2([]() {
+    std::thread t2([&]() {
         network::io_context_pool::s_excutorNums = 10;
         network::io_context_pool::Instance().start();
         {
@@ -62,6 +63,7 @@ void server_task() {
         s.GetHandler().RegisterProtocal(network::proxy::kTrafficProxyOpcode,
                                         network::proxy::TrafficProxyConnection::MakeShared);
         s.Start();
+        sync_p.set_value();
         Fundamental::Application::Instance().Loop();
     });
     server.run();
@@ -69,7 +71,9 @@ void server_task() {
 }
 
 void run_server() {
-    s_thread = std::make_unique<std::thread>(server_task);
+    std::promise<void> sync_p;
+    s_thread = std::make_unique<std::thread>([&]() { server_task(sync_p); });
+    sync_p.get_future().wait();
 }
 
 void exit_server() {
