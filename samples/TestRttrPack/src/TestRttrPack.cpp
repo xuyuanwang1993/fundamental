@@ -85,7 +85,7 @@ struct CustomObject {
     std::vector<color> cs;
     std::vector<nlohmann::json> objects;
     std::list<int> is;
-    
+
     bool operator==(const CustomObject& other) const noexcept {
         return cs == other.cs && objects == other.objects && is == other.is;
     }
@@ -152,6 +152,52 @@ RTTR_REGISTRATION {
 }
 int main(int argc, char* argv[]) {
     using namespace Fundamental::io;
+
+    {
+        int a            = 2;
+        int b            = 3;
+        int c            = 4;
+        using tuple_type = std::tuple<int, int, int>;
+        tuple_type origin { a, b, c };
+        auto data  = binary_batch_pack(a, b, c);
+        auto data2 = binary_pack_tuple(origin);
+        FINFOS << "gen buf:" << Fundamental::Utils::BufferToHex(data.data(), data.size());
+        FINFOS << "gen buf:" << Fundamental::Utils::BufferToHex(data2.data(), data2.size());
+        tuple_type gen;
+
+        FASSERT(binary_unpack_tuple(data.data(), data.size(), gen, true, 0) == true);
+        FASSERT(origin == gen);
+        tuple_type gen2;
+        FASSERT(binary_unpack_tuple(data2.data(), data2.size(), gen2, true, 0) == true);
+        FASSERT(origin == gen2);
+        int a_c = 0;
+        int b_c = 0;
+        int c_c = 0;
+        FASSERT(binary_bacth_unpack(data.data(), data.size(), true, 0, a_c, b_c, c_c) == true);
+        FASSERT(a == a_c && b == b_c && c == c_c);
+        a_c = 0;
+        b_c = 0;
+        c_c = 0;
+        FASSERT(binary_bacth_unpack(data2.data(), data2.size(), true, 0, a_c, b_c, c_c) == true);
+        FASSERT(a == a_c && b == b_c && c == c_c);
+    }
+
+    {
+        int x     = 2;
+        int y     = 3;
+        auto data = binary_pack(x);
+        binary_pack(data, y);
+        FINFOS << "gen buf:" << Fundamental::Utils::BufferToHex(data.data(), data.size());
+
+        int x_gen = 0;
+        int y_gen = 0;
+
+        FINFOS << binary_unpack(data.data(), data.size(), x_gen, true, 0);
+        FINFOS << binary_unpack(data.data(), data.size(), y_gen, true, 1);
+        FASSERT(x == x_gen);
+        FASSERT(y == y_gen);
+    }
+
     {
         CustomObject origin;
         origin.cs.push_back(color::blue);

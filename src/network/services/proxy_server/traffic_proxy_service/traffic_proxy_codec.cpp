@@ -35,5 +35,14 @@ bool TrafficDecoder::DecodeCommandFrame<TrafficProxyRequest>(const TrafficProxyD
     return true;
 }
 
+void TrafficEncoder::EncodeTrafficProxyRequest(const std::string& service, const std::string& field,
+                                               const std::string& token, ProxyFrame& outFrame) {
+    TrafficProxyRequest req;
+    req.field            = field;
+    req.proxyServiceName = service;
+    req.token            = token;
+    TrafficEncoder::EncodeProxyFrame(outFrame, req);
+}
+
 } // namespace proxy
 } // namespace network

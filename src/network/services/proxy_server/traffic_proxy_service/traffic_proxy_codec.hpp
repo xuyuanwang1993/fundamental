@@ -10,6 +10,8 @@ struct TrafficEncoder {
     static void EncodeCommandFrame(TrafficProxyDataType& dstBuffer, const CommandFrame& command_frame);
     template <typename CommandFrame>
     static void EncodeProxyFrame(ProxyFrame& dstFrame, const CommandFrame& command_frame);
+    static void EncodeTrafficProxyRequest(const std::string& service, const std::string& field, const std::string& token,
+                                      ProxyFrame& outFrame) ;
 };
 
 struct TrafficDecoder {
@@ -23,5 +25,6 @@ inline void TrafficEncoder::EncodeProxyFrame(ProxyFrame& dstFrame, const Command
     EncodeCommandFrame(dstFrame.payload, command_frame);
     ProxyRequestHandler::EncodeFrame(dstFrame);
 }
+
 } // namespace proxy
 } // namespace network

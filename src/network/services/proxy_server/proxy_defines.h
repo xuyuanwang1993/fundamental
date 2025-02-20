@@ -43,6 +43,26 @@ struct ProxyFrame {
         ret.push_back(asio::const_buffer(payload.GetData(), payload.GetSize()));
         return ret;
     }
+    template <typename VecBufferType>
+    void ToVecBuffer(VecBufferType& out) {
+        std::size_t out_size = 2 + 1 + 1 + 1 + 4 + sizeof(sizeStorage) + payload.GetSize();
+        out.resize(out_size);
+        auto* write_ptr = out.data();
+        std::memcpy(write_ptr, &fixed, 2);
+        write_ptr = write_ptr + 2;
+        std::memcpy(write_ptr, &checkSum, 1);
+        write_ptr = write_ptr + 1;
+        std::memcpy(write_ptr, &version, 1);
+        write_ptr = write_ptr + 1;
+        std::memcpy(write_ptr, &op, 1);
+        write_ptr = write_ptr + 1;
+        std::memcpy(write_ptr, mask.data, 4);
+        write_ptr = write_ptr + 4;
+        std::memcpy(write_ptr, &sizeStorage, sizeof(sizeStorage));
+        write_ptr = write_ptr + sizeof(sizeStorage);
+        std::memcpy(write_ptr, payload.GetData(), payload.GetSize());
+        write_ptr = write_ptr + payload.GetSize();
+    }
 };
 
 // a sample for payload
