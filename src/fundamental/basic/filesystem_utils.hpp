@@ -86,4 +86,13 @@ inline bool WriteFile(std::string_view path, const void* data, std::size_t len, 
 
     return false;
 }
+
+inline bool SwitchToProgramDir(const std::string& argv0) {
+    try {
+        std::filesystem::current_path(std::filesystem::path(argv0).parent_path());
+        return true;
+    } catch (const std::exception& e) {
+        return false;
+    }
+}
 } // namespace Fundamental::fs

@@ -3,6 +3,8 @@
 #include "fundamental/basic/allocator.hpp"
 #include "fundamental/basic/log.h"
 #include "fundamental/basic/utils.hpp"
+#include "fundamental/basic/filesystem_utils.hpp"
+
 #include "rpc/basic/custom_rpc_proxy.hpp"
 #include "rpc/basic/rpc_client.hpp"
 
@@ -85,6 +87,7 @@ BENCHMARK_TEMPLATE(TestSslProxy, 1024 * 1024 * 128);
 BENCHMARK_TEMPLATE(TestSslProxy, 1024 * 1024 * 1024);
 #endif
 int main(int argc, char* argv[]) {
+    Fundamental::fs::SwitchToProgramDir(argv[0]);
     char arg0_default[] = "benchmark";
     char* args_default  = arg0_default;
     if (!argv) {
