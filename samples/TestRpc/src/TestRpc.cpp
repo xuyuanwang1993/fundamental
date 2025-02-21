@@ -550,6 +550,7 @@ TEST(rpc_test, test_ssl_proxy) {
 #endif
 
 int main(int argc, char** argv) {
+    Fundamental::fs::SwitchToProgramDir(argv[0]);
     Fundamental::Logger::LoggerInitOptions options;
     options.minimumLevel = Fundamental::LogLevel::debug;
     options.logFormat    = "%^[%L]%H:%M:%S.%e%$[%t] %v ";
