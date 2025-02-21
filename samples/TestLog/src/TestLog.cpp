@@ -21,6 +21,7 @@ int main(int argc, char** argv) {
     return 0;
 }
 void TestDefaultLogger() {
+
     Fundamental::Logger::PrintBackTrace();
     std::size_t kTargetCount = 120;
     while (!Fundamental::Logger::IsDebuggerAttached() && kTargetCount != 0) {
@@ -47,7 +48,6 @@ void TestDefaultLogger() {
     };
 
     Fundamental::Logger::Initialize(std::move(options));
-
     std::cout << "APP_NAME:" << APP_NAME << std::endl;
     FINFOS << "stream output info";
     FERRS << "stream output error";
@@ -62,6 +62,7 @@ void TestDefaultLogger() {
     FFAIL("{}", "TEST");
     FFAIL("TEST111111111");
     int counts = 2;
+
     while (counts-- > 0) {
         FERR("---bad------{}{}", counts);
         FINFO("---------{}", counts);

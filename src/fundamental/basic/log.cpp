@@ -397,4 +397,9 @@ LoggerStream::~LoggerStream() {
     if (enable_output) loggerRef->Logger::LogOutput(level_, ss_.str());
 #endif
 }
+#if ENABLE_FUNDAMENTAL_ASSERT_MACRO
+    #pragma message("fundamental assert macro was enabled")
+#else
+    #pragma message("fundamental assert macro was disabled")
+#endif
 } // namespace Fundamental

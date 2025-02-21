@@ -240,17 +240,9 @@ inline constexpr std::array<char, N> __get_short_file_name__(const char (&file_n
 #ifndef NDEBUG
     #define FDEBUG(...)           FLOG(Fundamental::Logger::s_defaultLogger, Fundamental::LogLevel::debug, __VA_ARGS__)
     #define FDEBUG_I(logger, ...) FLOG(logger, Fundamental::LogLevel::debug, __VA_ARGS__)
-    #define FASSERT_THROWN(_check, ...)                                                                                \
-        if (!(_check)) {                                                                                               \
-            auto __debugInfo__ = Fundamental::StringFormat("[{}:{}"                                                    \
-                                                           "(" STR_HELPER(__LINE__) ")] [####check####:" #_check "] ", \
-                                                           LOG_FILE_NAME, __func__);                                   \
-            throw std::runtime_error(__debugInfo__ + Fundamental::StringFormat(__VA_ARGS__));                          \
-        }
 #else
-    #define FDEBUG(...)                 (void)0
-    #define FDEBUG_I(logger, ...)       (void)0
-    #define FASSERT_THROWN(_check, ...) (void)0
+    #define FDEBUG(...)           (void)0
+    #define FDEBUG_I(logger, ...) (void)0
 #endif
 
 #ifndef DISABLE_TRACE
@@ -297,7 +289,16 @@ inline constexpr std::array<char, N> __get_short_file_name__(const char (&file_n
                                   __func__, __LINE__)                                                                  \
             .null_stream()
 #endif
-#ifndef DISABLE_ASSERT
+#if !defined(NDEBUG) && !defined(DISABLE_ASSERT)
+    #define ENABLE_FUNDAMENTAL_ASSERT_MACRO 1
+    #define FASSERT_THROWN(_check, ...)                                                                                \
+        if (!(_check)) {                                                                                               \
+            auto __debugInfo__ = Fundamental::StringFormat("[{}:{}"                                                    \
+                                                           "(" STR_HELPER(__LINE__) ")] [####check####:" #_check "] ", \
+                                                           LOG_FILE_NAME, __func__);                                   \
+            throw std::runtime_error(__debugInfo__ + Fundamental::StringFormat(__VA_ARGS__));                          \
+        }
+
     #define FASSERT(_check, ...) FASSERT_THROWN(_check, ##__VA_ARGS__)
 
     #define FASSERT_ACTION(_check, _action, ...)                                                                       \
@@ -312,6 +313,7 @@ inline constexpr std::array<char, N> __get_short_file_name__(const char (&file_n
 #else
     #define FASSERT(_check, ...)                 (void)0
     #define FASSERT_ACTION(_check, _action, ...) (void)0
+    #define FASSERT_THROWN(_check, ...)          (void)0
 #endif
 
 // add  more logger instance

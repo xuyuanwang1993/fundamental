@@ -9,17 +9,17 @@ int main(int argc, char* argv[]) {
     arg_parser.AddOption("cc", "test short option with optional param", 'c',
                          Fundamental::arg_parser::param_type::optional_param, "testoparam");
     FASSERT(!arg_parser.AddOption("cc", "test short option with optional param", 'i',
-                                  Fundamental::arg_parser::param_type::optional_param, "testoparam"))
+                                  Fundamental::arg_parser::param_type::optional_param, "testoparam"));
     FASSERT(!arg_parser.AddOption("dd", "test short option with optional param", 'a',
-                                  Fundamental::arg_parser::param_type::optional_param, "testoparam"))
+                                  Fundamental::arg_parser::param_type::optional_param, "testoparam"));
     FASSERT(!arg_parser.AddOption("dd", "test short option with optional param", '?',
-                                  Fundamental::arg_parser::param_type::optional_param, "testoparam"))
+                                  Fundamental::arg_parser::param_type::optional_param, "testoparam"));
     FASSERT(!arg_parser.AddOption("dd", "test short option with optional param", ':',
-                                  Fundamental::arg_parser::param_type::optional_param, "testoparam"))
+                                  Fundamental::arg_parser::param_type::optional_param, "testoparam"));
     FASSERT(!arg_parser.AddOption("dd", "test short option with optional param", 'h',
-                                  Fundamental::arg_parser::param_type::optional_param, "testoparam"))
+                                  Fundamental::arg_parser::param_type::optional_param, "testoparam"));
     FASSERT(!arg_parser.AddOption("dd", "test short option with optional param", 'v',
-                                  Fundamental::arg_parser::param_type::optional_param, "testoparam"))
+                                  Fundamental::arg_parser::param_type::optional_param, "testoparam"));
     if (argc == 1) {
         arg_parser.ShowHelp();
         return 1;
