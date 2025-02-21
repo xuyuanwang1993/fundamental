@@ -455,73 +455,97 @@ TEST(rpc_test, test_auto_reconnect) {
 }
 #endif
 #ifndef RPC_DISABLE_SSL
-TEST(rpc_test, test_ssl) {
-    Fundamental::Timer check_timer;
-    Fundamental::ScopeGuard check_guard(
-        [&]() { EXPECT_LE(check_timer.GetDuration<Fundamental::Timer::TimeScale::Millisecond>(), 100); });
-
-    try {
-        rpc_client client("127.0.0.1", 9000);
-        bool r = client.connect();
-        if (!r) {
-            EXPECT_TRUE(false && "connect timeout");
-            return;
-        }
-        std::size_t cnt = 10;
-        while (cnt > 0) {
-            --cnt;
-            client.call<std::string>("echo", std::to_string(cnt) + "test nossl");
-        }
-    } catch (const std::exception& e) {
-        std::cout << __func__ << ":" << e.what() << std::endl;
-    }
-    std::cout << "finish no ssl" << std::endl;
-    try {
-        rpc_client client("127.0.0.1", 9000);
-        client.enable_ssl("server.crt");
-        bool r = client.connect();
-        if (!r) {
-            EXPECT_TRUE(false && "connect timeout");
-            return;
-        }
-        std::size_t cnt = 10;
-        while (cnt > 0) {
-            --cnt;
-            client.call<std::string>("echo", std::to_string(cnt) + "test");
-        }
-    } catch (const std::exception& e) {
-        std::cout << __func__ << ":" << e.what() << std::endl;
-    }
-
-    std::cout << "finish ssl" << std::endl;
-}
-// TEST(rpc_test, test_ssl_proxy) {
+// TEST(rpc_test, test_ssl) {
 //     Fundamental::Timer check_timer;
 //     Fundamental::ScopeGuard check_guard(
 //         [&]() { EXPECT_LE(check_timer.GetDuration<Fundamental::Timer::TimeScale::Millisecond>(), 100); });
 
-//     rpc_client client("127.0.0.1", std::stoi(kProxyServicePort));
-//     client.enable_ssl("server.crt");
-//     client.set_proxy(std::make_shared<network::rpc_service::CustomRpcProxy>(kProxyServiceName, kProxyServiceField,
-//                                                                             kProxyServiceToken));
-//     bool r = client.connect();
-//     if (!r) {
-//         EXPECT_TRUE(false && "connect timeout");
-//         return;
+//     try {
+//         rpc_client client("127.0.0.1", 9000);
+//         bool r = client.connect();
+//         if (!r) {
+//             EXPECT_TRUE(false && "connect timeout");
+//             return;
+//         }
+//         std::size_t cnt = 10;
+//         while (cnt > 0) {
+//             --cnt;
+//             client.call<std::string>("echo", std::to_string(cnt) + "test nossl");
+//         }
+//     } catch (const std::exception& e) {
+//         std::cout << __func__ << ":" << e.what() << std::endl;
+//     }
+//     std::cout << "finish no ssl" << std::endl;
+//     try {
+//         rpc_client client("127.0.0.1", 9000);
+//         client.enable_ssl("server.crt");
+//         bool r = client.connect();
+//         if (!r) {
+//             EXPECT_TRUE(false && "connect timeout");
+//             return;
+//         }
+//         std::size_t cnt = 10;
+//         while (cnt > 0) {
+//             --cnt;
+//             client.call<std::string>("echo", std::to_string(cnt) + "test");
+//         }
+//     } catch (const std::exception& e) {
+//         std::cout << __func__ << ":" << e.what() << std::endl;
 //     }
 
-//     {
-//         dummy1 d1 { 42, "test" };
-//         auto result = client.call<dummy1>("get_dummy", d1);
-//         EXPECT_TRUE(d1.id == result.id);
-//         EXPECT_TRUE(d1.str == result.str);
-//     }
-
-//     {
-//         auto result = client.call<std::string>("echo", "test");
-//         EXPECT_EQ(result, "test");
-//     }
+//     std::cout << "finish ssl" << std::endl;
 // }
+TEST(rpc_test, test_ssl_proxy) {
+    Fundamental::Timer check_timer;
+    Fundamental::ScopeGuard check_guard(
+        [&]() { EXPECT_LE(check_timer.GetDuration<Fundamental::Timer::TimeScale::Millisecond>(), 100); });
+    {
+        rpc_client client("127.0.0.1", std::stoi(kProxyServicePort));
+        client.enable_ssl("server.crt");
+        client.set_proxy(std::make_shared<network::rpc_service::CustomRpcProxy>(kProxyServiceName, kProxyServiceField,
+                                                                                kProxyServiceToken));
+        bool r = client.connect();
+        if (!r) {
+            EXPECT_TRUE(false && "connect timeout");
+            return;
+        }
+
+        {
+            dummy1 d1 { 42, "test" };
+            auto result = client.call<dummy1>("get_dummy", d1);
+            EXPECT_TRUE(d1.id == result.id);
+            EXPECT_TRUE(d1.str == result.str);
+        }
+
+        {
+            auto result = client.call<std::string>("echo", "test");
+            EXPECT_EQ(result, "test");
+        }
+    }
+    {
+        rpc_client client("127.0.0.1", std::stoi(kProxyServicePort));
+        client.enable_ssl("", network::rpc_service::rpc_client_ssl_level_optional);
+        client.set_proxy(std::make_shared<network::rpc_service::CustomRpcProxy>(kProxyServiceName, kProxyServiceField,
+                                                                                kProxyServiceToken));
+        bool r = client.connect();
+        if (!r) {
+            EXPECT_TRUE(false && "connect timeout");
+            return;
+        }
+
+        {
+            dummy1 d1 { 42, "test" };
+            auto result = client.call<dummy1>("get_dummy", d1);
+            EXPECT_TRUE(d1.id == result.id);
+            EXPECT_TRUE(d1.str == result.str);
+        }
+
+        {
+            auto result = client.call<std::string>("echo", "test");
+            EXPECT_EQ(result, "test");
+        }
+    }
+}
 #endif
 
 int main(int argc, char** argv) {

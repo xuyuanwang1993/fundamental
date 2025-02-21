@@ -70,6 +70,11 @@ enum class CallModel {
 const constexpr auto FUTURE = CallModel::future;
 
 const constexpr size_t DEFAULT_TIMEOUT = 5000; // milliseconds
+enum rpc_client_ssl_level {
+    rpc_client_ssl_level_none,
+    rpc_client_ssl_level_optional,
+    rpc_client_ssl_level_required
+};
 
 class rpc_client : private asio::noncopyable {
 public:
@@ -341,16 +346,18 @@ public:
                       std::string(buf.data(), buf.data() + buf.size()));
     }
 
-    void enable_ssl(const std::string& ser_pem_path) {
+    void enable_ssl(const std::string& ser_pem_path,
+                    rpc_client_ssl_level enable_ssl_level = rpc_client_ssl_level::rpc_client_ssl_level_required) {
 #ifndef RPC_DISABLE_SSL
-        pem_path = ser_pem_path;
+        pem_path  = ser_pem_path;
+        ssl_level = enable_ssl_level;
 #endif
     }
 
 private:
     bool is_ssl() const {
 #ifndef RPC_DISABLE_SSL
-        return !pem_path.empty();
+        return ssl_level != rpc_client_ssl_level_none;
 #else
         return false;
 #endif
@@ -730,15 +737,20 @@ private:
         asio::error_code ec;
         ssl_context.set_options(asio::ssl::context::default_workarounds, ec);
         ssl_context.load_verify_file(pem_path, ec);
-        if (ec) {
-            close();
-            error_callback(ec);
-            return;
-        }
         ssl_stream_ = std::make_unique<asio::ssl::stream<asio::ip::tcp::socket&>>(socket_, ssl_context);
-        ssl_stream_->set_verify_mode(asio::ssl::verify_peer);
-        ssl_stream_->set_verify_callback(
-            std::bind(&rpc_client::verify_certificate, this, std::placeholders::_1, std::placeholders::_2));
+        if (!ec) {
+            ssl_stream_->set_verify_mode(asio::ssl::verify_peer);
+            ssl_stream_->set_verify_callback(
+                std::bind(&rpc_client::verify_certificate, this, std::placeholders::_1, std::placeholders::_2));
+        } else {
+            if (ssl_level == rpc_client_ssl_level_required) {
+                close();
+                error_callback(ec);
+                return;
+            }
+            ssl_stream_->set_verify_mode(asio::ssl::verify_none);
+        }
+
         ssl_stream_->async_handshake(asio::ssl::stream_base::client, [this](const asio::error_code& ec) {
             if (!ec) {
                 rpc_protocal_ready();
@@ -791,7 +803,7 @@ private:
     std::string host_;
     unsigned short port_ = 0;
     asio::steady_timer reconnect_delay_timer_;
-    size_t reconnect_delay_ms         = 1000; // s
+    size_t reconnect_delay_ms       = 1000; // s
     int reconnect_cnt_              = -1;
     std::atomic_bool has_connected_ = { false };
     std::mutex conn_mtx_;
@@ -832,6 +844,7 @@ private:
     std::function<void(long, const std::string&)> on_result_received_callback_;
     //
     std::shared_ptr<RpcClientProxyInterface> proxy_interface;
+    rpc_client_ssl_level ssl_level = rpc_client_ssl_level::rpc_client_ssl_level_none;
 #ifndef RPC_DISABLE_SSL
     std::unique_ptr<asio::ssl::stream<asio::ip::tcp::socket&>> ssl_stream_ = nullptr;
     std::string pem_path;
