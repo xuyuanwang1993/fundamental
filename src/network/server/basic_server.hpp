@@ -81,7 +81,10 @@ inline void Server<Connection, RequestHandler>::Start() {
     if constexpr (std::is_same_v<ConnectionAcceptor, asio::ip::tcp::acceptor>) {
         acceptor_.set_option(asio::ip::tcp::acceptor::reuse_address(true));
 #if defined(IPV6_V6ONLY)
-        acceptor_.set_option(asio::ip::v6_only(false));
+        try {
+            acceptor_.set_option(asio::ip::v6_only(false));
+        } catch (const std::exception& e) { // when protocal is not ipv6
+        }
 #endif
     }
     acceptor_.bind(endpoint_);

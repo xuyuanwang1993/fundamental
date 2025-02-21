@@ -15,6 +15,7 @@
 #include <thread>
 #include <utility>
 
+#include "network/server/basic_server.hpp"
 #include "rpc_client_proxy.hpp"
 
 namespace network {
@@ -78,46 +79,23 @@ enum rpc_client_ssl_level {
 
 class rpc_client : private asio::noncopyable {
 public:
+    inline static std::function<asio::io_context&()> s_io_context_cb = []() -> decltype(auto) {
+        return network::io_context_pool::Instance().get_io_context();
+    };
+
+public:
     rpc_client() :
-    socket_(ios_), work_(asio::make_work_guard(ios_)), reconnect_delay_timer_(ios_), deadline_(ios_),
-    body_(INIT_BUF_SIZE) {
-        thd_ = std::make_shared<std::thread>([this] { ios_.run(); });
+    ios_(s_io_context_cb()), socket_(ios_), reconnect_delay_timer_(ios_), deadline_(ios_), body_(INIT_BUF_SIZE) {
     }
 
-    rpc_client(std::function<void(long, const std::string&)> on_result_received_callback) :
-    socket_(ios_), work_(asio::make_work_guard(ios_)), reconnect_delay_timer_(ios_), deadline_(ios_),
-    body_(INIT_BUF_SIZE), on_result_received_callback_(std::move(on_result_received_callback)) {
-        thd_ = std::make_shared<std::thread>([this] { ios_.run(); });
-    }
-
-    rpc_client(const std::string& host, unsigned short port) : rpc_client(nullptr, host, port) {
-    }
-
-    rpc_client(std::function<void(long, const std::string&)> on_result_received_callback, std::string host,
-               unsigned short port) :
-    socket_(ios_), work_(asio::make_work_guard(ios_)), host_(std::move(host)), port_(port),
-    reconnect_delay_timer_(ios_), deadline_(ios_), body_(INIT_BUF_SIZE),
-    on_result_received_callback_(std::move(on_result_received_callback)) {
-        thd_ = std::make_shared<std::thread>([this] { ios_.run(); });
+    rpc_client(std::string host, unsigned short port) :
+    ios_(s_io_context_cb()), socket_(ios_), host_(std::move(host)), port_(port), reconnect_delay_timer_(ios_),
+    deadline_(ios_), body_(INIT_BUF_SIZE) {
     }
 
     ~rpc_client() {
-        std::promise<void> promise;
-        asio::post(ios_, [this, &promise] {
-            close();
-            stop_client_ = true;
-            reconnect_delay_timer_.cancel();
-            deadline_.cancel();
-            promise.set_value();
-        });
-        promise.get_future().wait();
-        stop();
-    }
 
-    void run() {
-        if (thd_ != nullptr && thd_->joinable()) {
-            thd_->join();
-        }
+        stop();
     }
 
     void set_reconnect_delay(size_t milliseconds) {
@@ -239,7 +217,7 @@ public:
         auto future_result = async_call<FUTURE>(rpc_name, std::forward<Args>(args)...);
         auto status        = future_result.wait_for(std::chrono::milliseconds(TIMEOUT));
         if (status == std::future_status::timeout || status == std::future_status::deferred) {
-            throw std::out_of_range("timeout or deferred");
+            throw std::out_of_range("rpc timeout or deferred");
         }
 
         return future_result.get().template as<T>();
@@ -294,14 +272,15 @@ public:
     }
 
     void stop() {
-        if (thd_ != nullptr) {
-            // release work_
-            work_.reset();
-            if (thd_->joinable()) {
-                thd_->join();
-            }
-            thd_ = nullptr;
-        }
+        std::promise<void> promise;
+        asio::post(ios_, [this, &promise] {
+            close();
+            stop_client_ = true;
+            reconnect_delay_timer_.cancel();
+            deadline_.cancel();
+            promise.set_value();
+        });
+        promise.get_future().wait();
     }
 
     template <typename Func>
@@ -795,10 +774,8 @@ private:
         }
     }
 
-    asio::io_context ios_;
+    asio::io_context& ios_;
     asio::ip::tcp::socket socket_;
-    asio::executor_work_guard<asio::io_context::executor_type> work_;
-    std::shared_ptr<std::thread> thd_ = nullptr;
 
     std::string host_;
     unsigned short port_ = 0;
@@ -840,8 +817,6 @@ private:
 
     std::unordered_map<std::string, std::function<void(string_view)>> sub_map_;
     std::set<std::pair<std::string, std::string>> key_token_set_;
-
-    std::function<void(long, const std::string&)> on_result_received_callback_;
     //
     std::shared_ptr<RpcClientProxyInterface> proxy_interface;
     rpc_client_ssl_level ssl_level = rpc_client_ssl_level::rpc_client_ssl_level_none;

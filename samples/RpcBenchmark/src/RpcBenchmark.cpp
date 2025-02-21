@@ -24,7 +24,7 @@ static void TestNormal(benchmark::State& state) {
     client.enable_auto_heartbeat();
     std::string msg(blockSize, 'a');
     for (auto _ : state) {
-        benchmark::DoNotOptimize(client.call<std::string>("echo", msg));
+        benchmark::DoNotOptimize(client.call<20000,std::string>("echo", msg));
     }
 }
 
@@ -38,7 +38,7 @@ static void TestProxy(benchmark::State& state) {
                                                                             kProxyServiceToken));
     std::string msg(blockSize, 'a');
     for (auto _ : state) {
-        benchmark::DoNotOptimize(client.call<std::string>("echo", msg));
+        benchmark::DoNotOptimize(client.call<20000,std::string>("echo", msg));
     }
 }
 #ifndef RPC_DISABLE_SSL
@@ -53,29 +53,29 @@ static void TestSslProxy(benchmark::State& state) {
                                                                             kProxyServiceToken));
     std::string msg(blockSize, 'a');
     for (auto _ : state) {
-        benchmark::DoNotOptimize(client.call<std::string>("echo", msg));
+        benchmark::DoNotOptimize(client.call<20000,std::string>("echo", msg));
     }
 }
 #endif
-// BENCHMARK_TEMPLATE(TestNormal, 0);
-// BENCHMARK_TEMPLATE(TestNormal, 1024);
-// BENCHMARK_TEMPLATE(TestNormal, 4096);
-// BENCHMARK_TEMPLATE(TestNormal, 8192);
-// BENCHMARK_TEMPLATE(TestNormal, 1024 * 1024);
-// BENCHMARK_TEMPLATE(TestNormal, 1024 * 1024 * 32);
-// BENCHMARK_TEMPLATE(TestNormal, 1024 * 1024 * 128);
-// BENCHMARK_TEMPLATE(TestNormal, 1024 * 1024 * 1024);
+BENCHMARK_TEMPLATE(TestNormal, 0);
+BENCHMARK_TEMPLATE(TestNormal, 1024);
+BENCHMARK_TEMPLATE(TestNormal, 4096);
+BENCHMARK_TEMPLATE(TestNormal, 8192);
+BENCHMARK_TEMPLATE(TestNormal, 1024 * 1024);
+BENCHMARK_TEMPLATE(TestNormal, 1024 * 1024 * 32);
+BENCHMARK_TEMPLATE(TestNormal, 1024 * 1024 * 128);
+BENCHMARK_TEMPLATE(TestNormal, 1024 * 1024 * 1024);
 
-// BENCHMARK_TEMPLATE(TestProxy, 0);
-// BENCHMARK_TEMPLATE(TestProxy, 1024);
-// BENCHMARK_TEMPLATE(TestProxy, 4096);
-// BENCHMARK_TEMPLATE(TestProxy, 8192);
-// BENCHMARK_TEMPLATE(TestProxy, 1024 * 1024);
-// BENCHMARK_TEMPLATE(TestProxy, 1024 * 1024 * 32);
-// BENCHMARK_TEMPLATE(TestProxy, 1024 * 1024 * 128);
-// BENCHMARK_TEMPLATE(TestProxy, 1024 * 1024 * 1024);
+BENCHMARK_TEMPLATE(TestProxy, 0);
+BENCHMARK_TEMPLATE(TestProxy, 1024);
+BENCHMARK_TEMPLATE(TestProxy, 4096);
+BENCHMARK_TEMPLATE(TestProxy, 8192);
+BENCHMARK_TEMPLATE(TestProxy, 1024 * 1024);
+BENCHMARK_TEMPLATE(TestProxy, 1024 * 1024 * 32);
+BENCHMARK_TEMPLATE(TestProxy, 1024 * 1024 * 128);
+BENCHMARK_TEMPLATE(TestProxy, 1024 * 1024 * 1024);
 #ifndef RPC_DISABLE_SSL
-BENCHMARK_TEMPLATE(TestSslProxy, 1);
+// BENCHMARK_TEMPLATE(TestSslProxy, 1);
 // BENCHMARK_TEMPLATE(TestSslProxy, 1024);
 // BENCHMARK_TEMPLATE(TestSslProxy, 4096);
 // BENCHMARK_TEMPLATE(TestSslProxy, 8192);

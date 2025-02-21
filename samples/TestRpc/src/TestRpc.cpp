@@ -455,46 +455,47 @@ TEST(rpc_test, test_auto_reconnect) {
 }
 #endif
 #ifndef RPC_DISABLE_SSL
-// TEST(rpc_test, test_ssl) {
-//     Fundamental::Timer check_timer;
-//     Fundamental::ScopeGuard check_guard(
-//         [&]() { EXPECT_LE(check_timer.GetDuration<Fundamental::Timer::TimeScale::Millisecond>(), 100); });
+TEST(rpc_test, test_ssl) {
+    Fundamental::Timer check_timer;
+    Fundamental::ScopeGuard check_guard(
+        [&]() { EXPECT_LE(check_timer.GetDuration<Fundamental::Timer::TimeScale::Millisecond>(), 100); });
 
-//     try {
-//         rpc_client client("127.0.0.1", 9000);
-//         bool r = client.connect();
-//         if (!r) {
-//             EXPECT_TRUE(false && "connect timeout");
-//             return;
-//         }
-//         std::size_t cnt = 10;
-//         while (cnt > 0) {
-//             --cnt;
-//             client.call<std::string>("echo", std::to_string(cnt) + "test nossl");
-//         }
-//     } catch (const std::exception& e) {
-//         std::cout << __func__ << ":" << e.what() << std::endl;
-//     }
-//     std::cout << "finish no ssl" << std::endl;
-//     try {
-//         rpc_client client("127.0.0.1", 9000);
-//         client.enable_ssl("server.crt");
-//         bool r = client.connect();
-//         if (!r) {
-//             EXPECT_TRUE(false && "connect timeout");
-//             return;
-//         }
-//         std::size_t cnt = 10;
-//         while (cnt > 0) {
-//             --cnt;
-//             client.call<std::string>("echo", std::to_string(cnt) + "test");
-//         }
-//     } catch (const std::exception& e) {
-//         std::cout << __func__ << ":" << e.what() << std::endl;
-//     }
+    
+    try {
+        rpc_client client("127.0.0.1", 9000);
+        client.enable_ssl("server.crt");
+        bool r = client.connect();
+        if (!r) {
+            EXPECT_TRUE(false && "connect timeout");
+            return;
+        }
+        std::size_t cnt = 10;
+        while (cnt > 0) {
+            --cnt;
+            client.call<std::string>("echo", std::to_string(cnt) + "test");
+        }
+    } catch (const std::exception& e) {
+        std::cout << __func__ << ":" << e.what() << std::endl;
+    }
 
-//     std::cout << "finish ssl" << std::endl;
-// }
+    std::cout << "finish ssl" << std::endl;
+    try {
+        rpc_client client("127.0.0.1", 9000);
+        bool r = client.connect();
+        if (!r) {
+            EXPECT_TRUE(false && "connect timeout");
+            return;
+        }
+        std::size_t cnt = 10;
+        while (cnt > 0) {
+            --cnt;
+            client.call<std::string>("echo", std::to_string(cnt) + "test nossl");
+        }
+    } catch (const std::exception& e) {
+        std::cout << __func__ << ":" << e.what() << std::endl;
+    }
+    std::cout << "finish no ssl" << std::endl;
+}
 TEST(rpc_test, test_ssl_proxy) {
     Fundamental::Timer check_timer;
     Fundamental::ScopeGuard check_guard(
