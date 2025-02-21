@@ -115,8 +115,8 @@ public:
         }
     }
 
-    void set_connect_timeout(size_t milliseconds) {
-        connect_timeout_ = milliseconds;
+    void set_reconnect_delay(size_t milliseconds) {
+        reconnect_delay_ms = milliseconds;
     }
 
     void set_reconnect_count(int reconnect_count) {
@@ -291,7 +291,7 @@ public:
     void stop() {
         if (thd_ != nullptr) {
             // release work_
-            work_.~executor_work_guard();
+            work_.reset();
             if (thd_->joinable()) {
                 thd_->join();
             }
@@ -410,12 +410,13 @@ private:
             return;
         }
         reset_socket();
-        reconnect_delay_timer_.expires_after(std::chrono::milliseconds(connect_timeout_));
+        reconnect_delay_timer_.expires_after(std::chrono::milliseconds(reconnect_delay_ms));
         reconnect_delay_timer_.async_wait([this](const asio::error_code& ec) {
             if (!ec) {
                 async_connect();
                 return;
             }
+
             error_callback(ec);
         });
     }
@@ -486,16 +487,11 @@ private:
     void do_read() {
         async_read_head([this](const asio::error_code& ec, const size_t length) {
             if (!socket_.is_open()) {
-                // LOG(INFO) << "socket already closed";
                 has_connected_ = false;
                 return;
             }
 
             if (!ec) {
-                // const uint32_t body_len = *((uint32_t*)(head_));
-                // auto req_id = *((std::uint64_t*)(head_ + sizeof(int32_t)));
-                // auto req_type = *(request_type*)(head_ + sizeof(int32_t) +
-                // sizeof(int64_t));
                 rpc_header* header      = (rpc_header*)(head_);
                 const uint32_t body_len = header->body_len;
                 if (body_len > 0 && body_len < MAX_BUF_LEN) {
@@ -507,7 +503,6 @@ private:
                 }
 
                 if (body_len == 0 || body_len > MAX_BUF_LEN) {
-                    // LOG(INFO) << "invalid body len";
                     close();
                     error_callback(asio::error::make_error_code(asio::error::message_size));
                     return;
@@ -528,10 +523,7 @@ private:
 
     void read_body(std::uint64_t req_id, request_type req_type, size_t body_len) {
         async_read(body_len, [this, req_id, req_type, body_len](asio::error_code ec, std::size_t length) {
-            // cancel_timer();
-
             if (!socket_.is_open()) {
-                // LOG(INFO) << "socket already closed";
                 call_back(req_id, asio::error::make_error_code(asio::error::connection_aborted), {});
                 return;
             }
@@ -633,7 +625,6 @@ private:
         {
             std::unique_lock<std::mutex> lock(write_mtx_);
             while (!outbox_.empty()) {
-                ::free((char*)outbox_.front().content.data());
                 outbox_.pop_front();
             }
         }
@@ -655,9 +646,6 @@ private:
 #endif
         socket_.close(igored_ec);
         socket_ = decltype(socket_)(ios_);
-        if (!socket_.is_open()) {
-            socket_.open(asio::ip::tcp::v4());
-        }
     }
 
     class call_t : asio::noncopyable, public std::enable_shared_from_this<call_t> {
@@ -803,7 +791,7 @@ private:
     std::string host_;
     unsigned short port_ = 0;
     asio::steady_timer reconnect_delay_timer_;
-    size_t connect_timeout_         = 1000; // s
+    size_t reconnect_delay_ms         = 1000; // s
     int reconnect_cnt_              = -1;
     std::atomic_bool has_connected_ = { false };
     std::mutex conn_mtx_;

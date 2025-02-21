@@ -125,6 +125,11 @@ public:
         std::swap(ssl_config_, ssl_config);
     }
 #endif
+    void abort() {
+        close();
+        cancel_timer();
+    }
+
 private:
     void do_ssl_handshake(const char* preread_data, std::size_t read_len) {
         // handle ssl

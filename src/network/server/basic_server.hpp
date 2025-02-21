@@ -12,6 +12,14 @@ struct RequestHandlerDummy {};
 // when data is coming we should parse the reuqest data first util a valid reuqest recv finished
 // then we need a handler to process the request
 
+inline asio::ip::tcp::endpoint MakeTcpEndpoint(std::uint16_t port) {
+#if defined(IPV6_V6ONLY)
+    return asio::ip::tcp::endpoint(asio::ip::tcp::v6(), port);
+#else
+    return asio::ip::tcp::endpoint(asio::ip::tcp::v4(), port);
+#endif
+}
+
 template <typename RequestHandler, typename StreamSocketType = asio::ip::tcp>
 struct ConnectionInterface : public Fundamental::NonCopyable {
     using ConnectionSocket   = typename StreamSocketType::socket;
@@ -72,6 +80,9 @@ inline void Server<Connection, RequestHandler>::Start() {
     acceptor_.open(endpoint_.protocol());
     if constexpr (std::is_same_v<ConnectionAcceptor, asio::ip::tcp::acceptor>) {
         acceptor_.set_option(asio::ip::tcp::acceptor::reuse_address(true));
+#if defined(IPV6_V6ONLY)
+        acceptor_.set_option(asio::ip::v6_only(false));
+#endif
     }
     acceptor_.bind(endpoint_);
     acceptor_.listen();

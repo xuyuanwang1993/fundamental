@@ -16,11 +16,34 @@ namespace network {
 namespace rpc_service {
 using rpc_conn = std::weak_ptr<connection>;
 
+struct protocal_helper {
+    static tcp::endpoint make_endpoint(std::uint16_t port) {
+#ifndef RPC_IPV4_ONLY
+        return tcp::endpoint(tcp::v6(), port);
+#else
+        return tcp::endpoint(tcp::v4(), port);
+#endif
+    }
+    static void init_acceptor(tcp::acceptor& acceptor, std::uint16_t port) {
+        auto end_point = make_endpoint(port);
+        acceptor.open(end_point.protocol());
+        acceptor.set_option(asio::ip::tcp::acceptor::reuse_address(true));
+#ifndef RPC_IPV4_ONLY
+        // 关闭 v6_only 选项，允许同时接受 IPv4 和 IPv6 连接
+        asio::ip::v6_only v6_option(false);
+        acceptor.set_option(v6_option);
+#endif
+        acceptor.bind(end_point);
+        acceptor.listen();
+    }
+};
+
 class rpc_server : private asio::noncopyable {
 public:
     rpc_server(unsigned short port, size_t size, size_t timeout_seconds = 15, size_t check_seconds = 10) :
-    io_service_pool_(size), acceptor_(io_service_pool_.get_io_service(), tcp::endpoint(tcp::v4(), port)),
-    timeout_seconds_(timeout_seconds), check_seconds_(check_seconds), signals_(io_service_pool_.get_io_service()) {
+    io_service_pool_(size), acceptor_(io_service_pool_.get_io_service()), timeout_seconds_(timeout_seconds),
+    check_seconds_(check_seconds), signals_(io_service_pool_.get_io_service()) {
+        protocal_helper::init_acceptor(acceptor_, port);
         do_accept();
         check_thread_   = std::make_shared<std::thread>([this] { clean(); });
         pub_sub_thread_ = std::make_shared<std::thread>([this] { clean_sub_pub(); });
