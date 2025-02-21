@@ -121,8 +121,8 @@ public:
         on_net_err_ = &on_net_err;
     }
 #ifndef RPC_DISABLE_SSL
-    void enable_ssl(rpc_server_ssl_config ssl_config) {
-        std::swap(ssl_config_, ssl_config);
+    void enable_ssl(asio::ssl::context& ssl_context) {
+        ssl_context_ref = &ssl_context;
     }
 #endif
     void abort() {
@@ -134,28 +134,8 @@ private:
     void do_ssl_handshake(const char* preread_data, std::size_t read_len) {
         // handle ssl
 #ifndef RPC_DISABLE_SSL
-        auto self = this->shared_from_this();
-        unsigned long ssl_options =
-            asio::ssl::context::default_workarounds | asio::ssl::context::no_sslv2 | asio::ssl::context::single_dh_use;
-        try {
-            asio::ssl::context ssl_context(asio::ssl::context::sslv23);
-            ssl_context.set_options(ssl_options);
-            ssl_context.set_password_callback(
-                [cb = ssl_config_.passwd_cb](std::size_t size, asio::ssl::context_base::password_purpose purpose) {
-                    return cb(std::to_string(size) + " " + std::to_string(static_cast<std::size_t>(purpose)));
-                });
-
-            ssl_context.use_certificate_chain_file(ssl_config_.certificate_path);
-            ssl_context.use_private_key_file(ssl_config_.private_key_path, asio::ssl::context::pem);
-            if (!ssl_config_.tmp_dh_path.empty()) ssl_context.use_tmp_dh_file(ssl_config_.tmp_dh_path);
-            ssl_stream_ = std::make_unique<asio::ssl::stream<asio::ip::tcp::socket&>>(socket_, ssl_context);
-        } catch (const std::exception& e) {
-            if (on_net_err_) {
-                (*on_net_err_)(self, e.what());
-            }
-            close();
-            return;
-        }
+        auto self   = this->shared_from_this();
+        ssl_stream_ = std::make_unique<asio::ssl::stream<asio::ip::tcp::socket&>>(socket_, *ssl_context_ref);
 
         ssl_stream_->async_handshake(asio::ssl::stream_base::server, asio::const_buffer(preread_data, read_len),
                                      [this, self](const asio::error_code& error, std::size_t) {
@@ -204,7 +184,7 @@ private:
 #ifdef RPC_DEBUG
                                      std::cout << "[rpc] WARNNING!!! falling to no ssl socket" << std::endl;
 #endif
-                                     ssl_config_.certificate_path.clear();
+                                     ssl_context_ref = nullptr;
                                      read_head(kSslPreReadSize);
                                  }
                                  return;
@@ -215,7 +195,7 @@ private:
 
     bool is_ssl() const {
 #ifndef RPC_DISABLE_SSL
-        return !ssl_config_.certificate_path.empty();
+        return !ssl_context_ref;
 #else
         return false;
 #endif
@@ -487,7 +467,7 @@ private:
     bool delay_ = false;
 #ifndef RPC_DISABLE_SSL
     std::unique_ptr<asio::ssl::stream<asio::ip::tcp::socket&>> ssl_stream_ = nullptr;
-    rpc_server_ssl_config ssl_config_;
+    asio::ssl::context* ssl_context_ref                                        = nullptr;
 #endif
 };
 } // namespace rpc_service

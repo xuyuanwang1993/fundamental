@@ -53,7 +53,7 @@ static void TestSslProxy(benchmark::State& state) {
                                                                             kProxyServiceToken));
     std::string msg(blockSize, 'a');
     for (auto _ : state) {
-        benchmark::DoNotOptimize(client.call<20000,std::string>("echo", msg));
+        benchmark::DoNotOptimize(client.call<30000,std::string>("echo", msg));
     }
 }
 #endif
@@ -75,14 +75,14 @@ BENCHMARK_TEMPLATE(TestProxy, 1024 * 1024 * 32);
 BENCHMARK_TEMPLATE(TestProxy, 1024 * 1024 * 128);
 BENCHMARK_TEMPLATE(TestProxy, 1024 * 1024 * 1024);
 #ifndef RPC_DISABLE_SSL
-// BENCHMARK_TEMPLATE(TestSslProxy, 1);
-// BENCHMARK_TEMPLATE(TestSslProxy, 1024);
-// BENCHMARK_TEMPLATE(TestSslProxy, 4096);
-// BENCHMARK_TEMPLATE(TestSslProxy, 8192);
-// BENCHMARK_TEMPLATE(TestSslProxy, 1024 * 1024);
-// BENCHMARK_TEMPLATE(TestSslProxy, 1024 * 1024 * 32);
-// BENCHMARK_TEMPLATE(TestSslProxy, 1024 * 1024 * 128);
-// BENCHMARK_TEMPLATE(TestSslProxy, 1024 * 1024 * 1024);
+BENCHMARK_TEMPLATE(TestSslProxy, 1);
+BENCHMARK_TEMPLATE(TestSslProxy, 1024);
+BENCHMARK_TEMPLATE(TestSslProxy, 4096);
+BENCHMARK_TEMPLATE(TestSslProxy, 8192);
+BENCHMARK_TEMPLATE(TestSslProxy, 1024 * 1024);
+BENCHMARK_TEMPLATE(TestSslProxy, 1024 * 1024 * 32);
+BENCHMARK_TEMPLATE(TestSslProxy, 1024 * 1024 * 128);
+BENCHMARK_TEMPLATE(TestSslProxy, 1024 * 1024 * 1024);
 #endif
 int main(int argc, char* argv[]) {
     char arg0_default[] = "benchmark";

@@ -123,6 +123,24 @@ public:
         }
         std::swap(ssl_config_, ssl_config);
         if (!ssl_config_.passwd_cb) ssl_config_.passwd_cb = [](std::string) -> std::string { return "123456"; };
+
+        unsigned long ssl_options =
+            asio::ssl::context::default_workarounds | asio::ssl::context::no_sslv2 | asio::ssl::context::single_dh_use;
+        ssl_context = std::make_unique<asio::ssl::context>(asio::ssl::context::sslv23);
+        try {
+            ssl_context->set_options(ssl_options);
+            ssl_context->set_password_callback(
+                [cb = ssl_config_.passwd_cb](std::size_t size, asio::ssl::context_base::password_purpose purpose) {
+                    return cb(std::to_string(size) + " " + std::to_string(static_cast<std::size_t>(purpose)));
+                });
+
+            ssl_context->use_certificate_chain_file(ssl_config_.certificate_path);
+            ssl_context->use_private_key_file(ssl_config_.private_key_path, asio::ssl::context::pem);
+            if (!ssl_config_.tmp_dh_path.empty()) ssl_context->use_tmp_dh_file(ssl_config_.tmp_dh_path);
+        } catch (const std::exception& e) {
+            throw std::invalid_argument(std::string("load ssl config failed ") + e.what());
+        }
+
 #endif
     }
 
@@ -147,8 +165,8 @@ private:
                 // ec.message();
             } else {
 #ifndef RPC_DISABLE_SSL
-                if (!ssl_config_.certificate_path.empty()) {
-                    conn_->enable_ssl(ssl_config_);
+                if (ssl_context) {
+                    conn_->enable_ssl(*ssl_context);
                 }
 #endif
                 if (on_net_err_callback_) {
@@ -300,6 +318,7 @@ private:
     router router_;
     std::atomic_bool has_stoped_ = { false };
 #ifndef RPC_DISABLE_SSL
+    std::unique_ptr<asio::ssl::context> ssl_context = nullptr;
     rpc_server_ssl_config ssl_config_;
 #endif
 };

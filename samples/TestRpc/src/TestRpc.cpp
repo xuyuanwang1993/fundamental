@@ -14,7 +14,7 @@
 
 using namespace network;
 using namespace network::rpc_service;
-#if 0
+#if 1
 TEST(rpc_test, test_add) {
     Fundamental::Timer check_timer;
     Fundamental::ScopeGuard check_guard(
