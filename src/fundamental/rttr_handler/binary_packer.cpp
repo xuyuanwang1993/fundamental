@@ -200,8 +200,6 @@ void binary_pack_object_recursively(const rttr::variant& var, std::vector<std::u
         bool flag        = false;
         std::string data = var.to_string(&flag);
         if (!flag) {
-            auto v_type = var.get_type();
-            auto v_name = v_type.get_name();
             throw std::invalid_argument(Fundamental::StringFormat(
                 "type:{} convert to string failed,you should register convert func "
                 "std::string(const {} &,bool &) with type::register_converter_func",

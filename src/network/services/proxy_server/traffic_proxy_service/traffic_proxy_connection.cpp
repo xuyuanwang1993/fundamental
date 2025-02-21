@@ -36,14 +36,14 @@ void TrafficProxyConnection::ProcessTrafficProxy() {
                                                                  hostInfo)) {
         return;
     }
-    FINFO("start proxy {} {} {} -> {}:{}", request.proxyServiceName.ToString(), request.token.ToString(),
-          request.field.ToString(), hostInfo.host.ToString(), hostInfo.service.ToString());
+    FDEBUG("start proxy {} {} {} -> {}:{}", request.proxyServiceName.ToString(), request.token.ToString(),
+           request.field.ToString(), hostInfo.host.ToString(), hostInfo.service.ToString());
     HandShake();
     StartDnsResolve(hostInfo.host.ToString(), hostInfo.service.ToString());
 }
 
 void TrafficProxyConnection::HandleDisconnect(asio::error_code ec, const std::string& callTag, std::int32_t closeMask) {
-    if (!callTag.empty()) FINFO("disconnect for {} -> ec:{}-{}", callTag, ec.category().name(), ec.message());
+    if (!callTag.empty()) FDEBUG("disconnect for {} -> ec:{}-{}", callTag, ec.category().name(), ec.message());
     if (closeMask & ClientProxying) {
         if (status & ClientProxying) {
             status ^= ClientProxying;
@@ -211,7 +211,7 @@ void TrafficProxyConnection::DoStatistics() {
     checkTimer.expires_after(asio::chrono::seconds(s_trafficStatisticsIntervalSec));
     checkTimer.async_wait([this, self = shared_from_this()](const std::error_code& e) {
         if (e) {
-            FERR("stop proxy statistics for reason:{}", e.message());
+            FDEBUG("stop proxy statistics for reason:{}", e.message());
             return;
         }
         client2server.UpdateStatistics("client");

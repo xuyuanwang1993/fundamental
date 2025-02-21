@@ -5,6 +5,7 @@
 #include "io_service_pool.h"
 #include "router.hpp"
 #include <condition_variable>
+#include <filesystem>
 #include <mutex>
 #include <set>
 #include <thread>
@@ -14,11 +15,35 @@ using asio::ip::tcp;
 namespace network {
 namespace rpc_service {
 using rpc_conn = std::weak_ptr<connection>;
+
+struct protocal_helper {
+    static tcp::endpoint make_endpoint(std::uint16_t port) {
+#ifndef RPC_IPV4_ONLY
+        return tcp::endpoint(tcp::v6(), port);
+#else
+        return tcp::endpoint(tcp::v4(), port);
+#endif
+    }
+    static void init_acceptor(tcp::acceptor& acceptor, std::uint16_t port) {
+        auto end_point = make_endpoint(port);
+        acceptor.open(end_point.protocol());
+        acceptor.set_option(asio::ip::tcp::acceptor::reuse_address(true));
+#ifndef RPC_IPV4_ONLY
+        // 关闭 v6_only 选项，允许同时接受 IPv4 和 IPv6 连接
+        asio::ip::v6_only v6_option(false);
+        acceptor.set_option(v6_option);
+#endif
+        acceptor.bind(end_point);
+        acceptor.listen();
+    }
+};
+
 class rpc_server : private asio::noncopyable {
 public:
     rpc_server(unsigned short port, size_t size, size_t timeout_seconds = 15, size_t check_seconds = 10) :
-    io_service_pool_(size), acceptor_(io_service_pool_.get_io_service(), tcp::endpoint(tcp::v4(), port)),
-    timeout_seconds_(timeout_seconds), check_seconds_(check_seconds), signals_(io_service_pool_.get_io_service()) {
+    io_service_pool_(size), acceptor_(io_service_pool_.get_io_service()), timeout_seconds_(timeout_seconds),
+    check_seconds_(check_seconds), signals_(io_service_pool_.get_io_service()) {
+        protocal_helper::init_acceptor(acceptor_, port);
         do_accept();
         check_thread_   = std::make_shared<std::thread>([this] { clean(); });
         pub_sub_thread_ = std::make_shared<std::thread>([this] { clean_sub_pub(); });
@@ -85,6 +110,39 @@ public:
     void post_stop() {
         stop();
     }
+    // this function will throw when param is invalid
+    void enable_ssl(rpc_server_ssl_config ssl_config) {
+#ifndef RPC_DISABLE_SSL
+        if (ssl_config.certificate_path.empty() || ssl_config.private_key_path.empty() ||
+            !std::filesystem::is_regular_file(ssl_config.certificate_path) ||
+            !std::filesystem::is_regular_file(ssl_config.private_key_path)) {
+            throw std::invalid_argument("rpc_server/ssl need valid certificate and key file");
+        }
+        if (!ssl_config.tmp_dh_path.empty() && !std::filesystem::is_regular_file(ssl_config.tmp_dh_path)) {
+            throw std::invalid_argument("tmp_dh_path is not existed");
+        }
+        std::swap(ssl_config_, ssl_config);
+        if (!ssl_config_.passwd_cb) ssl_config_.passwd_cb = [](std::string) -> std::string { return "123456"; };
+
+        unsigned long ssl_options =
+            asio::ssl::context::default_workarounds | asio::ssl::context::no_sslv2 | asio::ssl::context::single_dh_use;
+        ssl_context = std::make_unique<asio::ssl::context>(asio::ssl::context::sslv23);
+        try {
+            ssl_context->set_options(ssl_options);
+            ssl_context->set_password_callback(
+                [cb = ssl_config_.passwd_cb](std::size_t size, asio::ssl::context_base::password_purpose purpose) {
+                    return cb(std::to_string(size) + " " + std::to_string(static_cast<std::size_t>(purpose)));
+                });
+
+            ssl_context->use_certificate_chain_file(ssl_config_.certificate_path);
+            ssl_context->use_private_key_file(ssl_config_.private_key_path, asio::ssl::context::pem);
+            if (!ssl_config_.tmp_dh_path.empty()) ssl_context->use_tmp_dh_file(ssl_config_.tmp_dh_path);
+        } catch (const std::exception& e) {
+            throw std::invalid_argument(std::string("load ssl config failed ") + e.what());
+        }
+
+#endif
+    }
 
 private:
     void do_accept() {
@@ -106,6 +164,11 @@ private:
                 // LOG(INFO) << "acceptor error: " <<
                 // ec.message();
             } else {
+#ifndef RPC_DISABLE_SSL
+                if (ssl_context) {
+                    conn_->enable_ssl(*ssl_context);
+                }
+#endif
                 if (on_net_err_callback_) {
                     conn_->on_network_error(on_net_err_callback_);
                 }
@@ -254,6 +317,10 @@ private:
     bool stop_check_pub_sub_ = false;
     router router_;
     std::atomic_bool has_stoped_ = { false };
+#ifndef RPC_DISABLE_SSL
+    std::unique_ptr<asio::ssl::context> ssl_context = nullptr;
+    rpc_server_ssl_config ssl_config_;
+#endif
 };
 } // namespace rpc_service
   // namespace rpc_service

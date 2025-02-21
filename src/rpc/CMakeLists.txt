@@ -7,7 +7,7 @@ file(GLOB lib_source
     basic/*.hpp
 )
 
-
+option(RPC_DISABLE_SSL "disable rpc ssl support." OFF)
 list(APPEND lib_source ${services_source})
 
 # Add to source group, TREE will enable cmake to config the folder layout automatically
@@ -28,6 +28,20 @@ target_link_libraries(${lib_name}_property INTERFACE
     BuildSettings
     ${GLOB_NAMESPACE}network${STATIC_LIB_SUFFIX}
 )
+
+if(RPC_DISABLE_SSL)
+    target_compile_definitions(${lib_name}_property
+        INTERFACE
+        RPC_DISABLE_SSL=1
+    )
+else()
+    find_package(OpenSSL REQUIRED)
+    target_link_libraries(${lib_name}_property
+        INTERFACE
+        OpenSSL::SSL
+        OpenSSL::Crypto
+    )
+endif()
 if(F_BUILD_STATIC)
     # Create the static library
     add_library(${lib_name}${STATIC_LIB_SUFFIX} STATIC ${lib_source})

@@ -1,10 +1,10 @@
 #pragma once
+#include "use_asio.hpp"
 #include <cstdint>
 #include <functional>
-#include "use_asio.hpp"
 
-namespace network
-{
+namespace network {
+namespace rpc_service {
 class rpc_client;
 class RpcClientProxyInterface {
     friend class rpc_client;
@@ -103,4 +103,5 @@ private:
     std::function<void(const asio::error_code&)> failed_cb_;
     asio::ip::tcp::socket* ref_socket_ = nullptr;
 };
-}
+} // namespace rpc_service
+} // namespace network

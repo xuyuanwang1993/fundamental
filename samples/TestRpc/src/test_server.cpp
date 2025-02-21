@@ -85,6 +85,11 @@ std::string get_name(rpc_conn conn, const person& p) {
     return p.name;
 }
 
+void auto_disconnect(rpc_conn conn, std::int32_t v) {
+    FINFOS << "auto_disconnect " << v;
+    conn.lock()->abort();
+}
+
 // if you want to response later, you can use async model, you can control when
 // to response
 void delay_echo(rpc_conn conn, const std::string& src) {
@@ -106,7 +111,6 @@ void delay_echo(rpc_conn conn, const std::string& src) {
 }
 
 std::string echo(rpc_conn conn, const std::string& src) {
-    FINFO("echo request:{}", src);
     return src;
 }
 
@@ -120,9 +124,10 @@ dummy1 get_dummy(rpc_conn conn, dummy1 d) {
 static bool stop = false;
 static std::unique_ptr<std::thread> s_thread;
 rpc_server* p_server = nullptr;
-void server_task() {
+void server_task(std::promise<void>& sync_p) {
 
     rpc_server server(9000, std::thread::hardware_concurrency(), 3600);
+    server.enable_ssl({ nullptr, "server.crt", "server.key", "dh2048.pem" });
     p_server = &server;
     dummy d;
     server.register_handler("add", &dummy::add, &d);
@@ -139,7 +144,7 @@ void server_task() {
     server.register_handler("delay_echo", delay_echo);
     server.register_handler("echo", echo);
     server.register_handler("get_int", get_int);
-
+    server.register_handler("auto_disconnect", auto_disconnect);
     server.register_handler(
         "publish_by_token", [&server](rpc_conn conn, std::string key, std::string token, std::string val) {
             FINFOS << "publish_by_token:" << key << ":" << token << " " << Fundamental::Utils::BufferToHex(val);
@@ -166,7 +171,7 @@ void server_task() {
             std::this_thread::sleep_for(std::chrono::milliseconds(50));
         }
     });
-    std::thread t2([]() {
+    std::thread t2([&]() {
         network::io_context_pool::s_excutorNums = 10;
         network::io_context_pool::Instance().start();
         {
@@ -187,15 +192,11 @@ void server_task() {
         // Initialise the server.
         using asio::ip::tcp;
         tcp::resolver resolver(network::io_context_pool::Instance().get_io_context());
-        auto endpoints = resolver.resolve("0.0.0.0", kProxyServicePort);
-        if (endpoints.empty()) {
-            FERR("resolve failed");
-            return;
-        }
-        network::proxy::ProxyServer s(*endpoints.begin());
+        network::proxy::ProxyServer s(network::MakeTcpEndpoint(std::stoul(kProxyServicePort)));
         s.GetHandler().RegisterProtocal(network::proxy::kTrafficProxyOpcode,
                                         network::proxy::TrafficProxyConnection::MakeShared);
         s.Start();
+        sync_p.set_value();
         Fundamental::Application::Instance().Loop();
     });
 
@@ -206,7 +207,9 @@ void server_task() {
 }
 
 void run_server() {
-    s_thread = std::make_unique<std::thread>(server_task);
+    std::promise<void> sync_p;
+    s_thread = std::make_unique<std::thread>([&]() { server_task(sync_p); });
+    sync_p.get_future().get();
 }
 
 void exit_server() {

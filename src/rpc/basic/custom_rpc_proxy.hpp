@@ -2,6 +2,7 @@
 #include "network/services/proxy_server/traffic_proxy_service/traffic_proxy_codec.hpp"
 #include "rpc_client.hpp"
 namespace network {
+namespace rpc_service {
 class CustomRpcProxy : public RpcClientProxyInterface {
 
 public:
@@ -34,4 +35,5 @@ private:
     const std::string field_;
     const std::string token_;
 };
+} // namespace rpc_service
 } // namespace network
