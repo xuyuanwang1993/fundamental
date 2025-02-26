@@ -109,6 +109,12 @@ public:
     bool DisConnect(HandleType handle);
     void Emit(Args... args);
     void operator()(Args... args);
+    bool operator!() const {
+        return _connections.empty();
+    }
+    operator bool() const {
+        return !_connections.empty();
+    }
 
 private:
     eventpp::CallbackList<ReturnType(Args...), PoliciesType> _connections;

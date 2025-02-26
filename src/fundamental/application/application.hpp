@@ -54,8 +54,8 @@ public:
     }
     void Exit() {
         bool expectedValue = true;
-        exitStarted.Emit();
         if (!bRunning.compare_exchange_strong(expectedValue, false)) return;
+        exitStarted.Emit();
         if (imp) imp->Exit();
         WakeUp();
         exitFinished.Emit();

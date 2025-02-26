@@ -2,13 +2,15 @@
 #define REST_RPC_RPC_SERVER_H_
 
 #include "connection.h"
-#include "io_service_pool.h"
+#include "network/server/io_context_pool.hpp"
 #include "router.hpp"
 #include <condition_variable>
 #include <filesystem>
 #include <mutex>
 #include <set>
 #include <thread>
+
+#include "fundamental/events/event_system.h"
 
 using asio::ip::tcp;
 
@@ -39,34 +41,47 @@ struct protocal_helper {
 };
 
 class rpc_server : private asio::noncopyable {
+    friend class connection;
+
 public:
-    rpc_server(unsigned short port, size_t size, size_t timeout_seconds = 15, size_t check_seconds = 10) :
-    io_service_pool_(size), acceptor_(io_service_pool_.get_io_service()), timeout_seconds_(timeout_seconds),
-    check_seconds_(check_seconds), signals_(io_service_pool_.get_io_service()) {
+    Fundamental::Signal<void(asio::error_code, string_view)> on_err;
+    Fundamental::Signal<void(std::shared_ptr<connection>, std::string)> on_net_err;
+
+public:
+    rpc_server(unsigned short port, size_t timeout_seconds = 15) :
+    acceptor_(io_context_pool::Instance().get_io_context()), timeout_seconds_(timeout_seconds) {
         protocal_helper::init_acceptor(acceptor_, port);
-        do_accept();
-        check_thread_   = std::make_shared<std::thread>([this] { clean(); });
-        pub_sub_thread_ = std::make_shared<std::thread>([this] { clean_sub_pub(); });
-        signals_.add(SIGINT);
-        signals_.add(SIGTERM);
-#if defined(SIGQUIT)
-        signals_.add(SIGQUIT);
-#endif // defined(SIGQUIT)
-        do_await_stop();
     }
 
     ~rpc_server() {
+        FDEBUG("release rpc_server start");
+        decltype(connections_) tmp;
+        {
+            std::unique_lock<std::mutex> lock(mtx_);
+            tmp.swap(connections_);
+        }
+        for (auto& conn : tmp) {
+            // active close
+            conn.second->close();
+        }
         stop();
+        FDEBUG("release rpc_server over");
     }
 
-    void async_run() {
-        thd_ = std::make_shared<std::thread>([this] { io_service_pool_.run(); });
+    void start() {
+        bool expected_value = false;
+        if (!has_started_.compare_exchange_strong(expected_value, true)) return;
+        do_accept();
     }
-
-    void run() {
-        io_service_pool_.run();
+    void stop() {
+        bool expected_value = true;
+        if (!has_started_.compare_exchange_strong(expected_value, false)) return;
+        try {
+            // close acceptor directly
+            acceptor_.close();
+        } catch (const std::exception& e) {
+        }
     }
-
     template <bool is_pub = false, typename Function>
     void register_handler(std::string const& name, const Function& f) {
         router_.register_handler<is_pub>(name, f);
@@ -77,36 +92,17 @@ public:
         router_.register_handler<is_pub>(name, f, self);
     }
 
-    void set_error_callback(std::function<void(asio::error_code, string_view)> f) {
-        err_cb_ = std::move(f);
+    template <typename... Args>
+    void publish(std::string key, Args&&... args) {
+        {
+            std::unique_lock<std::mutex> lock(sub_mtx_);
+            if (sub_map_.empty()) return;
+        }
+        auto ret = rpc_service::msgpack_codec::pack(std::forward<Args>(args)...);
+        std::string s_data(ret.data(), ret.data() + ret.size());
+        forward_msg(std::move(key), std::move(s_data));
     }
 
-    void set_conn_timeout_callback(std::function<void(int64_t)> callback) {
-        conn_timeout_callback_ = std::move(callback);
-    }
-
-    void set_network_err_callback(std::function<void(std::shared_ptr<connection>, std::string /*reason*/)> on_net_err) {
-        on_net_err_callback_ = std::move(on_net_err);
-    }
-
-    template <typename T>
-    void publish(const std::string& key, T data) {
-        publish(key, "", std::move(data));
-    }
-
-    template <typename T>
-    void publish_by_token(const std::string& key, std::string token, T data) {
-        publish(key, std::move(token), std::move(data));
-    }
-
-    void forward_publish_msg(const std::string& key, std::string_view msg, std::string token = "") {
-        forward_msg(key, std::move(token), std::string(msg));
-    }
-
-    std::set<std::string> get_token_list() {
-        std::unique_lock<std::mutex> lock(sub_mtx_);
-        return token_list_;
-    }
     void post_stop() {
         stop();
     }
@@ -146,177 +142,92 @@ public:
 
 private:
     void do_accept() {
-        conn_.reset(new connection(io_service_pool_.get_io_service(), timeout_seconds_, router_));
-        conn_->set_callback([this](std::string key, std::string token, std::weak_ptr<connection> conn) {
-            std::unique_lock<std::mutex> lock(sub_mtx_);
-            sub_map_.emplace(std::move(key) + token, conn);
-            if (!token.empty()) {
-                token_list_.emplace(std::move(token));
-            }
-        });
 
-        acceptor_.async_accept(conn_->socket(), [this](asio::error_code ec) {
-            if (!acceptor_.is_open()) {
-                return;
-            }
+        acceptor_.async_accept(
+            io_context_pool::Instance().get_io_context(), [this](asio::error_code ec, asio::ip::tcp::socket socket) {
+                if (!acceptor_.is_open()) {
+                    return;
+                }
 
-            if (ec) {
-                // LOG(INFO) << "acceptor error: " <<
-                // ec.message();
-            } else {
+                if (ec) {
+                    // maybe system error... ignored
+                } else {
+                    auto new_conn = std::make_shared<connection>(std::move(socket), timeout_seconds_, router_);
+                    new_conn->on_new_subscriber_added.Connect([this](std::string key, std::weak_ptr<connection> conn) {
+                        std::unique_lock<std::mutex> lock(sub_mtx_);
+                        sub_map_.emplace(std::move(key), conn);
+                    });
+                    if (on_net_err) {
+                        new_conn->on_net_err_.Connect(on_net_err);
+                    }
+                    new_conn->on_connection_closed.Connect([this](const connection& conn) {
+                        std::unique_lock<std::mutex> lock(mtx_);
+                        connections_.erase(conn.conn_id());
+                    });
+                    new_conn->on_publish_msg.Connect(
+                        [this](std::string key, std::string data) { forward_msg(std::move(key), std::move(data)); });
+                    new_conn->on_subscribers_removed.Connect(
+                        [this](const std::unordered_set<std::string>& keys, std::weak_ptr<connection> conn) {
+                            std::unique_lock<std::mutex> lock(sub_mtx_);
+                            for (auto& key : keys) {
+                                auto range = sub_map_.equal_range(key);
+                                for (auto it = range.first; it != range.second;) {
+                                    if (it->second.lock() == conn.lock()) {
+                                        it = sub_map_.erase(it);
+                                        break;
+                                    } else {
+                                        ++it;
+                                    }
+                                }
+                            }
+                        });
 #ifndef RPC_DISABLE_SSL
-                if (ssl_context) {
-                    conn_->enable_ssl(*ssl_context);
-                }
+                    if (ssl_context) {
+                        new_conn->enable_ssl(*ssl_context);
+                    }
 #endif
-                if (on_net_err_callback_) {
-                    conn_->on_network_error(on_net_err_callback_);
+
+                    new_conn->start();
+                    std::unique_lock<std::mutex> lock(mtx_);
+                    new_conn->set_conn_id(conn_id_);
+                    FDEBUG("start connection -> {}", conn_id_);
+                    connections_.emplace(conn_id_++, new_conn);
                 }
-                conn_->start();
-                std::unique_lock<std::mutex> lock(mtx_);
-                conn_->set_conn_id(conn_id_);
-                connections_.emplace(conn_id_++, conn_);
-            }
 
-            do_accept();
-        });
+                do_accept();
+            });
     }
 
-    void clean() {
-        while (!stop_check_) {
-            std::unique_lock<std::mutex> lock(mtx_);
-            cv_.wait_for(lock, std::chrono::seconds(check_seconds_));
-
-            for (auto it = connections_.cbegin(); it != connections_.cend();) {
-                if (it->second->has_closed()) {
-                    if (conn_timeout_callback_) {
-                        conn_timeout_callback_(it->second->conn_id());
-                    }
-                    it = connections_.erase(it);
-                } else {
-                    ++it;
-                }
-            }
-        }
-    }
-
-    void clean_sub_pub() {
-        while (!stop_check_pub_sub_) {
-            std::unique_lock<std::mutex> lock(sub_mtx_);
-            sub_cv_.wait_for(lock, std::chrono::seconds(10));
-
-            for (auto it = sub_map_.cbegin(); it != sub_map_.cend();) {
-                auto conn = it->second.lock();
-                if (conn == nullptr || conn->has_closed()) {
-                    // remove token
-                    for (auto t = token_list_.begin(); t != token_list_.end();) {
-                        if (it->first.find(*t) != std::string::npos) {
-                            t = token_list_.erase(t);
-                        } else {
-                            ++t;
-                        }
-                    }
-
-                    it = sub_map_.erase(it);
-                } else {
-                    ++it;
-                }
-            }
-        }
-    }
-    void error_callback(const asio::error_code& ec, string_view msg) {
-        if (err_cb_) {
-            err_cb_(ec, msg);
-        }
-    }
-    void forward_msg(std::string key, std::string token, std::string data) {
+    void forward_msg(std::string key, std::string data) {
         std::unique_lock<std::mutex> lock(sub_mtx_);
-        auto range = sub_map_.equal_range(key + token);
+        auto range = sub_map_.equal_range(key);
         if (range.first != range.second) {
             for (auto it = range.first; it != range.second; ++it) {
                 auto conn = it->second.lock();
                 if (conn == nullptr || conn->has_closed()) {
                     continue;
                 }
-
-                conn->publish(key + token, data);
+                conn->publish(key, data);
             }
         } else {
             if (!sub_map_.empty())
-                error_callback(asio::error::make_error_code(asio::error::invalid_argument),
-                               "The subscriber of the key: " + key + " does not exist.");
+                on_err(asio::error::make_error_code(asio::error::invalid_argument),
+                       "The subscriber of the key: " + key + " does not exist.");
         }
     }
-    template <typename T>
-    void publish(std::string key, std::string token, T data) {
-        {
-            std::unique_lock<std::mutex> lock(sub_mtx_);
-            if (sub_map_.empty()) return;
-        }
 
-        auto b = rpc_service::msgpack_codec::pack(data);
-        std::string s_data(b.data(), b.data() + b.size());
-        forward_msg(std::move(key), std::move(token), std::move(s_data));
-    }
-
-    void do_await_stop() {
-        signals_.async_wait([this](std::error_code /*ec*/, int /*signo*/) { stop(); });
-    }
-
-    void stop() {
-        if (has_stoped_) {
-            return;
-        }
-
-        {
-            std::unique_lock<std::mutex> lock(mtx_);
-            stop_check_ = true;
-            cv_.notify_all();
-        }
-        check_thread_->join();
-
-        {
-            std::unique_lock<std::mutex> lock(sub_mtx_);
-            stop_check_pub_sub_ = true;
-            sub_cv_.notify_all();
-        }
-        pub_sub_thread_->join();
-
-        io_service_pool_.stop();
-        if (thd_) {
-            thd_->join();
-        }
-        has_stoped_ = true;
-    }
-
-    io_service_pool io_service_pool_;
+    std::atomic_bool has_started_ = false;
     tcp::acceptor acceptor_;
-    std::shared_ptr<connection> conn_;
-    std::shared_ptr<std::thread> thd_;
     std::size_t timeout_seconds_;
 
     std::unordered_map<int64_t, std::shared_ptr<connection>> connections_;
     int64_t conn_id_ = 0;
     std::mutex mtx_;
-    std::shared_ptr<std::thread> check_thread_;
-    size_t check_seconds_;
-    bool stop_check_ = false;
-    std::condition_variable cv_;
 
-    asio::signal_set signals_;
-
-    std::function<void(asio::error_code, string_view)> err_cb_;
-    std::function<void(int64_t)> conn_timeout_callback_;
-    std::function<void(std::shared_ptr<connection>, std::string)> on_net_err_callback_ = nullptr;
     std::unordered_multimap<std::string, std::weak_ptr<connection>> sub_map_;
-    std::set<std::string> token_list_;
     std::mutex sub_mtx_;
-    std::condition_variable sub_cv_;
 
-    std::shared_ptr<std::thread> pub_sub_thread_;
-    bool stop_check_pub_sub_ = false;
     router router_;
-    std::atomic_bool has_stoped_ = { false };
 #ifndef RPC_DISABLE_SSL
     std::unique_ptr<asio::ssl::context> ssl_context = nullptr;
     rpc_server_ssl_config ssl_config_;

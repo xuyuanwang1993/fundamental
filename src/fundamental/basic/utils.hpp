@@ -60,7 +60,7 @@ void SetThreadName(const std::string& name);
 std::string BufferToHex(const void* buffer, std::size_t size);
 template <typename T>
 inline std::string BufferToHex(const T& v) {
-    using  ValueType = typename T::value_type;
+    using ValueType = typename T::value_type;
     return BufferToHex(v.data(), v.size() * sizeof(ValueType));
 }
 

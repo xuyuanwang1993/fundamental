@@ -15,6 +15,7 @@
 #include <thread>
 #include <utility>
 
+#include "fundamental/basic/log.h"
 #include "network/server/basic_server.hpp"
 #include "rpc_client_proxy.hpp"
 
@@ -77,7 +78,40 @@ enum rpc_client_ssl_level {
     rpc_client_ssl_level_required
 };
 
+// call these interface not in io thread
+class ClientStreamReadWriter {
+public:
+    ClientStreamReadWriter(rpc_client& client);
+    ~ClientStreamReadWriter();
+    template <typename T>
+    bool Read(T& request, std::size_t max_wait_ms = 5000);
+    template <typename U>
+    bool Write(U&& response);
+    bool WriteDone();
+    std::error_code Finish(std::size_t max_wait_ms = 5000);
+    std::error_code GetLastError() const;
+
+private:
+    void read_head();
+    void read_body();
+    void set_status(rpc_stream_data_status status, std::error_code ec);
+    void handle_write();
+
+private:
+    std::mutex mutex;
+    std::error_code last_err_;
+    rpc_stream_packet read_packet_buffer;
+    std::atomic<rpc_stream_data_status> last_data_status_ = rpc_stream_data_status::rpc_stream_none;
+
+    rpc_client& client_;
+    std::condition_variable cv_;
+    std::deque<std::vector<std::uint8_t>> response_cache_;
+    std::deque<rpc_stream_packet> write_cache_;
+};
+
 class rpc_client : private asio::noncopyable {
+    friend class ClientStreamReadWriter;
+
 public:
     inline static std::function<asio::io_context&()> s_io_context_cb = []() -> decltype(auto) {
         return network::io_context_pool::Instance().get_io_context();
@@ -94,7 +128,6 @@ public:
     }
 
     ~rpc_client() {
-
         stop();
     }
 
@@ -230,6 +263,7 @@ public:
 
     template <CallModel model, typename... Args>
     future_result<req_result> async_call(const std::string& rpc_name, Args&&... args) {
+        if (has_upgrade) throw std::runtime_error("client has already upgrade");
         auto p                         = std::make_shared<std::promise<req_result>>();
         std::future<req_result> future = p->get_future();
 
@@ -243,13 +277,14 @@ public:
 
         rpc_service::msgpack_codec codec;
         auto ret = codec.pack(std::forward<Args>(args)...);
-        write(fu_id, request_type::req_res, std::move(ret), MD5::MD5Hash32(rpc_name.data()));
+        write(fu_id, request_type::rpc_req, std::move(ret), MD5::MD5Hash32(rpc_name.data()));
         return future_result<req_result> { fu_id, std::move(future) };
     }
 
     template <size_t TIMEOUT = DEFAULT_TIMEOUT, typename... Args>
     void async_call(const std::string& rpc_name, std::function<void(asio::error_code, string_view)> cb,
                     Args&&... args) {
+        if (has_upgrade) throw std::runtime_error("client has already upgrade");
         if (!has_connected_) {
             if (cb) cb(asio::error::make_error_code(asio::error::not_connected), "not connected");
             return;
@@ -268,7 +303,7 @@ public:
 
         rpc_service::msgpack_codec codec;
         auto ret = codec.pack(std::forward<Args>(args)...);
-        write(cb_id, request_type::req_res, std::move(ret), MD5::MD5Hash32(rpc_name.data()));
+        write(cb_id, request_type::rpc_req, std::move(ret), MD5::MD5Hash32(rpc_name.data()));
     }
 
     void stop() {
@@ -284,69 +319,102 @@ public:
     }
 
     template <typename Func>
-    void subscribe(std::string key, Func f) {
-        auto it = sub_map_.find(key);
-        if (it != sub_map_.end()) {
-            assert("duplicated subscribe");
-            return;
+    future_result<req_result> subscribe(std::string key, Func f) {
+        if (has_upgrade) throw std::runtime_error("client has already upgrade");
+        {
+            std::unique_lock<std::mutex> lock(sub_mtx_);
+            auto it = sub_map_.find(key);
+            if (it != sub_map_.end()) {
+                FASSERT(false && "duplicated subscribe");
+                return {};
+            }
+            sub_map_.emplace(key, std::move(f));
         }
 
-        sub_map_.emplace(key, std::move(f));
-        send_subscribe(key, "");
-        key_token_set_.emplace(std::move(key), "");
+        return post_future_call(request_type::rpc_subscribe, key);
     }
 
-    template <typename Func>
-    void subscribe(std::string key, std::string token, Func f) {
-        auto composite_key = key + token;
-        auto it            = sub_map_.find(composite_key);
-        if (it != sub_map_.end()) {
-            assert("duplicated subscribe");
-            return;
+    future_result<req_result> unsubscribe(std::string key) {
+        if (has_upgrade) throw std::runtime_error("client has already upgrade");
+        {
+            std::unique_lock<std::mutex> lock(sub_mtx_);
+            auto it = sub_map_.find(key);
+            if (it == sub_map_.end()) {
+                FASSERT(false && "subscribe key not found");
+                return {};
+            }
+            sub_map_.erase(key);
         }
 
-        sub_map_.emplace(std::move(composite_key), std::move(f));
-        send_subscribe(key, token);
-        key_token_set_.emplace(std::move(key), std::move(token));
+        return post_future_call(request_type::rpc_subscribe, key);
     }
 
-    template <typename... Args, size_t TIMEOUT = 3>
-    void publish(std::string key, Args&&... args) {
+    template <typename... Args>
+    future_result<req_result> publish(std::string key, Args&&... args) {
+        // convert to format string data
         rpc_service::msgpack_codec codec;
-        auto buf = codec.pack(std::forward<Args>(args)...);
-        call<TIMEOUT>("publish", std::move(key), "", std::string(buf.data(), buf.data() + buf.size()));
-    }
-
-    template <typename... Args, size_t TIMEOUT = 3>
-    void publish_by_token(std::string key, std::string token, Args&&... args) {
-        rpc_service::msgpack_codec codec;
-        auto buf = codec.pack(std::forward<Args>(args)...);
-        call<TIMEOUT>("publish_by_token", std::move(key), std::move(token),
-                      std::string(buf.data(), buf.data() + buf.size()));
+        auto ret = codec.pack(std::forward<Args>(args)...);
+        return post_future_call(request_type::rpc_publish, key, std::string(ret.data(), ret.data() + ret.size()));
     }
 
     void enable_ssl(const std::string& ser_pem_path,
                     rpc_client_ssl_level enable_ssl_level = rpc_client_ssl_level::rpc_client_ssl_level_required) {
 #ifndef RPC_DISABLE_SSL
-        if (ssl_level == rpc_client_ssl_level::rpc_client_ssl_level_none) return;
-        pem_path    = ser_pem_path;
-        ssl_level   = enable_ssl_level;
-        ssl_context = std::make_unique<asio::ssl::context>(asio::ssl::context::sslv23);
-        ssl_context->set_default_verify_paths();
-        asio::error_code ec;
-        ssl_context->set_options(asio::ssl::context::default_workarounds, ec);
-        ssl_context->load_verify_file(pem_path, ec);
-        if (ec) {
-            if (ssl_level == rpc_client_ssl_level_required) {
-                throw std::invalid_argument(ec.message());
-            }
-        } else {
-            ssl_level = rpc_client_ssl_level_required;
-        }
+        pem_path  = ser_pem_path;
+        ssl_level = enable_ssl_level;
 #endif
     }
 
+    std::shared_ptr<ClientStreamReadWriter> upgrade_to_stream(std::string_view rpc_name,
+                                                              std::size_t timeout_msec = 5000) {
+        if (has_upgrade) throw std::runtime_error("client has already upgrade");
+        auto p                         = std::make_shared<std::promise<req_result>>();
+        std::future<req_result> future = p->get_future();
+
+        uint64_t fu_id = 0;
+        {
+            std::unique_lock<std::mutex> lock(cb_mtx_);
+            fu_id_++;
+            fu_id = fu_id_;
+            future_map_.emplace(fu_id, std::move(p));
+        }
+        write(fu_id, request_type::rpc_stream, {}, MD5::MD5Hash32(rpc_name.data()));
+        std::shared_ptr<ClientStreamReadWriter> ret;
+        try {
+            if (timeout_msec > 0)
+                future.wait_for(std::chrono::milliseconds(timeout_msec));
+            else {
+                future.wait();
+            }
+            ret = std::make_shared<ClientStreamReadWriter>(*this);
+        } catch (const std::exception& e) {
+#ifdef DEBUG
+            std::cout << "upgrade_to_stream: failed for " << e.what();
+#endif
+        }
+        return ret;
+    }
+
 private:
+    template <typename... Args>
+    future_result<req_result> post_future_call(request_type call_type, Args&&... args) {
+        auto p                         = std::make_shared<std::promise<req_result>>();
+        std::future<req_result> future = p->get_future();
+
+        uint64_t fu_id = 0;
+        {
+            std::unique_lock<std::mutex> lock(cb_mtx_);
+            fu_id_++;
+            fu_id = fu_id_;
+            future_map_.emplace(fu_id, std::move(p));
+        }
+
+        rpc_service::msgpack_codec codec;
+        auto ret = codec.pack(std::forward<Args>(args)...);
+        write(fu_id, call_type, std::move(ret), 0);
+        return future_result<req_result> { fu_id, std::move(future) };
+    }
+
     bool is_ssl() const {
 #ifndef RPC_DISABLE_SSL
         return ssl_level != rpc_client_ssl_level_none;
@@ -429,7 +497,7 @@ private:
         deadline_.async_wait([this, timeout](const asio::error_code& ec) {
             if (!ec) {
                 if (has_connected_) {
-                    write(0, request_type::req_res, rpc_service::rpc_buffer_type(0), 0);
+                    write(0, request_type::rpc_heartbeat, rpc_service::rpc_buffer_type(0), 0);
                 }
             }
 
@@ -460,7 +528,7 @@ private:
         write_buffers[0] = asio::buffer(&header_, sizeof(rpc_header));
         write_buffers[1] = asio::buffer((char*)msg.content.data(), write_size_);
 
-        async_write(write_buffers, [this](const asio::error_code& ec, const size_t length) {
+        async_write(std::move(write_buffers), [this](const asio::error_code& ec, const size_t length) {
             if (ec) {
                 has_connected_ = false;
                 close();
@@ -507,13 +575,6 @@ private:
                     return;
                 }
             } else {
-                {
-                    std::unique_lock<std::mutex> lock(cb_mtx_);
-                    for (auto& item : callback_map_) {
-                        item.second->callback(ec, {});
-                    }
-                }
-
                 close();
                 error_callback(ec);
             }
@@ -529,19 +590,24 @@ private:
 
             if (!ec) {
                 // entier body
-                if (req_type == request_type::req_res) {
+                if (req_type == request_type::rpc_res) {
                     call_back(req_id, ec, { body_.data(), body_len });
-                } else if (req_type == request_type::sub_pub) {
+                    do_read();
+                } else if (req_type == request_type::rpc_publish) {
                     callback_sub(ec, { body_.data(), body_len });
+                    do_read();
+                } else if (req_type == request_type::rpc_stream) {
+                    call_back(req_id, ec, { body_.data(), body_len });
+                    has_upgrade = true;
                 } else {
+                    FWARN("invalid req_type failed {}", (std::int32_t)req_type);
                     close();
                     error_callback(asio::error::make_error_code(asio::error::invalid_argument));
                     return;
                 }
 
-                do_read();
             } else {
-                // LOG(INFO) << ec.message();
+                FWARN("read failed {}", ec.message());
                 has_connected_ = false;
                 call_back(req_id, ec, {});
                 close();
@@ -550,17 +616,17 @@ private:
         });
     }
 
-    void send_subscribe(const std::string& key, const std::string& token) {
-        rpc_service::msgpack_codec codec;
-        auto ret = codec.pack(key, token);
-        write(0, request_type::sub_pub, std::move(ret), MD5::MD5Hash32(key.data()));
-    }
-
     void resend_subscribe() {
-        if (key_token_set_.empty()) return;
-
-        for (auto& pair : key_token_set_) {
-            send_subscribe(pair.first, pair.second);
+        if (sub_map_.empty()) return;
+        std::vector<std::string> sub_keys;
+        {
+            std::unique_lock<std::mutex> lock(sub_mtx_);
+            for (auto& item : sub_map_) {
+                sub_keys.push_back(item.first);
+            }
+        }
+        for (auto& key : sub_keys) {
+            post_future_call(request_type::rpc_subscribe, key);
         }
     }
 
@@ -609,12 +675,16 @@ private:
             [[maybe_unused]] auto code = std::get<0>(tp);
             auto& key                  = std::get<1>(tp);
             auto& data                 = std::get<2>(tp);
-
-            auto it = sub_map_.find(key);
-            if (it == sub_map_.end()) {
-                return;
+            decltype(sub_map_)::iterator::value_type::second_type cb;
+            {
+                std::unique_lock<std::mutex> lock(sub_mtx_);
+                auto it = sub_map_.find(key);
+                if (it == sub_map_.end()) {
+                    return;
+                }
+                cb = it->second;
             }
-            it->second(data);
+            cb(data);
         } catch (const std::exception& /*ex*/) {
             error_callback(asio::error::make_error_code(asio::error::invalid_argument));
         }
@@ -630,7 +700,14 @@ private:
 
         {
             std::unique_lock<std::mutex> lock(cb_mtx_);
+            auto err = error::make_error_code(error::rpc_errors::rpc_failed);
+            for (auto& item : callback_map_) {
+                item.second->callback(err, "");
+            }
             callback_map_.clear();
+            for (auto& item : future_map_) {
+                item.second->set_exception(std::make_exception_ptr(std::runtime_error("rpc client closed")));
+            }
             future_map_.clear();
         }
     }
@@ -724,7 +801,22 @@ private:
     }
     void ssl_handshake() {
 #ifndef RPC_DISABLE_SSL
-        ssl_stream_ = std::make_unique<asio::ssl::stream<asio::ip::tcp::socket&>>(socket_, *ssl_context);
+        asio::ssl::context ssl_context(asio::ssl::context::sslv23);
+        ssl_context.set_default_verify_paths();
+        asio::error_code ec;
+        ssl_context.set_options(asio::ssl::context::default_workarounds, ec);
+        ssl_context.load_verify_file(pem_path, ec);
+        if (ec) {
+            if (ssl_level == rpc_client_ssl_level_required) {
+                close();
+                error_callback(ec);
+                return;
+            }
+        } else {
+            ssl_level = rpc_client_ssl_level_required;
+        }
+
+        ssl_stream_ = std::make_unique<asio::ssl::stream<asio::ip::tcp::socket&>>(socket_, ssl_context);
         if (ssl_level == rpc_client_ssl_level_required) {
             ssl_stream_->set_verify_mode(asio::ssl::verify_peer);
             ssl_stream_->set_verify_callback(
@@ -736,6 +828,7 @@ private:
             if (!ec) {
                 rpc_protocal_ready();
             } else {
+                FDEBUG("perform client ssl handshake failed {}", ec.message());
                 close();
                 error_callback(ec);
             }
@@ -754,6 +847,17 @@ private:
     }
 
     template <typename Handler>
+    void async_buffer_read(std::vector<asio::mutable_buffer> buffers, Handler handler) {
+        if (is_ssl()) {
+#ifndef RPC_DISABLE_SSL
+            asio::async_read(*ssl_stream_, std::move(buffers), std::move(handler));
+#endif
+        } else {
+            asio::async_read(socket_, std::move(buffers), std::move(handler));
+        }
+    }
+
+    template <typename Handler>
     void async_read(size_t size_to_read, Handler handler) {
         if (is_ssl()) {
 #ifndef RPC_DISABLE_SSL
@@ -766,13 +870,13 @@ private:
     }
 
     template <typename BufferType, typename Handler>
-    void async_write(const BufferType& buffers, Handler handler) {
+    void async_write(BufferType buffers, Handler handler) {
         if (is_ssl()) {
 #ifndef RPC_DISABLE_SSL
-            asio::async_write(*ssl_stream_, buffers, std::move(handler));
+            asio::async_write(*ssl_stream_, std::move(buffers), std::move(handler));
 #endif
         } else {
-            asio::async_write(socket_, buffers, std::move(handler));
+            asio::async_write(socket_, std::move(buffers), std::move(handler));
         }
     }
 
@@ -817,16 +921,215 @@ private:
 
     rpc_header header_;
 
+    std::mutex sub_mtx_;
     std::unordered_map<std::string, std::function<void(string_view)>> sub_map_;
-    std::set<std::pair<std::string, std::string>> key_token_set_;
     //
     std::shared_ptr<RpcClientProxyInterface> proxy_interface;
     rpc_client_ssl_level ssl_level = rpc_client_ssl_level::rpc_client_ssl_level_none;
 #ifndef RPC_DISABLE_SSL
-    std::unique_ptr<asio::ssl::context> ssl_context                        = nullptr;
     std::unique_ptr<asio::ssl::stream<asio::ip::tcp::socket&>> ssl_stream_ = nullptr;
     std::string pem_path;
 #endif
+    // rpc handler
+    std::atomic_bool has_upgrade = false;
 };
+
+inline ClientStreamReadWriter::ClientStreamReadWriter(rpc_client& client) : client_(client) {
+    read_head();
+}
+inline ClientStreamReadWriter::~ClientStreamReadWriter() {
+    if (last_data_status_ < rpc_stream_data_status::rpc_stream_finish) {
+        set_status(rpc_stream_data_status::rpc_stream_finish,
+                   error::make_error_code(error::rpc_errors::rpc_internal_error));
+    }
+    client_.close();
+}
+template <typename T>
+inline bool ClientStreamReadWriter::Read(T& request, std::size_t max_wait_ms) {
+    auto check_func = [this]() -> bool {
+        return last_data_status_ >= rpc_stream_data_status::rpc_stream_write_done || !response_cache_.empty();
+    };
+    std::vector<std::uint8_t> response_data;
+    {
+        std::unique_lock<std::mutex> locker(mutex);
+        if (max_wait_ms > 0)
+            cv_.wait_for(locker, std::chrono::milliseconds(max_wait_ms), check_func);
+        else {
+            cv_.wait(locker, check_func);
+        }
+        if (response_cache_.empty() || last_data_status_ == rpc_stream_data_status::rpc_stream_failed) return false;
+        response_data = std::move(response_cache_.front());
+        response_cache_.pop_front();
+    }
+    try {
+        request = msgpack_codec::unpack<T>(response_data.data(), response_data.size());
+    } catch (const std::exception& e) {
+        set_status(rpc_stream_data_status::rpc_stream_failed,
+                   error::make_error_code(error::rpc_errors::rpc_unpack_failed));
+
+        return false;
+    }
+
+    return true;
+}
+template <typename U>
+inline bool ClientStreamReadWriter::Write(U&& response) {
+    if (last_data_status_ >= rpc_stream_data_status::rpc_stream_finish) return false;
+    rpc_buffer_type data;
+    try {
+        data = msgpack_codec::pack(std::forward<U>(response));
+    } catch (const std::exception& e) {
+        set_status(rpc_stream_data_status::rpc_stream_failed,
+                   error::make_error_code(error::rpc_errors::rpc_pack_failed));
+
+        return false;
+    }
+    asio::post(client_.socket_.get_executor(), [this, data = std::move(data)]() mutable {
+        auto& new_item = write_cache_.emplace_back();
+        new_item.size  = htole32(static_cast<std::uint32_t>(data.size()));
+        new_item.type  = static_cast<std::uint8_t>(rpc_stream_data_status::rpc_stream_data);
+        new_item.data  = std::move(data);
+        if (write_cache_.size() == 1) handle_write();
+    });
+    return true;
+}
+
+inline bool ClientStreamReadWriter::WriteDone() {
+    if (last_data_status_ >= rpc_stream_data_status::rpc_stream_finish) return false;
+    asio::post(client_.socket_.get_executor(), [this]() mutable {
+        auto& new_item = write_cache_.emplace_back();
+        new_item.size  = 0;
+        new_item.type  = static_cast<std::uint8_t>(rpc_stream_data_status::rpc_stream_write_done);
+        new_item.data.clear();
+        if (write_cache_.size() == 1) handle_write();
+    });
+    return true;
+}
+
+inline std::error_code ClientStreamReadWriter::Finish(std::size_t max_wait_ms) {
+    do {
+        if (last_data_status_ >= rpc_stream_data_status::rpc_stream_finish) break;
+        asio::post(client_.socket_.get_executor(), [this]() mutable {
+            auto& new_item = write_cache_.emplace_back();
+            new_item.size  = 0;
+            new_item.type  = static_cast<std::uint8_t>(rpc_stream_data_status::rpc_stream_finish);
+            new_item.data.clear();
+            if (write_cache_.size() == 1) handle_write();
+        });
+        auto check_func = [this]() -> bool { return last_data_status_ >= rpc_stream_data_status::rpc_stream_finish; };
+        std::unique_lock<std::mutex> locker(mutex);
+        if (max_wait_ms > 0)
+            cv_.wait_for(locker, std::chrono::milliseconds(max_wait_ms), check_func);
+        else {
+            cv_.wait(locker, check_func);
+        }
+    } while (0);
+
+    return last_err_;
+}
+
+inline std::error_code ClientStreamReadWriter::GetLastError() const {
+    return last_err_;
+}
+inline void ClientStreamReadWriter::read_head() {
+    client_.async_buffer_read({ asio::buffer(&read_packet_buffer.size, sizeof(read_packet_buffer.size)) },
+                              [this](asio::error_code ec, std::size_t length) {
+                                  if (last_data_status_ >= rpc_stream_data_status::rpc_stream_finish) return;
+                                  if (ec) {
+                                      set_status(rpc_stream_data_status::rpc_stream_failed, std::move(ec));
+                                  } else {
+                                      read_packet_buffer.size = le32toh(read_packet_buffer.size);
+                                      try {
+                                          read_packet_buffer.data.resize(read_packet_buffer.size);
+                                          read_body();
+                                      } catch (...) {
+                                          set_status(rpc_stream_data_status::rpc_stream_failed,
+                                                     error::make_error_code(error::rpc_errors::rpc_memory_error));
+                                      }
+                                  }
+                              });
+}
+inline void ClientStreamReadWriter::read_body() {
+    std::vector<asio::mutable_buffer> buffers;
+    buffers.emplace_back(asio::buffer(&read_packet_buffer.type, 1));
+    if (read_packet_buffer.size > 0)
+        buffers.emplace_back(asio::buffer(read_packet_buffer.data.data(), read_packet_buffer.size));
+    client_.async_buffer_read(std::move(buffers), [this](asio::error_code ec, std::size_t length) {
+        if (last_data_status_ >= rpc_stream_data_status::rpc_stream_write_done) return;
+        if (ec) {
+            set_status(rpc_stream_data_status::rpc_stream_failed, std::move(ec));
+        } else {
+            auto status = static_cast<rpc_stream_data_status>(read_packet_buffer.type);
+            if (status < last_data_status_ || status >= rpc_stream_data_status::rpc_stream_finish) {
+                set_status(rpc_stream_data_status::rpc_stream_failed,
+                           error::make_error_code(error::rpc_errors::rpc_bad_request));
+                return;
+            }
+            switch (status) {
+            case rpc_stream_data_status::rpc_stream_data: {
+                read_head();
+                std::scoped_lock<std::mutex> locker(mutex);
+                last_data_status_ = rpc_stream_data_status::rpc_stream_data;
+                response_cache_.emplace_back(std::move(read_packet_buffer.data));
+                cv_.notify_one();
+            } break;
+            case rpc_stream_data_status::rpc_stream_write_done: {
+                set_status(status, error::make_error_code(error::rpc_errors::rpc_success));
+                read_head();
+            } break;
+            default: {
+                set_status(rpc_stream_data_status::rpc_stream_failed,
+                           error::make_error_code(error::rpc_errors::rpc_bad_request));
+                break;
+            }
+            }
+        }
+    });
+}
+inline void ClientStreamReadWriter::set_status(rpc_stream_data_status status, std::error_code ec) {
+    if (last_data_status_.load() >= rpc_stream_data_status::rpc_stream_finish) {
+        cv_.notify_all();
+        return;
+    }
+    std::scoped_lock<std::mutex> locker(mutex);
+    last_err_         = std::move(ec);
+    last_data_status_ = status;
+    cv_.notify_all();
+    if (last_data_status_.load() >= rpc_stream_data_status::rpc_stream_finish) {
+        client_.close();
+    }
+}
+inline void ClientStreamReadWriter::handle_write() {
+    if (last_data_status_.load() >= rpc_stream_data_status::rpc_stream_finish) write_cache_.clear();
+    if (write_cache_.empty()) {
+        return;
+    }
+
+    std::vector<asio::const_buffer> write_buffers;
+    auto& item = write_cache_.front();
+    write_buffers.emplace_back(asio::const_buffer(&item.size, sizeof(item.size)));
+    write_buffers.emplace_back(asio::const_buffer(&item.type, sizeof(item.type)));
+    if (item.data.size() > 0) {
+        write_buffers.emplace_back(asio::const_buffer(item.data.data(), item.data.size()));
+    }
+
+    client_.async_write(std::move(write_buffers), [this](asio::error_code ec, std::size_t length) {
+        if (last_data_status_ >= rpc_stream_data_status::rpc_stream_finish) return;
+        if (ec) {
+            set_status(rpc_stream_data_status::rpc_stream_failed, ec);
+            return;
+        }
+        auto packet_type = write_cache_.front().type;
+        if (packet_type == static_cast<std::uint8_t>(rpc_stream_data_status::rpc_stream_finish)) {
+            write_cache_.clear();
+            set_status(rpc_stream_data_status::rpc_stream_finish,
+                       error::make_error_code(error::rpc_errors::rpc_success));
+
+        } else {
+            write_cache_.pop_front();
+            handle_write();
+        }
+    });
+}
 } // namespace rpc_service
 } // namespace network
