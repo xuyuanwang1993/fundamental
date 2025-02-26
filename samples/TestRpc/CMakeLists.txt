@@ -31,7 +31,7 @@ target_include_directories(${app_target_name}
 target_link_libraries(${app_target_name}
     PRIVATE
     BuildSettings
-    ${GLOB_NAMESPACE}rpc${STATIC_LIB_SUFFIX}
+    ${GLOB_NAMESPACE}rpc
 )
 
 
