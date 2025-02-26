@@ -15,12 +15,6 @@ io_contexts_ { io_context_ptr(new asio::io_context) }, next_io_context_(0), sign
     //  should release all resource reference before our application is exited
     //  when the static resource will be recycled, this action avoids error access
     //  to no-static objects
-    Fundamental::Application::Instance().exitStarted.Connect([this]() {
-        FINFO("asio context pool stop for application exit");
-        stop();
-        work_.clear();
-        io_contexts_.clear();
-    });
 }
 
 io_context_pool::~io_context_pool() {
@@ -57,17 +51,20 @@ void io_context_pool::start() {
 #if defined(SIGQUIT)
     signals_.add(SIGQUIT);
 #endif // defined(SIGQUIT)
-    signals_.async_wait([](std::error_code ec, int signo) {
-        FINFO("quit  because of  signal:{} ec:{}", signo, ec.message());
-        Fundamental::Application::Instance().Exit();
-        FINFO("quit finished");
+    signals_.async_wait([this](std::error_code ec, int signo) {
+        FDEBUG("recv signo:{} msg:{}", signo, ec.message());
+        notify_sys_signal(std::move(ec), signo);
     });
 }
 
 void io_context_pool::stop() {
+    FDEBUG("stop io context pool");
     // Explicitly stop all io_contexts.
+    work_.clear();
     for (std::size_t i = 0; i < io_contexts_.size(); ++i)
         io_contexts_[i]->stop();
+    io_contexts_.clear();
+    FDEBUG("stop io context over");
 }
 
 asio::io_context& io_context_pool::get_io_context() {

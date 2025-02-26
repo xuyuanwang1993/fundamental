@@ -1,15 +1,20 @@
 #pragma once
-#include "fundamental/basic/utils.hpp"
+
+
 #include <asio.hpp>
 #include <list>
 #include <memory>
 #include <vector>
+#include <stdexcept>
+
+#include "fundamental/basic/utils.hpp"
+#include "fundamental/events/event_system.h"
 namespace network {
 /// A pool of io_context objects.
 class io_context_pool : public Fundamental::Singleton<io_context_pool> {
 public:
     inline static std::size_t s_excutorNums = 0;
-
+    Fundamental::Signal<void(std::error_code /*ec*/, int /*signo*/)> notify_sys_signal;
 public:
     /// Construct the io_context pool.
     io_context_pool();

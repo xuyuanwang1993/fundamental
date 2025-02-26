@@ -16,17 +16,13 @@
 #include <random>
 #include <utility>
 void InitTrafficProxyManager();
-int main(int argc, char* argv[])
-{
+int main(int argc, char* argv[]) {
     auto p = ::getenv("CLIENT");
-    if (!p)
-    {
+    if (!p) {
         FINFO("you can set env \"CLIENT\" to perform as a client role");
-        try
-        {
+        try {
             // Check command line arguments.
-            if (argc != 4)
-            {
+            if (argc != 4) {
                 std::cerr << "Usage: server <address> <port> <threads>\n";
                 std::cerr << "  For IPv4, try:\n";
                 std::cerr << "    receiver 0.0.0.0 4885 1 \n";
@@ -36,6 +32,10 @@ int main(int argc, char* argv[])
             }
             network::io_context_pool::s_excutorNums = std::stoi(argv[3]);
             network::io_context_pool::Instance().start();
+            Fundamental::Application::Instance().exitStarted.Connect(
+                [&]() { network::io_context_pool::Instance().stop(); });
+            network::io_context_pool::Instance().notify_sys_signal.Connect(
+                [](std::error_code code, std::int32_t signo) { Fundamental::Application::Instance().Exit(); });
             InitTrafficProxyManager();
             // Initialise the server.
             using asio::ip::tcp;
@@ -47,34 +47,32 @@ int main(int argc, char* argv[])
             }
             network::proxy::ProxyServer s(*endpoints.begin());
             s.GetHandler().RegisterProtocal(network::proxy::kAgentOpcode, network::proxy::AgentConnection::MakeShared);
-            s.GetHandler().RegisterProtocal(network::proxy::kTrafficProxyOpcode, network::proxy::TrafficProxyConnection::MakeShared);
+            s.GetHandler().RegisterProtocal(network::proxy::kTrafficProxyOpcode,
+                                            network::proxy::TrafficProxyConnection::MakeShared);
             s.Start();
             Fundamental::Application::Instance().Loop();
-        }
-        catch (std::exception& e)
-        {
+        } catch (std::exception& e) {
             FERR("exception: {}", e.what());
         }
 
         return 0;
-    }
-    else
-    {
+    } else {
         using asio::ip::tcp;
-        try
-        {
-            if (argc != 5)
-            {
+        try {
+            if (argc != 5) {
                 std::cerr << "Usage: client <host> <port> <mode> <section>\n";
                 return 1;
             }
             network::io_context_pool::s_excutorNums = 2;
             network::io_context_pool::Instance().start();
+            Fundamental::Application::Instance().exitStarted.Connect(
+                [&]() { network::io_context_pool::Instance().stop(); });
+            network::io_context_pool::Instance().notify_sys_signal.Connect(
+                [](std::error_code code, std::int32_t signo) { Fundamental::Application::Instance().Exit(); });
             network::proxy::rpc::AgentClient client;
             std::string mode    = argv[3];
             std::string section = argv[4];
-            if (mode == "update")
-            {
+            if (mode == "update") {
                 std::random_device rd;
                 std::int32_t len = (rd() % 2000) + 100;
                 std::string msg(len, 'c');
@@ -84,12 +82,10 @@ int main(int argc, char* argv[])
                 context.request.id      = "test";
                 context.request.section = section;
                 context.request.data    = msg;
-                FDEBUG("id:{} section:{} msg:{}", context.request.id.Dump(),
-                       context.request.section.Dump(),
+                FDEBUG("id:{} section:{} msg:{}", context.request.id.Dump(), context.request.section.Dump(),
                        context.request.data.Dump());
                 FDEBUG("str id:{} section:{} msg:{}", context.request.id.DumpAscii(),
-                       context.request.section.DumpAscii(),
-                       context.request.data.DumpAscii());
+                       context.request.section.DumpAscii(), context.request.data.DumpAscii());
                 using namespace network::proxy::rpc;
                 context.cb = [](bool bSuccess, AgentClientToken token, AgentResponse&& res) {
                     FINFO("update success:{} token:{}", bSuccess, token);
@@ -98,9 +94,7 @@ int main(int argc, char* argv[])
                 };
                 auto token = client.Update(context);
                 FINFO("create task token:{}", token);
-            }
-            else if (mode == "sniff")
-            {
+            } else if (mode == "sniff") {
                 network::proxy::rpc::AgentSniffContext context;
                 context.host    = argv[1];
                 context.service = argv[2];
@@ -111,21 +105,16 @@ int main(int argc, char* argv[])
                     network::proxy::AgentSniffResponse response;
                     Fundamental::BufferReader<network::proxy::ProxySizeType> reader;
                     reader.SetBuffer(res.data.data(), res.data.size());
-                    try
-                    {
+                    try {
                         reader.ReadRawMemory(response.host);
                         FINFO("host:{}", response.host.ToString());
-                    }
-                    catch (const std::exception&)
-                    {
+                    } catch (const std::exception&) {
                     }
                     Fundamental::Application::Instance().Exit();
                 };
                 auto token = client.Sniff(context);
                 FINFO("create task token:{}", token);
-            }
-            else
-            {
+            } else {
                 network::proxy::rpc::AgentQueryContext context;
                 context.host                            = argv[1];
                 context.service                         = argv[2];
@@ -141,15 +130,12 @@ int main(int argc, char* argv[])
                     network::proxy::AgentQueryResponse response;
                     Fundamental::BufferReader<network::proxy::ProxySizeType> reader;
                     reader.SetBuffer(res.data.data(), res.data.size());
-                    try
-                    {
+                    try {
                         reader.ReadValue(&response.timestamp);
                         reader.ReadRawMemory(response.data);
                         FINFO("time:{}  data:{}", Fundamental::Timer::ToTimeStr(response.timestamp),
                               response.data.ToString());
-                    }
-                    catch (const std::exception&)
-                    {
+                    } catch (const std::exception&) {
                     }
 
                     Fundamental::Application::Instance().Exit();
@@ -158,9 +144,7 @@ int main(int argc, char* argv[])
                 FINFO("create task token:{}", token);
             }
             Fundamental::Application::Instance().Loop();
-        }
-        catch (std::exception& e)
-        {
+        } catch (std::exception& e) {
             FERR("exception: {}", e.what());
         }
 
@@ -168,8 +152,7 @@ int main(int argc, char* argv[])
     }
 }
 
-void InitTrafficProxyManager()
-{
+void InitTrafficProxyManager() {
     using namespace network::proxy;
     auto& manager = TrafficProxyManager::Instance();
     { // add http proxy

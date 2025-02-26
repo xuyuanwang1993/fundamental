@@ -29,9 +29,7 @@
 #include <thread>
 #include <vector>
 namespace Fundamental {
-template <typename _Callable, typename... _Args>
-using invoke_future_t = std::future<std::invoke_result_t<_Callable, _Args...>>;
-using clock_t         = std::chrono::steady_clock;
+using clock_t = std::chrono::steady_clock;
 
 enum ThreadPoolType : std::int32_t {
     ShortTimeThreadPool = 0,
@@ -51,7 +49,7 @@ struct ThreadPoolTaskStatusSyncerWarpper {
     std::atomic<ThreadPoolTaskStatus> status = ThreadTaskWaitting;
 };
 
-template <typename _Callable, typename... _Args>
+template <typename ResultType>
 struct ThreadPoolTaskToken {
     bool CancelTask() {
         ThreadPoolTaskStatus old = status->status.load();
@@ -61,7 +59,7 @@ struct ThreadPoolTaskToken {
         return false;
     }
     std::shared_ptr<ThreadPoolTaskStatusSyncerWarpper> status = std::make_shared<ThreadPoolTaskStatusSyncerWarpper>();
-    invoke_future_t<_Callable, _Args...> resultFuture;
+    std::future<ResultType> resultFuture;
 };
 
 class ThreadPool final {
@@ -97,25 +95,26 @@ public:
     bool RunOne();
 
     template <typename _Callable, typename... _Args>
-    auto Enqueue(_Callable&& f, _Args&&... args) -> ThreadPoolTaskToken<_Callable, _Args...> {
+    auto Enqueue(_Callable&& f, _Args&&... args) -> ThreadPoolTaskToken<std::invoke_result_t<_Callable, _Args...>> {
         return Schedule(clock_t::now(), std::forward<_Callable>(f), std::forward<_Args>(args)...);
     }
 
     template <typename _Callable, typename... _Args>
-    auto Schedule(clock_t::duration delay, _Callable&& f, _Args&&... args) -> ThreadPoolTaskToken<_Callable, _Args...> {
+    auto Schedule(clock_t::duration delay, _Callable&& f, _Args&&... args)
+        -> ThreadPoolTaskToken<std::invoke_result_t<_Callable, _Args...>> {
         return Schedule(clock_t::now() + delay, std::forward<_Callable>(f), std::forward<_Args>(args)...);
     }
 
     template <typename _Callable, typename... _Args>
     auto Schedule(clock_t::time_point time, _Callable&& f, _Args&&... args)
-        -> ThreadPoolTaskToken<_Callable, _Args...> {
+        -> ThreadPoolTaskToken<std::invoke_result_t<_Callable, _Args...>> {
 
-        using R      = std::invoke_result_t<_Callable, _Args...>;
-        auto promise = std::make_shared<std::promise<R>>();
+        using ResultType      = std::invoke_result_t<_Callable, _Args...>;
+        auto promise = std::make_shared<std::promise<ResultType>>();
         auto bound   = std::bind(std::forward<_Callable>(f), std::forward<_Args>(args)...);
         auto task    = [bound, promise]() {
             try {
-                if constexpr (std::is_same_v<R, void>) {
+                if constexpr (std::is_same_v<ResultType, void>) {
                     bound();
                     promise->set_value();
                 } else {
@@ -125,7 +124,7 @@ public:
                 promise->set_exception(std::make_exception_ptr(e));
             }
         };
-        ThreadPoolTaskToken<_Callable, _Args...> result;
+        ThreadPoolTaskToken<ResultType> result;
         result.resultFuture = std::move(promise->get_future());
         std::unique_lock<std::mutex> lock(m_tasksMutex);
         m_tasks.push({ time, task, result.status });

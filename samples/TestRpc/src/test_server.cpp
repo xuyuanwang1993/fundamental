@@ -11,6 +11,7 @@
 #include "fundamental/application/application.hpp"
 #include "fundamental/basic/log.h"
 #include "fundamental/delay_queue/delay_queue.h"
+#include "fundamental/thread_pool/thread_pool.h"
 #include "network/services/proxy_server/proxy_connection.hpp"
 #include "network/services/proxy_server/proxy_defines.h"
 #include "network/services/proxy_server/traffic_proxy_service/traffic_proxy_connection.hpp"
@@ -19,6 +20,8 @@
 
 using namespace network;
 using namespace rpc_service;
+
+static auto& rpc_stream_pool = Fundamental::ThreadPool::Instance<100>();
 
 RTTR_REGISTRATION {
     rttr::registration::class_<person>("person")
@@ -103,11 +106,115 @@ void delay_echo(rpc_conn conn, const std::string& src) {
         [conn, req_id, src] {
             auto conn_sp = conn.lock();
             if (conn_sp) {
-                conn_sp->pack_and_response(req_id, std::move(src));
+                conn_sp->response(req_id, network::rpc_service::request_type::rpc_res, std::move(src));
             }
         },
         true);
     s_delay_queue.StartDelayTask(h);
+}
+
+void test_stream(rpc_conn conn) {
+    auto c = conn.lock();
+    auto w = c->InitRpcStream();
+
+    rpc_stream_pool.Enqueue(
+        [](decltype(w) stream) {
+            FWARN("stream start");
+            person p;
+            while (stream->Read(p, 0)) {
+                FDEBUG("id:{},age:{},name:{}", p.id, p.age, p.name);
+                p.name += " from server";
+                p.age += 10;
+                p.id += 10;
+                if (!stream->Write(p)) break;
+            };
+            stream->WriteDone();
+            auto ec = stream->Finish(0);
+            if (ec) {
+                FINFO("rpc failed {}", ec.message());
+            } else {
+                FINFO("rpc done");
+            }
+        },
+        w);
+}
+
+void test_read_stream(rpc_conn conn) {
+    auto c = conn.lock();
+    auto w = c->InitRpcStream();
+
+    rpc_stream_pool.Enqueue(
+        [](decltype(w) stream) {
+            person p;
+            p.id   = 0;
+            p.age  = 1;
+            p.name = "111";
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            stream->Write(p);
+            stream->WriteDone();
+            auto ec = stream->Finish(0);
+            if (ec) {
+                FINFO("rpc failed {}", ec.message());
+            } else {
+                FINFO("rpc done");
+            }
+        },
+        w);
+}
+
+void test_write_stream(rpc_conn conn) {
+    auto c = conn.lock();
+    auto w = c->InitRpcStream();
+
+    rpc_stream_pool.Enqueue(
+        [](decltype(w) stream) {
+            person p;
+            stream->WriteDone();
+            while (stream->Read(p, 0)) {
+                FINFO("write {} {} {}", p.id, p.age, p.name);
+            }
+
+            auto ec = stream->Finish(0);
+            if (ec) {
+                FINFO("rpc failed {}", ec.message());
+            } else {
+                FINFO("rpc done");
+            }
+        },
+        w);
+}
+
+void test_broken_stream(rpc_conn conn) {
+    auto c = conn.lock();
+    auto w = c->InitRpcStream();
+
+    rpc_stream_pool.Enqueue(
+        [](decltype(w) stream) {
+            // just do nothing
+        },
+        w);
+}
+
+void test_echo_stream(rpc_conn conn) {
+    auto c  = conn.lock();
+    auto w  = c->InitRpcStream();
+    auto id = c->conn_id();
+    rpc_stream_pool.Enqueue(
+        [id](decltype(w) stream) {
+            FWARN("stream start");
+            std::string msg;
+            while (stream->Read(msg, 0)) {
+                if (!stream->Write(msg + " from server")) break;
+            };
+            stream->WriteDone();
+            auto ec = stream->Finish(0);
+            if (ec) {
+                FINFO("rpc failed {} {}", id, ec.message());
+            } else {
+                FINFO("rpc done {}", id);
+            }
+        },
+        w);
 }
 
 std::string echo(rpc_conn conn, const std::string& src) {
@@ -121,14 +228,13 @@ int get_int(rpc_conn conn, int val) {
 dummy1 get_dummy(rpc_conn conn, dummy1 d) {
     return d;
 }
-static bool stop = false;
-static std::unique_ptr<std::thread> s_thread;
-rpc_server* p_server = nullptr;
+std::unique_ptr<std::thread> s_thread;
+;
 void server_task(std::promise<void>& sync_p) {
 
-    rpc_server server(9000, std::thread::hardware_concurrency(), 3600);
+    auto s_server = std::make_shared<rpc_server>(9000, 3600);
+    auto& server                         = *s_server;
     server.enable_ssl({ nullptr, "server.crt", "server.key", "dh2048.pem" });
-    p_server = &server;
     dummy d;
     server.register_handler("add", &dummy::add, &d);
 
@@ -145,65 +251,61 @@ void server_task(std::promise<void>& sync_p) {
     server.register_handler("echo", echo);
     server.register_handler("get_int", get_int);
     server.register_handler("auto_disconnect", auto_disconnect);
-    server.register_handler(
-        "publish_by_token", [&server](rpc_conn conn, std::string key, std::string token, std::string val) {
-            FINFOS << "publish_by_token:" << key << ":" << token << " " << Fundamental::Utils::BufferToHex(val);
-            server.forward_publish_msg(std::move(key), std::move(val), std::move(token));
-        });
-
-    server.register_handler("publish", [&server](rpc_conn conn, std::string key, std::string token, std::string val) {
-        FINFOS << "publish:" << key << ":" << token << " " << Fundamental::Utils::BufferToHex(val);
-        server.forward_publish_msg(std::move(key), std::move(val));
-    });
-    server.set_network_err_callback([](std::shared_ptr<connection> conn, std::string reason) {
+    server.register_handler("test_stream", test_stream);
+    server.register_handler("test_read_stream", test_read_stream);
+    server.register_handler("test_write_stream", test_write_stream);
+    server.register_handler("test_broken_stream", test_broken_stream);
+    server.register_handler("test_echo_stream", test_echo_stream);
+    server.on_net_err.Connect([](std::shared_ptr<connection> conn, std::string reason) {
         std::cout << "remote client address: " << conn->remote_address() << " networking error, reason: " << reason
                   << "\n";
     });
-
-    std::thread thd([&server] {
-        person p { 10, "jack", 21 };
-        while (!stop) {
-            server.publish("key", "hello subscriber from server");
-            auto list = server.get_token_list();
-            for (auto& token : list) {
-                server.publish_by_token("key", token, p);
-            }
-            std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        }
+    auto time_queue = Fundamental::Application::Instance().DelayQueue();
+    auto h          = time_queue->AddDelayTask(10, [s_server] {
+        person p { 10, "jack_server", 21 };
+        s_server->publish("key", "publish msg from server");
+        s_server->publish("key_p", p);
     });
-    std::thread t2([&]() {
-        network::io_context_pool::s_excutorNums = 10;
-        network::io_context_pool::Instance().start();
-        {
-            using namespace network::proxy;
-            auto& manager = TrafficProxyManager::Instance();
-            { // add http proxy
-                TrafficProxyHostInfo host;
-                host.token = kProxyServiceToken;
-                {
-                    TrafficProxyHost hostRecord;
-                    hostRecord.host    = "0.0.0.0";
-                    hostRecord.service = "9000";
-                    host.hosts.emplace(TrafficProxyDataType(kProxyServiceField), std::move(hostRecord));
-                }
-                manager.UpdateTrafficProxyHostInfo(TrafficProxyDataType(kProxyServiceName), std::move(host));
+    time_queue->StartDelayTask(h);
+    network::io_context_pool::s_excutorNums = 10;
+    network::io_context_pool::Instance().start();
+    Fundamental::Application::Instance().exitStarted.Connect([&]() { network::io_context_pool::Instance().stop(); });
+    network::io_context_pool::Instance().notify_sys_signal.Connect(
+        [](std::error_code code, std::int32_t signo) { Fundamental::Application::Instance().Exit(); });
+    {
+        using namespace network::proxy;
+        auto& manager = TrafficProxyManager::Instance();
+        { // add http proxy
+            TrafficProxyHostInfo host;
+            host.token = kProxyServiceToken;
+            {
+                TrafficProxyHost hostRecord;
+                hostRecord.host    = "0.0.0.0";
+                hostRecord.service = "9000";
+                host.hosts.emplace(TrafficProxyDataType(kProxyServiceField), std::move(hostRecord));
             }
+            manager.UpdateTrafficProxyHostInfo(TrafficProxyDataType(kProxyServiceName), std::move(host));
         }
-        // Initialise the server.
-        using asio::ip::tcp;
-        tcp::resolver resolver(network::io_context_pool::Instance().get_io_context());
-        network::proxy::ProxyServer s(network::MakeTcpEndpoint(std::stoul(kProxyServicePort)));
-        s.GetHandler().RegisterProtocal(network::proxy::kTrafficProxyOpcode,
-                                        network::proxy::TrafficProxyConnection::MakeShared);
-        s.Start();
-        sync_p.set_value();
-        Fundamental::Application::Instance().Loop();
-    });
-
-    server.run();
-    stop = true;
-    thd.join();
-    t2.join();
+    }
+    // Initialise the server.
+    using asio::ip::tcp;
+    tcp::resolver resolver(network::io_context_pool::Instance().get_io_context());
+    auto s = std::make_shared<network::proxy::ProxyServer>(network::MakeTcpEndpoint(std::stoul(kProxyServicePort)));
+    s->GetHandler().RegisterProtocal(network::proxy::kTrafficProxyOpcode,
+                                     network::proxy::TrafficProxyConnection::MakeShared);
+    s->Start();
+    server.start();
+    rpc_stream_pool.Spawn(5);
+    sync_p.set_value();
+    Fundamental::Application::Instance().exitStarted.Connect(
+        [s_server = std::move(s_server), s = std::move(s), h, time_queue]() mutable {
+            FDEBUG("emit stop server");
+            time_queue->StopDelayTask(h);
+            if (s_server) s_server->stop();
+            s_server = nullptr;
+        },
+        false);
+    Fundamental::Application::Instance().Loop();
 }
 
 void run_server() {
@@ -213,8 +315,12 @@ void run_server() {
 }
 
 void exit_server() {
-    stop = false;
+    // delay 100ms to exit to test resource manager
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+    FDEBUG("exit server 2");
     Fundamental::Application::Instance().Exit();
-    if (p_server) p_server->post_stop();
+    FDEBUG("exit server 1");
     if (s_thread) s_thread->join();
+    FDEBUG("exit server");
 }

@@ -27,6 +27,10 @@ int main(int argc, char* argv[]) {
             }
             network::io_context_pool::s_excutorNums = std::stoi(argv[3]);
             network::io_context_pool::Instance().start();
+            Fundamental::Application::Instance().exitStarted.Connect(
+                [&]() { network::io_context_pool::Instance().stop(); });
+            network::io_context_pool::Instance().notify_sys_signal.Connect(
+                [](std::error_code code, std::int32_t signo) { Fundamental::Application::Instance().Exit(); });
             // Initialise the server.
             using asio::ip::tcp;
             tcp::resolver resolver(network::io_context_pool::Instance().get_io_context());
@@ -36,6 +40,7 @@ int main(int argc, char* argv[]) {
                 return 1;
             }
             network::echo::EchoServer s(*endpoints.begin());
+
             s.Start();
             Fundamental::Application::Instance().Loop();
         } catch (std::exception& e) {

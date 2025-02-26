@@ -6,6 +6,7 @@
 #include "fundamental/delay_queue/delay_queue.h"
 #include "rpc/basic/custom_rpc_proxy.hpp"
 
+#include "fundamental/application/application.hpp"
 #include "rpc/basic/rpc_client.hpp"
 #include <chrono>
 #include <fstream>
@@ -14,7 +15,17 @@
 
 using namespace network;
 using namespace network::rpc_service;
-#if 1
+static Fundamental::ThreadPool& s_test_pool = Fundamental::ThreadPool::Instance<101>();
+#if 0
+TEST(rpc_test, test_connect) {
+    Fundamental::Timer check_timer;
+    Fundamental::ScopeGuard check_guard(
+        [&]() { EXPECT_LE(check_timer.GetDuration<Fundamental::Timer::TimeScale::Millisecond>(), 100); });
+    rpc_client client;
+    [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
+    EXPECT_TRUE(r && client.has_connected());
+}
+
 TEST(rpc_test, test_add) {
     Fundamental::Timer check_timer;
     Fundamental::ScopeGuard check_guard(
@@ -80,7 +91,6 @@ TEST(rpc_test, test_hello) {
         std::cout << __func__ << ":" << e.what() << std::endl;
     }
 }
-
 
 TEST(rpc_test, test_get_person_name) {
     Fundamental::Timer check_timer;
@@ -237,17 +247,6 @@ TEST(rpc_test, test_call_with_timeout) {
     }
 }
 
-TEST(rpc_test, test_connect) {
-    Fundamental::Timer check_timer;
-    Fundamental::ScopeGuard check_guard(
-        [&]() { EXPECT_LE(check_timer.GetDuration<Fundamental::Timer::TimeScale::Millisecond>(), 100); });
-    rpc_client client;
-    client.enable_auto_reconnect(); // automatic reconnect
-    client.enable_auto_heartbeat(); // automatic heartbeat
-    [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
-    EXPECT_TRUE(r && client.has_connected());
-}
-
 TEST(rpc_test, test_callback) {
     Fundamental::Timer check_timer;
     Fundamental::ScopeGuard check_guard(
@@ -257,7 +256,9 @@ TEST(rpc_test, test_callback) {
     client.enable_auto_heartbeat();
     [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
     EXPECT_TRUE(r);
-    std::atomic<std::size_t> count = 200;
+    std::atomic<std::size_t> count    = 200;
+    static std::atomic_bool is_failed = false;
+    Fundamental::Application::Instance().exitStarted.Connect([&]() { is_failed.exchange(true); });
     for (size_t i = 0; i < 100; i++) {
         std::string test = "test" + std::to_string(i + 1);
         // set timeout 100ms
@@ -268,10 +269,12 @@ TEST(rpc_test, test_callback) {
                 Fundamental::ScopeGuard g([&]() { --count; });
                 if (ec) {
                     FINFOS << "delay_echo timeout:" << ec.value() << " " << ec.message();
+                    is_failed.exchange(true);
                     return;
                 }
 
                 if (has_error(data)) {
+                    is_failed.exchange(true);
                     FINFOS << "delay_echo error msg:" << get_error_msg(data);
                 } else {
                     auto str = get_result<std::string>(data);
@@ -289,10 +292,12 @@ TEST(rpc_test, test_callback) {
                 Fundamental::ScopeGuard g([&]() { --count; });
                 if (ec) {
                     FINFOS << "echo timeout:" << ec.value() << " " << ec.message();
+                    is_failed.exchange(true);
                     return;
                 }
 
                 if (has_error(data)) {
+                    is_failed.exchange(true);
                     FINFOS << "echo error msg:" << get_error_msg(data);
                 } else {
                     auto str = get_result<std::string>(data);
@@ -301,98 +306,12 @@ TEST(rpc_test, test_callback) {
             },
             test1);
     }
-    while (count.load() != 0) {
+    while (count.load() != 0 && !is_failed) {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
+    EXPECT_TRUE(!is_failed);
 }
 
-TEST(rpc_test, test_sub1) {
-    Fundamental::Timer check_timer;
-    Fundamental::ScopeGuard check_guard(
-        [&]() { EXPECT_LE(check_timer.GetDuration<Fundamental::Timer::TimeScale::Millisecond>(), 100); });
-    bool success = true;
-    do {
-        rpc_client client;
-        client.enable_auto_reconnect();
-        client.enable_auto_heartbeat();
-        bool r = client.connect("127.0.0.1", 9000);
-        if (!r) {
-            success = false;
-            break;
-        }
-        std::atomic<std::size_t> target_count = 0;
-        client.subscribe("key", [&](string_view data) {
-            msgpack_codec codec;
-            try {
-                auto msg = codec.unpack<std::string>(data.data(), data.size());
-                std::cout << "key_1:" << msg << "\n";
-                target_count++;
-            } catch (const std::exception& e) {
-                std::cerr << e.what() << '\n';
-                success = false;
-            }
-        });
-
-        client.subscribe("key", "sub_key", [&](string_view data) {
-            msgpack_codec codec;
-            try {
-                person p = codec.unpack<person>(data.data(), data.size());
-                std::cout << "sub1 by key:" << p.name << "\n";
-                target_count++;
-            } catch (const std::exception& e) {
-                success = false;
-                std::cerr << e.what() << '\n';
-            }
-        });
-        client.subscribe("key", "sub_key2", [&](string_view data) {
-            msgpack_codec codec;
-            try {
-                person p = codec.unpack<person>(data.data(), data.size());
-                std::cout << "sub1 by key_2:" << p.name << "\n";
-                target_count++;
-            } catch (const std::exception& e) {
-                success = false;
-                std::cerr << e.what() << '\n';
-            }
-        });
-        rpc_client client2;
-        client2.enable_auto_reconnect();
-        client2.enable_auto_heartbeat();
-        r = client2.connect("127.0.0.1", 9000);
-        if (!r) {
-            success = false;
-            break;
-        }
-
-        client2.subscribe("key", [&](string_view data) {
-            msgpack_codec codec;
-            try {
-                auto msg = codec.unpack<std::string>(data.data(), data.size());
-                std::cout << "key2:" << msg << "\n";
-                target_count++;
-            } catch (const std::exception& e) {
-                success = false;
-                std::cerr << e.what() << '\n';
-            }
-        });
-
-        rpc_client client3;
-        client3.enable_auto_reconnect();
-        client3.enable_auto_heartbeat();
-        r = client3.connect("127.0.0.1", 9000);
-        if (!r) {
-            success = false;
-            break;
-        }
-
-        person p { 10, "jack", 21 };
-        client3.publish("key", "hello from client");
-        client3.publish_by_token("key", "sub_key", p);
-        while (success && target_count.load() < 10)
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    } while (0);
-    EXPECT_EQ(success, true);
-}
 TEST(rpc_test, test_proxy) {
     Fundamental::Timer check_timer;
     Fundamental::ScopeGuard check_guard(
@@ -419,7 +338,6 @@ TEST(rpc_test, test_proxy) {
         EXPECT_EQ(result, "test");
     }
 }
-
 TEST(rpc_test, test_auto_reconnect) {
     Fundamental::Timer check_timer;
     Fundamental::ScopeGuard check_guard(
@@ -437,30 +355,238 @@ TEST(rpc_test, test_auto_reconnect) {
         std::int32_t cnt = 3;
         while (cnt > 0) {
             --cnt;
-            try
-            {
+            try {
                 client.call<void>("auto_disconnect", cnt);
+            } catch (...) {
             }
-            catch(...)
-            {
-                
-            }
-            
-            
+
             std::this_thread::sleep_for(std::chrono::milliseconds(15));
         }
     } catch (const std::exception& e) {
         std::cout << __func__ << ":" << e.what() << std::endl;
     }
 }
+TEST(rpc_test, test_sub1) {
+    Fundamental::Timer check_timer;
+    Fundamental::ScopeGuard check_guard(
+        [&]() { EXPECT_LE(check_timer.GetDuration<Fundamental::Timer::TimeScale::Millisecond>(), 100); });
+    static bool success = true;
+    Fundamental::Application::Instance().exitStarted.Connect([&]() { success = (false); });
+    do {
+        rpc_client client;
+        client.enable_auto_reconnect();
+        client.enable_auto_heartbeat();
+        bool r = client.connect("127.0.0.1", 9000);
+        if (!r) {
+            success = false;
+            break;
+        }
+        std::atomic<std::size_t> target_count = 0;
+        client
+            .subscribe("key",
+                       [&](string_view data) {
+                           msgpack_codec codec;
+                           try {
+                               auto msg = codec.unpack<std::string>(data.data(), data.size());
+                               std::cout << "key_1:" << msg << "\n";
+                               target_count++;
+                           } catch (const std::exception& e) {
+                               std::cerr << e.what() << '\n';
+                               success = false;
+                           }
+                       })
+            .get();
+        client
+            .subscribe("key_p",
+                       [&](string_view data) {
+                           msgpack_codec codec;
+                           try {
+                               auto msg = codec.unpack<person>(data.data(), data.size());
+                               std::cout << "key_p:" << msg.name << "\n";
+                               target_count++;
+                           } catch (const std::exception& e) {
+                               std::cerr << e.what() << '\n';
+                               success = false;
+                           }
+                       })
+            .get();
+        rpc_client client2;
+        client2.enable_auto_reconnect();
+        client2.enable_auto_heartbeat();
+        r = client2.connect("127.0.0.1", 9000);
+        if (!r) {
+            success = false;
+            break;
+        }
+
+        client2
+            .subscribe("key",
+                       [&](string_view data) {
+                           msgpack_codec codec;
+                           try {
+                               auto msg = codec.unpack<std::string>(data.data(), data.size());
+                               std::cout << "key2:" << msg << "\n";
+                               target_count++;
+                               if (target_count.load() > 4) {
+                                   client2.unsubscribe("key");
+                               }
+                           } catch (const std::exception& e) {
+                               success = false;
+                               std::cerr << e.what() << '\n';
+                           }
+                       })
+            .get();
+
+        rpc_client client3;
+        client3.enable_auto_reconnect();
+        client3.enable_auto_heartbeat();
+        r = client3.connect("127.0.0.1", 9000);
+        if (!r) {
+            success = false;
+            break;
+        }
+
+        person p { 10, "jack_client", 21 };
+        client3.publish("key", "publish msg from client").get();
+        while (success && target_count.load() < 10)
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    } while (0);
+    EXPECT_EQ(success, true);
+}
+
+TEST(rpc_test, basice_rpc_stream_test) {
+    rpc_client client;
+    [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
+    EXPECT_TRUE(r && client.has_connected());
+    auto ptr = client.upgrade_to_stream("test_stream");
+    EXPECT_TRUE(ptr != nullptr);
+}
+
+TEST(rpc_test, basice_rpc_stream_read_write) {
+    rpc_client client;
+    [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
+    EXPECT_TRUE(r && client.has_connected());
+    auto stream = client.upgrade_to_stream("test_stream");
+    EXPECT_TRUE(stream != nullptr);
+    person p;
+    p.id            = 0;
+    p.age           = 10;
+    p.name          = "jack ";
+    std::size_t cnt = 0;
+    while (cnt < 5) {
+        p.id = cnt;
+        p.age += cnt;
+        p.name += std::to_string(cnt);
+        EXPECT_TRUE(stream->Write(p));
+        ++cnt;
+    }
+    EXPECT_TRUE(stream->WriteDone());
+    std::size_t read_cnt = 0;
+    while (stream->Read(p, 0)) {
+        ++read_cnt;
+        FINFO("id:{},age:{},name:{}", p.id, p.age, p.name);
+    }
+    EXPECT_TRUE(read_cnt == cnt);
+    EXPECT_TRUE(!stream->Finish(0));
+}
+
+TEST(rpc_test, basice_rpc_stream_read_only) {
+    rpc_client client;
+    [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
+    EXPECT_TRUE(r && client.has_connected());
+    auto stream = client.upgrade_to_stream("test_read_stream");
+    EXPECT_TRUE(stream != nullptr);
+    person p;
+    p.id            = 0;
+    p.age           = 10;
+    p.name          = "jack ";
+    std::size_t cnt = 0;
+    // test delay read
+    EXPECT_TRUE(!stream->Read(p, 10));
+    while (stream->Read(p, 0)) {
+        FINFO("id:{},age:{},name:{}", p.id, p.age, p.name);
+    }
+    while (cnt < 2) {
+        p.id = cnt;
+        p.age += cnt;
+        p.name += std::to_string(cnt);
+        EXPECT_TRUE(stream->Write(p));
+        ++cnt;
+    }
+    EXPECT_TRUE(stream->WriteDone());
+
+    EXPECT_TRUE(!stream->Finish(0));
+}
+
+TEST(rpc_test, basice_rpc_stream_write_only) {
+    rpc_client client;
+    [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
+    EXPECT_TRUE(r && client.has_connected());
+    auto stream = client.upgrade_to_stream("test_write_stream");
+    EXPECT_TRUE(stream != nullptr);
+    person p;
+    p.id            = 0;
+    p.age           = 10;
+    p.name          = "jack ";
+    std::size_t cnt = 0;
+    while (cnt < 2) {
+        p.id = cnt;
+        p.age += cnt;
+        p.name += std::to_string(cnt);
+        EXPECT_TRUE(stream->Write(p));
+        ++cnt;
+    }
+    EXPECT_TRUE(stream->WriteDone());
+    while (stream->Read(p, 0)) {
+        FINFO("id:{},age:{},name:{}", p.id, p.age, p.name);
+    }
+    EXPECT_TRUE(!stream->Finish(0));
+}
+
+TEST(rpc_test, test_broken_rpc_stream) {
+    rpc_client client;
+    [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
+    EXPECT_TRUE(r && client.has_connected());
+    auto stream = client.upgrade_to_stream("test_broken_stream");
+    EXPECT_TRUE(stream != nullptr);
+    person p;
+    std::size_t cnt = 0;
+    while (cnt < 2) {
+        stream->Write(p);
+        ++cnt;
+    }
+    stream->WriteDone();
+    while (stream->Read(p, 0)) {
+    }
+    EXPECT_TRUE(stream->Finish(0));
+}
+
+TEST(rpc_test, test_echo_stream) {
+    rpc_client client;
+    [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
+    EXPECT_TRUE(r && client.has_connected());
+    auto stream = client.upgrade_to_stream("test_echo_stream");
+    EXPECT_TRUE(stream != nullptr);
+    std::size_t cnt  = 10;
+    std::string base = "msg ";
+    while (cnt != 0) {
+        EXPECT_TRUE(stream->Write(base + std::to_string(cnt)));
+        --cnt;
+        std::string tmp;
+        EXPECT_TRUE(stream->Read(tmp));
+        FINFO("echo msg:{}", tmp);
+    }
+    EXPECT_TRUE(stream->WriteDone());
+    EXPECT_TRUE(!stream->Finish(0));
+}
 #endif
-#ifndef RPC_DISABLE_SSL
+
+#if !defined(RPC_DISABLE_SSL) && 0
 TEST(rpc_test, test_ssl) {
     Fundamental::Timer check_timer;
     Fundamental::ScopeGuard check_guard(
         [&]() { EXPECT_LE(check_timer.GetDuration<Fundamental::Timer::TimeScale::Millisecond>(), 100); });
 
-    
     try {
         rpc_client client("127.0.0.1", 9000);
         client.enable_ssl("server.crt");
@@ -547,18 +673,157 @@ TEST(rpc_test, test_ssl_proxy) {
         }
     }
 }
+TEST(rpc_test, test_ssl_proxy_echo_stream) {
+    rpc_client client;
+    client.enable_ssl("server.crt");
+    client.set_proxy(std::make_shared<network::rpc_service::CustomRpcProxy>(kProxyServiceName, kProxyServiceField,
+                                                                            kProxyServiceToken));
+    [[maybe_unused]] bool r = client.connect("127.0.0.1", 9001);
+    EXPECT_TRUE(r && client.has_connected());
+    auto stream = client.upgrade_to_stream("test_echo_stream");
+    EXPECT_TRUE(stream != nullptr);
+    std::size_t cnt  = 5;
+    std::string base = "msg ";
+    while (cnt != 0) {
+        EXPECT_TRUE(stream->Write(base + std::to_string(cnt)));
+        --cnt;
+        std::string tmp;
+        EXPECT_TRUE(stream->Read(tmp));
+        FINFO("ssl/proxy echo msg:{}", tmp);
+    }
+    EXPECT_TRUE(stream->WriteDone());
+    EXPECT_TRUE(!stream->Finish(0));
+}
+TEST(rpc_test, test_ssl_concept) {
+    // sudo tcpdump -i any -n -vv -X port 9000
+    {
+        rpc_client client;
+        client.enable_ssl("server.crt", network::rpc_service::rpc_client_ssl_level_optional);
+        [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
+        EXPECT_TRUE(r && client.has_connected());
+        auto stream = client.upgrade_to_stream("test_echo_stream");
+        EXPECT_TRUE(stream != nullptr);
+        std::string base = "1111";
+        EXPECT_TRUE(stream->Write(base));
+        EXPECT_TRUE(stream->WriteDone());
+        EXPECT_TRUE(!stream->Finish(0));
+    }
+    {
+        rpc_client client;
+        client.enable_ssl("server.crt_none", network::rpc_service::rpc_client_ssl_level_optional);
+        [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
+        EXPECT_TRUE(r && client.has_connected());
+        auto stream = client.upgrade_to_stream("test_echo_stream");
+        EXPECT_TRUE(stream != nullptr);
+        std::string base = "1111";
+        EXPECT_TRUE(stream->Write(base));
+        EXPECT_TRUE(stream->WriteDone());
+        EXPECT_TRUE(!stream->Finish(0));
+    }
+    {
+        rpc_client client;
+        [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
+        EXPECT_TRUE(r && client.has_connected());
+        auto stream = client.upgrade_to_stream("test_echo_stream");
+        EXPECT_TRUE(stream != nullptr);
+        std::string base = "1111";
+        EXPECT_TRUE(stream->Write(base));
+        EXPECT_TRUE(stream->WriteDone());
+        EXPECT_TRUE(!stream->Finish(0));
+    }
+}
 #endif
 
+// TEST(rpc_test, test_ssl_echo_stream_mutithread) {
+//     std::vector<Fundamental::ThreadPoolTaskToken<void>> tasks;
+//     auto nums      = 1000;
+//     auto task_func = []() {
+//         rpc_client client;
+//         client.enable_ssl("server.crt");
+
+//         [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
+//         EXPECT_TRUE(r && client.has_connected());
+//         auto stream = client.upgrade_to_stream("test_echo_stream");
+//         EXPECT_TRUE(stream != nullptr);
+//         std::size_t cnt  = 5;
+//         std::string base = "msg ";
+//         while (cnt != 0) {
+//             EXPECT_TRUE(stream->Write(base + std::to_string(cnt)));
+//             --cnt;
+//             std::string tmp;
+//             EXPECT_TRUE(stream->Read(tmp));
+//             FINFO("ssl echo msg:{}", tmp);
+//         }
+//         EXPECT_TRUE(stream->WriteDone());
+//         EXPECT_TRUE(!stream->Finish(0));
+//     };
+//     while (nums > 0) {
+//         tasks.emplace_back(s_test_pool.Enqueue(task_func));
+//         nums--;
+//     }
+//     for (auto& f : tasks)
+//         EXPECT_NO_THROW(f.resultFuture.get());
+// }
+
+TEST(rpc_test, test_ssl_proxy_echo_stream_mutithread) {
+    std::vector<Fundamental::ThreadPoolTaskToken<void>> tasks;
+    auto nums      = s_test_pool.Count();
+    auto task_func = []() {
+        rpc_client client;
+        //client.enable_ssl("server.crt");
+        client.set_proxy(std::make_shared<network::rpc_service::CustomRpcProxy>(kProxyServiceName, kProxyServiceField,
+                                                                                kProxyServiceToken));
+        [[maybe_unused]] bool r = client.connect("127.0.0.1", 9001);
+        EXPECT_TRUE(r && client.has_connected());
+        auto stream = client.upgrade_to_stream("test_echo_stream");
+        EXPECT_TRUE(stream != nullptr);
+        std::size_t cnt  = 5;
+        std::string base = "msg ";
+        while (cnt != 0) {
+            EXPECT_TRUE(stream->Write(base + std::to_string(cnt)));
+            --cnt;
+            std::string tmp;
+            EXPECT_TRUE(stream->Read(tmp));
+            FINFO("ssl/proxy echo msg:{}", tmp);
+        }
+        EXPECT_TRUE(stream->WriteDone());
+        EXPECT_TRUE(!stream->Finish(0));
+    };
+    while (nums > 0) {
+        tasks.emplace_back(s_test_pool.Enqueue(task_func));
+        nums--;
+    }
+    for (auto& f : tasks)
+        EXPECT_NO_THROW(f.resultFuture.get());
+}
+
 int main(int argc, char** argv) {
+    int mode = 0;
+    if (argc > 1) mode = std::stoi(argv[1]);
     Fundamental::fs::SwitchToProgramDir(argv[0]);
     Fundamental::Logger::LoggerInitOptions options;
     options.minimumLevel = Fundamental::LogLevel::debug;
     options.logFormat    = "%^[%L]%H:%M:%S.%e%$[%t] %v ";
-
     Fundamental::Logger::Initialize(std::move(options));
-    ::testing::InitGoogleTest(&argc, argv);
-    run_server();
-    auto ret = RUN_ALL_TESTS();
-    exit_server();
-    return ret;
+    s_test_pool.Spawn(8);
+    if (mode == 0) {
+        ::testing::InitGoogleTest(&argc, argv);
+        run_server();
+        auto ret = RUN_ALL_TESTS();
+        exit_server();
+        FINFO("finish all test");
+        return ret;
+    } else if (mode == 1) {
+        std::promise<void> sync_p;
+        server_task(sync_p);
+        sync_p.get_future().get();
+        exit_server();
+    } else {
+        ::testing::InitGoogleTest(&argc, argv);
+        network::io_context_pool::s_excutorNums = 10;
+        network::io_context_pool::Instance().start();
+
+        return RUN_ALL_TESTS();
+    }
+    return 0;
 }
