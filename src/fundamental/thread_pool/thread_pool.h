@@ -35,7 +35,9 @@ enum ThreadPoolType : std::int32_t {
     ShortTimeThreadPool = 0,
     LongTimeThreadPool  = 1,
     BlockTimeThreadPool = 2,
-    PrallelThreadPool   = 3
+    PrallelThreadPool   = 3,
+    ProducerThreadPool  = 4,
+    ConsumerThreadPool  = 5
 };
 
 enum ThreadPoolTaskStatus : std::uint32_t {
@@ -83,6 +85,24 @@ public:
         return *instance;
     }
 
+    static ThreadPool& DefaultPool() {
+        return Instance<ShortTimeThreadPool>();
+    }
+    static ThreadPool& LongTimePool() {
+        return Instance<LongTimeThreadPool>();
+    }
+    static ThreadPool& BlockTimePool() {
+        return Instance<BlockTimeThreadPool>();
+    }
+    static ThreadPool& PrallelTaskPool() {
+        return Instance<PrallelThreadPool>();
+    }
+    static ThreadPool& ProducerPool() {
+        return Instance<ProducerThreadPool>();
+    }
+    static ThreadPool& ConsumerPool() {
+        return Instance<ConsumerThreadPool>();
+    }
     ThreadPool(const ThreadPool&)            = delete;
     ThreadPool& operator=(const ThreadPool&) = delete;
     ThreadPool(ThreadPool&&)                 = delete;
@@ -109,10 +129,10 @@ public:
     auto Schedule(clock_t::time_point time, _Callable&& f, _Args&&... args)
         -> ThreadPoolTaskToken<std::invoke_result_t<_Callable, _Args...>> {
 
-        using ResultType      = std::invoke_result_t<_Callable, _Args...>;
-        auto promise = std::make_shared<std::promise<ResultType>>();
-        auto bound   = std::bind(std::forward<_Callable>(f), std::forward<_Args>(args)...);
-        auto task    = [bound, promise]() {
+        using ResultType = std::invoke_result_t<_Callable, _Args...>;
+        auto promise     = std::make_shared<std::promise<ResultType>>();
+        auto bound       = std::bind(std::forward<_Callable>(f), std::forward<_Args>(args)...);
+        auto task        = [bound, promise]() {
             try {
                 if constexpr (std::is_same_v<ResultType, void>) {
                     bound();
