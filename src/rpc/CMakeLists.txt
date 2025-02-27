@@ -5,6 +5,9 @@ file(GLOB lib_source
     basic/*.h
     basic/*.cpp
     basic/*.hpp
+    proxy/*.h
+    proxy/*.cpp
+    proxy/*.hpp
 )
 
 option(RPC_DISABLE_SSL "disable rpc ssl support." OFF)
@@ -13,9 +16,9 @@ list(APPEND lib_source ${services_source})
 # Add to source group, TREE will enable cmake to config the folder layout automatically
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${lib_source})
 
-add_library(${lib_name} INTERFACE)
+add_library(${lib_name} STATIC ${lib_source})
 
-target_include_directories(${lib_name} INTERFACE
+target_include_directories(${lib_name} PUBLIC
     ${src_root_dir}
 )
 
@@ -24,20 +27,21 @@ set_target_properties(${lib_name} PROPERTIES
 )
 
 # Config link dependencies
-target_link_libraries(${lib_name} INTERFACE
+target_link_libraries(${lib_name} PUBLIC
     BuildSettings
-    ${GLOB_NAMESPACE}network${STATIC_LIB_SUFFIX}
+    asio
+    ${GLOB_NAMESPACE}fundamental${STATIC_LIB_SUFFIX}
 )
 
 if(RPC_DISABLE_SSL)
     target_compile_definitions(${lib_name}
-        INTERFACE
+        PUBLIC
         RPC_DISABLE_SSL=1
     )
 else()
     find_package(OpenSSL REQUIRED)
     target_link_libraries(${lib_name}
-        INTERFACE
+        PUBLIC
         OpenSSL::SSL
         OpenSSL::Crypto
     )

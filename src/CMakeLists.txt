@@ -1,6 +1,5 @@
 set(src_root_dir ${CMAKE_CURRENT_SOURCE_DIR})
 add_subdirectory(fundamental)
 if(FUNDAMENTAL_BUILD_NETWORK)
-    add_subdirectory(network)
     add_subdirectory(rpc)
 endif()

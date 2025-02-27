@@ -1,6 +1,9 @@
 #pragma once
-#include "network/services/proxy_server/traffic_proxy_service/traffic_proxy_codec.hpp"
-#include "rpc_client.hpp"
+#include "fundamental/basic/log.h"
+#include "fundamental/basic/utils.hpp"
+#include "proxy_codec.hpp"
+#include "rpc/basic/rpc_client_proxy.hpp"
+
 namespace network {
 namespace rpc_service {
 class CustomRpcProxy : public RpcClientProxyInterface {
@@ -12,21 +15,20 @@ public:
 
 protected:
     std::int32_t FinishSend() override {
-        recvBufCache.resize(2);
+        recvBufCache.resize(network::proxy::ProxyRequest::kVerifyStrLen);
         return RpcClientProxyInterface::HandShakeStatusMask::HandShakeNeedMoreData;
     }
     std::int32_t FinishRecv() override {
-        static const char handshakeStr[] = "ok";
-        if (std::memcmp(recvBufCache.data(), handshakeStr, 2) == 0)
+        if (std::memcmp(recvBufCache.data(), network::proxy::ProxyRequest::kVerifyStr,
+                        network::proxy::ProxyRequest::kVerifyStrLen) == 0)
             return RpcClientProxyInterface::HandShakeStatusMask::HandShakeSucess;
         else {
             return RpcClientProxyInterface::HandShakeStatusMask::HandShakeFailed;
         }
     }
     void Init() {
-        network::proxy::ProxyFrame frame;
-        network::proxy::TrafficEncoder::EncodeTrafficProxyRequest(serviceName_, field_, token_, frame);
-        frame.ToVecBuffer(sendBufCache);
+        network::proxy::ProxyRequest request(serviceName_, token_, field_);
+        sendBufCache = request.Encode();
         curentStatus = RpcClientProxyInterface::HandShakeStatusMask::HandShakeDataPending;
     }
 

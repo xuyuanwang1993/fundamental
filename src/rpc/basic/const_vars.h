@@ -45,7 +45,7 @@ struct rpc_stream_packet
     std::vector<std::uint8_t> data;
 };
 
-static const uint8_t MAGIC_NUM = 39;
+static const uint8_t RPC_MAGIC_NUM = 39;
 #pragma pack(1)
 struct rpc_header {
     uint8_t magic;
@@ -57,7 +57,7 @@ struct rpc_header {
 #pragma pack()
 
 static constexpr std::size_t MAX_BUF_LEN     = 1024LLU * 1024 * 1024 * 4;
-static constexpr std::size_t HEAD_LEN        = sizeof(rpc_header);
+static constexpr std::size_t kRpcHeadLen        = sizeof(rpc_header);
 static constexpr std::size_t INIT_BUF_SIZE   = 2 * 1024;
 static constexpr std::size_t kSslPreReadSize = 3;
 

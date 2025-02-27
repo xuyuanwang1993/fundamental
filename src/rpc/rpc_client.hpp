@@ -1,9 +1,11 @@
 #pragma once
-#include "client_util.hpp"
-#include "const_vars.h"
-#include "md5.hpp"
-#include "meta_util.hpp"
-#include "use_asio.hpp"
+#include "basic/client_util.hpp"
+#include "basic/const_vars.h"
+#include "basic/md5.hpp"
+#include "basic/meta_util.hpp"
+#include "basic/rpc_client_proxy.hpp"
+#include "basic/use_asio.hpp"
+#include "basic/io_context_pool.hpp"
 
 #include <deque>
 #include <functional>
@@ -16,8 +18,7 @@
 #include <utility>
 
 #include "fundamental/basic/log.h"
-#include "network/server/basic_server.hpp"
-#include "rpc_client_proxy.hpp"
+
 
 namespace network {
 namespace rpc_service {
@@ -524,7 +525,7 @@ private:
         auto& msg   = outbox_[0];
         write_size_ = (uint32_t)msg.content.size();
         std::array<asio::const_buffer, 2> write_buffers;
-        header_          = { MAGIC_NUM, msg.req_type, write_size_, msg.req_id, msg.func_id };
+        header_          = { RPC_MAGIC_NUM, msg.req_type, write_size_, msg.req_id, msg.func_id };
         write_buffers[0] = asio::buffer(&header_, sizeof(rpc_header));
         write_buffers[1] = asio::buffer((char*)msg.content.data(), write_size_);
 
@@ -536,7 +537,6 @@ private:
 
                 return;
             }
-
             std::unique_lock<std::mutex> lock(write_mtx_);
             if (outbox_.empty()) {
                 return;
@@ -839,10 +839,10 @@ private:
     void async_read_head(Handler handler) {
         if (is_ssl()) {
 #ifndef RPC_DISABLE_SSL
-            asio::async_read(*ssl_stream_, asio::buffer(head_, HEAD_LEN), std::move(handler));
+            asio::async_read(*ssl_stream_, asio::buffer(head_, kRpcHeadLen), std::move(handler));
 #endif
         } else {
-            asio::async_read(socket_, asio::buffer(head_, HEAD_LEN), std::move(handler));
+            asio::async_read(socket_, asio::buffer(head_, kRpcHeadLen), std::move(handler));
         }
     }
 
@@ -916,7 +916,7 @@ private:
 
     uint64_t temp_req_id_ = 0;
 
-    char head_[HEAD_LEN] = {};
+    char head_[kRpcHeadLen] = {};
     std::vector<char> body_;
 
     rpc_header header_;
