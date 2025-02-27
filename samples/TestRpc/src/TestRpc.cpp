@@ -4,10 +4,10 @@
 #include "fundamental/basic/filesystem_utils.hpp"
 #include "fundamental/basic/log.h"
 #include "fundamental/delay_queue/delay_queue.h"
-#include "rpc/basic/custom_rpc_proxy.hpp"
+#include "rpc/proxy/custom_rpc_proxy.hpp"
 
 #include "fundamental/application/application.hpp"
-#include "rpc/basic/rpc_client.hpp"
+#include "rpc/rpc_client.hpp"
 #include <chrono>
 #include <fstream>
 #include <gtest/gtest.h>
@@ -317,7 +317,7 @@ TEST(rpc_test, test_proxy) {
     Fundamental::ScopeGuard check_guard(
         [&]() { EXPECT_LE(check_timer.GetDuration<Fundamental::Timer::TimeScale::Millisecond>(), 100); });
 
-    rpc_client client("127.0.0.1", std::stoi(kProxyServicePort));
+    rpc_client client("127.0.0.1", 9000);
     client.set_proxy(std::make_shared<network::rpc_service::CustomRpcProxy>(kProxyServiceName, kProxyServiceField,
                                                                             kProxyServiceToken));
     bool r = client.connect();
@@ -627,7 +627,7 @@ TEST(rpc_test, test_ssl_proxy) {
     Fundamental::ScopeGuard check_guard(
         [&]() { EXPECT_LE(check_timer.GetDuration<Fundamental::Timer::TimeScale::Millisecond>(), 100); });
     {
-        rpc_client client("127.0.0.1", std::stoi(kProxyServicePort));
+        rpc_client client("127.0.0.1", 9000);
         client.enable_ssl("server.crt");
         client.set_proxy(std::make_shared<network::rpc_service::CustomRpcProxy>(kProxyServiceName, kProxyServiceField,
                                                                                 kProxyServiceToken));
@@ -650,7 +650,7 @@ TEST(rpc_test, test_ssl_proxy) {
         }
     }
     {
-        rpc_client client("127.0.0.1", std::stoi(kProxyServicePort));
+        rpc_client client("127.0.0.1", 9000);
         client.enable_ssl("", network::rpc_service::rpc_client_ssl_level_optional);
         client.set_proxy(std::make_shared<network::rpc_service::CustomRpcProxy>(kProxyServiceName, kProxyServiceField,
                                                                                 kProxyServiceToken));
@@ -678,7 +678,7 @@ TEST(rpc_test, test_ssl_proxy_echo_stream) {
     client.enable_ssl("server.crt");
     client.set_proxy(std::make_shared<network::rpc_service::CustomRpcProxy>(kProxyServiceName, kProxyServiceField,
                                                                             kProxyServiceToken));
-    [[maybe_unused]] bool r = client.connect("127.0.0.1", 9001);
+    [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
     EXPECT_TRUE(r && client.has_connected());
     auto stream = client.upgrade_to_stream("test_echo_stream");
     EXPECT_TRUE(stream != nullptr);
@@ -734,36 +734,36 @@ TEST(rpc_test, test_ssl_concept) {
 }
 #endif
 
-// TEST(rpc_test, test_ssl_echo_stream_mutithread) {
-//     std::vector<Fundamental::ThreadPoolTaskToken<void>> tasks;
-//     auto nums      = 1000;
-//     auto task_func = []() {
-//         rpc_client client;
-//         client.enable_ssl("server.crt");
+TEST(rpc_test, test_ssl_echo_stream_mutithread) {
+    std::vector<Fundamental::ThreadPoolTaskToken<void>> tasks;
+    auto nums      = 1000;
+    auto task_func = []() {
+        rpc_client client;
+        //client.enable_ssl("server.crt");
 
-//         [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
-//         EXPECT_TRUE(r && client.has_connected());
-//         auto stream = client.upgrade_to_stream("test_echo_stream");
-//         EXPECT_TRUE(stream != nullptr);
-//         std::size_t cnt  = 5;
-//         std::string base = "msg ";
-//         while (cnt != 0) {
-//             EXPECT_TRUE(stream->Write(base + std::to_string(cnt)));
-//             --cnt;
-//             std::string tmp;
-//             EXPECT_TRUE(stream->Read(tmp));
-//             FINFO("ssl echo msg:{}", tmp);
-//         }
-//         EXPECT_TRUE(stream->WriteDone());
-//         EXPECT_TRUE(!stream->Finish(0));
-//     };
-//     while (nums > 0) {
-//         tasks.emplace_back(s_test_pool.Enqueue(task_func));
-//         nums--;
-//     }
-//     for (auto& f : tasks)
-//         EXPECT_NO_THROW(f.resultFuture.get());
-// }
+        [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
+        EXPECT_TRUE(r && client.has_connected());
+        auto stream = client.upgrade_to_stream("test_echo_stream");
+        EXPECT_TRUE(stream != nullptr);
+        std::size_t cnt  = 5;
+        std::string base = "msg ";
+        while (cnt != 0) {
+            EXPECT_TRUE(stream->Write(base + std::to_string(cnt)));
+            --cnt;
+            std::string tmp;
+            EXPECT_TRUE(stream->Read(tmp));
+            FINFO("ssl echo msg:{}", tmp);
+        }
+        EXPECT_TRUE(stream->WriteDone());
+        EXPECT_TRUE(!stream->Finish(0));
+    };
+    while (nums > 0) {
+        tasks.emplace_back(s_test_pool.Enqueue(task_func));
+        nums--;
+    }
+    for (auto& f : tasks)
+        EXPECT_NO_THROW(f.resultFuture.get());
+}
 
 TEST(rpc_test, test_ssl_proxy_echo_stream_mutithread) {
     std::vector<Fundamental::ThreadPoolTaskToken<void>> tasks;
@@ -773,7 +773,7 @@ TEST(rpc_test, test_ssl_proxy_echo_stream_mutithread) {
         //client.enable_ssl("server.crt");
         client.set_proxy(std::make_shared<network::rpc_service::CustomRpcProxy>(kProxyServiceName, kProxyServiceField,
                                                                                 kProxyServiceToken));
-        [[maybe_unused]] bool r = client.connect("127.0.0.1", 9001);
+        [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
         EXPECT_TRUE(r && client.has_connected());
         auto stream = client.upgrade_to_stream("test_echo_stream");
         EXPECT_TRUE(stream != nullptr);
@@ -797,6 +797,8 @@ TEST(rpc_test, test_ssl_proxy_echo_stream_mutithread) {
         EXPECT_NO_THROW(f.resultFuture.get());
 }
 
+
+
 int main(int argc, char** argv) {
     int mode = 0;
     if (argc > 1) mode = std::stoi(argv[1]);
@@ -805,7 +807,7 @@ int main(int argc, char** argv) {
     options.minimumLevel = Fundamental::LogLevel::debug;
     options.logFormat    = "%^[%L]%H:%M:%S.%e%$[%t] %v ";
     Fundamental::Logger::Initialize(std::move(options));
-    s_test_pool.Spawn(8);
+    s_test_pool.Spawn(1);
     if (mode == 0) {
         ::testing::InitGoogleTest(&argc, argv);
         run_server();

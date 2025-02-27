@@ -1,6 +1,6 @@
 #include "test_server.h"
 
-#include "rpc/basic/rpc_server.hpp"
+#include "rpc/rpc_server.hpp"
 
 #include <atomic>
 #include <chrono>
@@ -12,11 +12,6 @@
 #include "fundamental/basic/log.h"
 #include "fundamental/delay_queue/delay_queue.h"
 #include "fundamental/thread_pool/thread_pool.h"
-#include "network/services/proxy_server/proxy_connection.hpp"
-#include "network/services/proxy_server/proxy_defines.h"
-#include "network/services/proxy_server/traffic_proxy_service/traffic_proxy_connection.hpp"
-#include "network/services/proxy_server/traffic_proxy_service/traffic_proxy_defines.h"
-#include "network/services/proxy_server/traffic_proxy_service/traffic_proxy_manager.hpp"
 
 using namespace network;
 using namespace rpc_service;
@@ -229,11 +224,11 @@ dummy1 get_dummy(rpc_conn conn, dummy1 d) {
     return d;
 }
 std::unique_ptr<std::thread> s_thread;
-;
+static network::proxy::ProxyManager s_manager;
 void server_task(std::promise<void>& sync_p) {
 
     auto s_server = std::make_shared<rpc_server>(9000, 3600);
-    auto& server                         = *s_server;
+    auto& server  = *s_server;
     server.enable_ssl({ nullptr, "server.crt", "server.key", "dh2048.pem" });
     dummy d;
     server.register_handler("add", &dummy::add, &d);
@@ -274,31 +269,37 @@ void server_task(std::promise<void>& sync_p) {
         [](std::error_code code, std::int32_t signo) { Fundamental::Application::Instance().Exit(); });
     {
         using namespace network::proxy;
-        auto& manager = TrafficProxyManager::Instance();
+        auto& manager = s_manager;
         { // add http proxy
-            TrafficProxyHostInfo host;
+            ProxyHostInfo host;
             host.token = kProxyServiceToken;
             {
-                TrafficProxyHost hostRecord;
+                ProxyHost hostRecord;
                 hostRecord.host    = "0.0.0.0";
                 hostRecord.service = "9000";
-                host.hosts.emplace(TrafficProxyDataType(kProxyServiceField), std::move(hostRecord));
+                host.hosts.emplace(kProxyServiceField, std::move(hostRecord));
             }
-            manager.UpdateTrafficProxyHostInfo(TrafficProxyDataType(kProxyServiceName), std::move(host));
+            manager.UpdateProxyHostInfo(kProxyServiceName, std::move(host));
+        }
+        { // add http proxy
+            ProxyHostInfo host;
+            host.token = "test_http_token";
+            {
+                ProxyHost hostRecord;
+                hostRecord.host    = "www.baidu.com";
+                hostRecord.service = "http";
+                host.hosts.emplace(kProxyServiceField, std::move(hostRecord));
+            }
+            manager.UpdateProxyHostInfo("test_http", std::move(host));
         }
     }
-    // Initialise the server.
-    using asio::ip::tcp;
-    tcp::resolver resolver(network::io_context_pool::Instance().get_io_context());
-    auto s = std::make_shared<network::proxy::ProxyServer>(network::MakeTcpEndpoint(std::stoul(kProxyServicePort)));
-    s->GetHandler().RegisterProtocal(network::proxy::kTrafficProxyOpcode,
-                                     network::proxy::TrafficProxyConnection::MakeShared);
-    s->Start();
+    server.enable_data_proxy(&s_manager);
+
     server.start();
     rpc_stream_pool.Spawn(5);
     sync_p.set_value();
     Fundamental::Application::Instance().exitStarted.Connect(
-        [s_server = std::move(s_server), s = std::move(s), h, time_queue]() mutable {
+        [s_server = std::move(s_server), h, time_queue]() mutable {
             FDEBUG("emit stop server");
             time_queue->StopDelayTask(h);
             if (s_server) s_server->stop();

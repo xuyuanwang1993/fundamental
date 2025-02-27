@@ -5,8 +5,8 @@
 #include "fundamental/basic/log.h"
 #include "fundamental/basic/utils.hpp"
 
-#include "rpc/basic/custom_rpc_proxy.hpp"
-#include "rpc/basic/rpc_client.hpp"
+#include "rpc/proxy/custom_rpc_proxy.hpp"
+#include "rpc/rpc_client.hpp"
 
 #include <chrono>
 #include <iostream>
@@ -34,7 +34,7 @@ static void TestNormal(benchmark::State& state) {
 
 template <std::size_t blockSize>
 static void TestProxy(benchmark::State& state) {
-    network::rpc_service::rpc_client client("127.0.0.1", std::stoul(kProxyServicePort));
+    network::rpc_service::rpc_client client("127.0.0.1", 9000);
     client.set_proxy(std::make_shared<network::rpc_service::CustomRpcProxy>(kProxyServiceName, kProxyServiceField,
                                                                             kProxyServiceToken));
     client.connect();
@@ -51,7 +51,7 @@ static void TestProxy(benchmark::State& state) {
 #ifndef RPC_DISABLE_SSL
 template <std::size_t blockSize>
 static void TestSslProxy(benchmark::State& state) {
-    network::rpc_service::rpc_client client("127.0.0.1", std::stoul(kProxyServicePort));
+    network::rpc_service::rpc_client client("127.0.0.1", 9000);
     client.enable_ssl("server.crt");
     client.set_proxy(std::make_shared<network::rpc_service::CustomRpcProxy>(kProxyServiceName, kProxyServiceField,
                                                                             kProxyServiceToken));
@@ -68,7 +68,7 @@ static void TestSslProxy(benchmark::State& state) {
 }
 template <std::size_t blockSize>
 static void TestSslProxyStream(benchmark::State& state) {
-    network::rpc_service::rpc_client client("127.0.0.1", std::stoul(kProxyServicePort));
+    network::rpc_service::rpc_client client("127.0.0.1", 9000);
     client.enable_ssl("server.crt");
     client.set_proxy(std::make_shared<network::rpc_service::CustomRpcProxy>(kProxyServiceName, kProxyServiceField,
                                                                             kProxyServiceToken));

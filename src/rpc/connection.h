@@ -1,9 +1,12 @@
 #ifndef REST_RPC_CONNECTION_H_
 #define REST_RPC_CONNECTION_H_
 
-#include "const_vars.h"
-#include "router.hpp"
-#include "use_asio.hpp"
+#include "basic/const_vars.h"
+#include "basic/router.hpp"
+#include "basic/use_asio.hpp"
+#include "proxy/proxy_codec.hpp"
+#include "proxy/proxy_handler.hpp"
+#include "proxy/proxy_manager.hpp"
 
 #include <any>
 #include <array>
@@ -69,7 +72,7 @@ public:
     Fundamental::Signal<void(std::string, std::weak_ptr<connection>)> on_new_subscriber_added;
     Fundamental::Signal<void(const std::unordered_set<std::string>&, std::weak_ptr<connection>)> on_subscribers_removed;
     Fundamental::Signal<void(std::shared_ptr<connection>, std::string)> on_net_err_;
-    Fundamental::Signal<void(const connection&)> on_connection_closed;
+    Fundamental::Signal<void()> on_connection_closed;
     Fundamental::Signal<void(std::string /*key*/, std::string /*data*/)> on_publish_msg;
 
 public:
@@ -80,7 +83,7 @@ public:
 
     ~connection() {
         close();
-        FDEBUG("release connection -> {}", conn_id_);
+        FDEBUG("release connection {:p} -> {}", (void*)this, conn_id_);
     }
 
     void start() {
@@ -122,16 +125,6 @@ public:
         return conn_id_;
     }
 
-    template <typename T>
-    void set_user_data(const T& data) {
-        user_data_ = data;
-    }
-
-    template <typename T>
-    T get_user_data() {
-        return std::any_cast<T>(user_data_);
-    }
-
     const std::vector<char>& body() const {
         return body_;
     }
@@ -169,6 +162,10 @@ public:
         return ret;
     }
 
+    void config_proxy_manager(network::proxy::ProxyManager* manager) {
+        proxy_manager_ = manager;
+    }
+
 private:
     void publish(const std::string& key, const std::string& data) {
         response(0, request_type::rpc_publish, key, data);
@@ -184,7 +181,6 @@ private:
                                      [this, self](const asio::error_code& error, std::size_t) {
                                          if (error) {
                                              FDEBUG("perform ssl handshake failed {}", error.message());
-                                             print(error);
                                              on_net_err_(self, error.message());
                                              close();
                                              return;
@@ -204,7 +200,7 @@ private:
                              }
                              do {
                                  if (ec) {
-                                     print(ec);
+                                     FDEBUG("ssl handshake read failed {}", ec.message());
                                      on_net_err_(self, ec.message());
 
                                      break;
@@ -237,63 +233,125 @@ private:
         return false;
 #endif
     }
+    void process_rpc_request() {
+        rpc_header* header      = (rpc_header*)(head_);
+        req_id_                 = header->req_id;
+        const uint32_t body_len = header->body_len;
+        req_type_               = header->req_type;
+        switch (req_type_) {
+        case request_type::rpc_req:
+        case request_type::rpc_subscribe:
+        case request_type::rpc_unsubscribe:
+        case request_type::rpc_publish: {
+            if (body_len > 0) {
+                if (body_len >= MAX_BUF_LEN) {
+                    response_interal(req_id_, msgpack_codec::pack_args_str(result_code::FAIL, "body too large"));
+                    break;
+                }
+                if (body_.size() < body_len) {
+                    body_.resize(body_len);
+                }
+                read_body(header->func_id, body_len);
+            } else if (req_type_ == request_type::rpc_req) {
+                handle_none_param_request(header->func_id);
+            } else {
+                response_interal(req_id_, msgpack_codec::pack_args_str(result_code::FAIL, "bad request"));
+            }
+        } break;
+        case request_type::rpc_stream: {
+            process_rpc_stream(header->func_id);
+        } break;
+        case request_type::rpc_heartbeat: {
+            cancel_timer();
+            read_head();
+            return;
+        }
+        default: {
+            response_interal(req_id_, msgpack_codec::pack_args_str(result_code::FAIL, "bad request type"));
+            break;
+        }
+        }
+    }
+    void process_proxy_request() {
+        using network::proxy::ProxyRequest;
+        do {
+            if (!proxy_manager_) {
+                FDEBUG("data proxy not enabled");
+                break;
+            }
+            auto data_size = ProxyRequest::PeekSize(head_ + 1);
+            if (data_size > ProxyRequest::kMaxPayloadLen) {
+                FERR("invalid proxy request size {} overflow {}", data_size, ProxyRequest::kMaxPayloadLen);
+                break;
+            }
+            data_size += ProxyRequest::kHeaderLen;
+            auto proxy_buffer = std::make_shared<std::vector<std::uint8_t>>(data_size);
+            std::memcpy(proxy_buffer->data(), head_, kRpcHeadLen);
+            reset_timer();
+            auto self(this->shared_from_this());
+            auto p_data = proxy_buffer->data() + kRpcHeadLen;
+            async_buffer_read(
+                { asio::buffer(p_data, data_size - kRpcHeadLen) },
+                [this, self, proxy_buffer = std::move(proxy_buffer)](asio::error_code ec, std::size_t length) {
+                    if (!socket_.is_open()) {
+                        on_net_err_(self, "socket already closed");
+                        return;
+                    }
+                    if (ec) {
+                        FDEBUG("proxy init read failed {}", ec.message());
+                        on_net_err_(self, ec.message());
+                        close();
+                        return;
+                    }
+                    do {
+                        ProxyRequest request;
+                        if (!request.FromBuf(proxy_buffer->data(), proxy_buffer->size())) {
+                            FERR("invalid proxy request data");
+                            FDEBUG("{}", Fundamental::Utils::BufferToHex(proxy_buffer->data(), proxy_buffer->size()));
+                            break;
+                        }
+                        network::proxy::ProxyHost hostInfo;
+                        if (!proxy_manager_->GetProxyHostInfo(request.service_name_, request.token_, request.field_,
+                                                              hostInfo)) {
+                            FERR("get proxy host failed");
+                            break;
+                        }
+
+                        FDEBUG("start proxy {} {} {} -> {}:{}", request.service_name_, request.token_, request.field_,
+                               hostInfo.host, hostInfo.service);
+                        network::proxy::proxy_handler::MakeShared(hostInfo.host, hostInfo.service, std::move(socket_))
+                            ->SetUp();
+                        cancel_timer();
+                        return;
+                    } while (0);
+                    close();
+                });
+            return;
+        } while (0);
+        close();
+    }
     void read_head(std::size_t offset = 0) {
         reset_timer();
         auto self(this->shared_from_this());
-        async_buffer_read({ asio::buffer(head_ + offset, HEAD_LEN - offset) }, [this, self](asio::error_code ec,
-                                                                                            std::size_t length) {
+        async_buffer_read({ asio::buffer(head_ + offset, kRpcHeadLen - offset) }, [this, self](asio::error_code ec,
+                                                                                               std::size_t length) {
             if (!socket_.is_open()) {
                 on_net_err_(self, "socket already closed");
                 return;
             }
             if (ec) {
-                print(ec);
+                FDEBUG("rpc read head failed {}", ec.message());
                 on_net_err_(self, ec.message());
                 close();
                 return;
             }
-            rpc_header* header = (rpc_header*)(head_);
-            if (header->magic != MAGIC_NUM) {
-                print("protocol error");
-                close();
-                return;
-            }
-
-            req_id_                 = header->req_id;
-            const uint32_t body_len = header->body_len;
-            req_type_               = header->req_type;
-            switch (req_type_) {
-            case request_type::rpc_req:
-            case request_type::rpc_subscribe:
-            case request_type::rpc_unsubscribe:
-            case request_type::rpc_publish: {
-                if (body_len > 0) {
-                    if (body_len >= MAX_BUF_LEN) {
-                        response_interal(req_id_, msgpack_codec::pack_args_str(result_code::FAIL, "body too large"));
-                        break;
-                    }
-                    if (body_.size() < body_len) {
-                        body_.resize(body_len);
-                    }
-                    read_body(header->func_id, body_len);
-                } else if (req_type_ == request_type::rpc_req) {
-                    handle_none_param_request(header->func_id);
-                } else {
-                    response_interal(req_id_, msgpack_codec::pack_args_str(result_code::FAIL, "bad request"));
-                }
-            } break;
-            case request_type::rpc_stream: {
-                process_rpc_stream(header->func_id);
-            } break;
-            case request_type::rpc_heartbeat: {
-                cancel_timer();
-                read_head();
-                return;
-            }
+            switch (head_[0]) {
+            case RPC_MAGIC_NUM: process_rpc_request(); break;
+            case network::proxy::ProxyRequest::kMagicNum: process_proxy_request(); break;
             default: {
-                response_interal(req_id_, msgpack_codec::pack_args_str(result_code::FAIL, "bad request type"));
-                break;
-            }
+                FERR("{:p} protocol error magic  {:02x}", (void*)this, static_cast<std::uint8_t>(head_[0]));
+                close();
+            } break;
             }
         });
     }
@@ -397,32 +455,30 @@ private:
     void write() {
         auto& msg   = write_queue_.front();
         write_size_ = (uint32_t)msg.content.size();
-        header_     = { MAGIC_NUM, msg.req_type, write_size_, msg.req_id };
+        header_     = { RPC_MAGIC_NUM, msg.req_type, write_size_, msg.req_id };
         std::array<asio::const_buffer, 2> write_buffers;
         write_buffers[0] = asio::buffer(&header_, sizeof(rpc_header));
         write_buffers[1] = asio::buffer(msg.content.data(), write_size_);
 
         auto self = this->shared_from_this();
-        async_write(write_buffers, [this, self](asio::error_code ec, std::size_t length) { on_write(ec, length); });
-    }
+        async_write(write_buffers, [this, self](asio::error_code ec, std::size_t length) {
+            if (ec) {
+                FDEBUG("rpc write failed {}", ec.message());
+                on_net_err_(shared_from_this(), ec.message());
+                close();
+                return;
+            }
 
-    void on_write(asio::error_code ec, std::size_t length) {
-        if (ec) {
-            print(ec);
-            on_net_err_(shared_from_this(), ec.message());
-            close();
-            return;
-        }
+            if (has_closed()) {
+                return;
+            }
 
-        if (has_closed()) {
-            return;
-        }
+            write_queue_.pop_front();
 
-        write_queue_.pop_front();
-
-        if (!write_queue_.empty()) {
-            write();
-        }
+            if (!write_queue_.empty()) {
+                write();
+            }
+        });
     }
 
     template <typename Handler>
@@ -495,7 +551,7 @@ private:
             std::unordered_set<std::string> tmp;
             std::swap(subscribers_, tmp);
             on_subscribers_removed(tmp, weak_from_this());
-            on_connection_closed(*this);
+            on_connection_closed();
         }
 
 #ifndef RPC_DISABLE_SSL
@@ -511,25 +567,8 @@ private:
         socket_.close(ignored_ec);
     }
 
-    template <typename... Args>
-    void print(Args... args) {
-#ifdef RPC_DEBUG
-        std::cout << "[rpc] ";
-        std::initializer_list<int> { (std::cout << args << ' ', 0)... };
-        std::cout << "\n";
-#endif
-    }
-
-    void print(const asio::error_code& ec) {
-        print(ec.value(), ec.message());
-    }
-
-    void print(const std::exception& ex) {
-        print(ex.what());
-    }
-
     tcp::socket socket_;
-    char head_[HEAD_LEN];
+    char head_[kRpcHeadLen];
     std::vector<char> body_;
     std::uint64_t req_id_;
     request_type req_type_;
@@ -549,12 +588,13 @@ private:
     std::shared_ptr<ServerStreamReadWriter> rpc_stream_rw_;
 
     router& router_;
-    std::any user_data_;
     bool delay_ = false;
 #ifndef RPC_DISABLE_SSL
     std::unique_ptr<asio::ssl::stream<asio::ip::tcp::socket&>> ssl_stream_ = nullptr;
     asio::ssl::context* ssl_context_ref                                    = nullptr;
 #endif
+    // proxy
+    network::proxy::ProxyManager* proxy_manager_ = nullptr;
 };
 
 inline ServerStreamReadWriter::ServerStreamReadWriter(std::shared_ptr<connection> conn) : conn_(conn) {

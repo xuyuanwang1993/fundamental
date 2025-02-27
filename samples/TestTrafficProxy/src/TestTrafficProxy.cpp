@@ -8,9 +8,6 @@
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 //
 
-#include "network/services/proxy_server/proxy_encode.h"
-#include "network/services/proxy_server/proxy_request_handler.hpp"
-#include "network/services/proxy_server/traffic_proxy_service/traffic_proxy_codec.hpp"
 
 #include <asio.hpp>
 #include <functional>
@@ -18,6 +15,10 @@
 #include <istream>
 #include <ostream>
 #include <string>
+
+#include "fundamental/basic/log.h"
+#include "rpc/proxy/proxy_encoder.h"
+
 using asio::ip::tcp;
 
 class client
@@ -42,7 +43,7 @@ public:
         // into a list of endpoints.
         if (::getenv("USE_TRAFFIC_PROXY"))
         {
-            resolver_.async_resolve("127.0.0.1", "4885",
+            resolver_.async_resolve("127.0.0.1", "9000",
                                     std::bind(&client::handle_resolve, this,
                                               asio::placeholders::error,
                                               asio::placeholders::results));
@@ -72,7 +73,6 @@ private:
         if (!ptr)
             return;
         proxy_encode_input input;
-        input.opCode                 = 1;
         std::string proxyServiceName = "test_http";
         input.service                = proxyServiceName.data();
         input.serviceLen             = proxyServiceName.size();

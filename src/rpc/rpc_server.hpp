@@ -1,9 +1,9 @@
 #ifndef REST_RPC_RPC_SERVER_H_
 #define REST_RPC_RPC_SERVER_H_
 
+#include "basic/router.hpp"
 #include "connection.h"
-#include "network/server/io_context_pool.hpp"
-#include "router.hpp"
+
 #include <condition_variable>
 #include <filesystem>
 #include <mutex>
@@ -11,6 +11,7 @@
 #include <thread>
 
 #include "fundamental/events/event_system.h"
+#include "basic/io_context_pool.hpp"
 
 using asio::ip::tcp;
 
@@ -46,6 +47,7 @@ class rpc_server : private asio::noncopyable {
 public:
     Fundamental::Signal<void(asio::error_code, string_view)> on_err;
     Fundamental::Signal<void(std::shared_ptr<connection>, std::string)> on_net_err;
+    Fundamental::Signal<void()> on_release;
 
 public:
     rpc_server(unsigned short port, size_t timeout_seconds = 15) :
@@ -55,15 +57,7 @@ public:
 
     ~rpc_server() {
         FDEBUG("release rpc_server start");
-        decltype(connections_) tmp;
-        {
-            std::unique_lock<std::mutex> lock(mtx_);
-            tmp.swap(connections_);
-        }
-        for (auto& conn : tmp) {
-            // active close
-            conn.second->close();
-        }
+        on_release.Emit();
         stop();
         FDEBUG("release rpc_server over");
     }
@@ -139,6 +133,9 @@ public:
 
 #endif
     }
+    void enable_data_proxy(network::proxy::ProxyManager* manager) {
+        proxy_manager = manager;
+    }
 
 private:
     void do_accept() {
@@ -160,10 +157,12 @@ private:
                     if (on_net_err) {
                         new_conn->on_net_err_.Connect(on_net_err);
                     }
-                    new_conn->on_connection_closed.Connect([this](const connection& conn) {
-                        std::unique_lock<std::mutex> lock(mtx_);
-                        connections_.erase(conn.conn_id());
+                    auto release_handle = on_release.Connect([con = new_conn->weak_from_this()]() {
+                        auto ptr = con.lock();
+                        if (ptr) ptr->close();
                     });
+                    new_conn->on_connection_closed.Connect(
+                        [release_handle, this]() { on_release.DisConnect(release_handle); });
                     new_conn->on_publish_msg.Connect(
                         [this](std::string key, std::string data) { forward_msg(std::move(key), std::move(data)); });
                     new_conn->on_subscribers_removed.Connect(
@@ -186,12 +185,16 @@ private:
                         new_conn->enable_ssl(*ssl_context);
                     }
 #endif
-
+                    std::int64_t id = 0;
+                    // increase conn_id_ and return old value
+                    while (true) {
+                        id = conn_id_.load();
+                        if (conn_id_.compare_exchange_strong(id, id + 1)) break;
+                    }
+                    new_conn->set_conn_id(id);
+                    new_conn->config_proxy_manager(proxy_manager);
                     new_conn->start();
-                    std::unique_lock<std::mutex> lock(mtx_);
-                    new_conn->set_conn_id(conn_id_);
-                    FDEBUG("start connection -> {}", conn_id_);
-                    connections_.emplace(conn_id_++, new_conn);
+                    FDEBUG("start connection {:p} -> {}", (void*)(new_conn.get()),id);
                 }
 
                 do_accept();
@@ -220,9 +223,7 @@ private:
     tcp::acceptor acceptor_;
     std::size_t timeout_seconds_;
 
-    std::unordered_map<int64_t, std::shared_ptr<connection>> connections_;
-    int64_t conn_id_ = 0;
-    std::mutex mtx_;
+    std::atomic<std::int64_t> conn_id_ = 0;
 
     std::unordered_multimap<std::string, std::weak_ptr<connection>> sub_map_;
     std::mutex sub_mtx_;
@@ -232,6 +233,8 @@ private:
     std::unique_ptr<asio::ssl::context> ssl_context = nullptr;
     rpc_server_ssl_config ssl_config_;
 #endif
+    // proxy
+    network::proxy::ProxyManager* proxy_manager = nullptr;
 };
 } // namespace rpc_service
   // namespace rpc_service
