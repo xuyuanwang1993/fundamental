@@ -238,7 +238,7 @@ bool binary_unpack_string(const std::uint8_t*& data, std::size_t& len, std::stri
         return false;
     }
     if (len < str_size) {
-        FERR("str buf is invalid");
+        FERR("str buf is invalid need {} actual {}",str_size,len);
         return false;
     }
     out_str.resize(str_size);
