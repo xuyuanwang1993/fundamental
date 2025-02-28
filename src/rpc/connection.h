@@ -306,9 +306,9 @@ private:
                         close();
                         return;
                     }
-#ifndef RPC_VERBOSE
+#ifdef RPC_VERBOSE
                     FDEBUG("server proxy request read {}",
-                           Fundamental::Utils::BufferToHex(proxy_buffer->data(), proxy_buffer->size()));
+                           Fundamental::Utils::BufferToHex(proxy_buffer->data(), proxy_buffer->size(), 140));
 #endif
                     do {
                         ProxyRequest request;
@@ -352,7 +352,7 @@ private:
                 close();
                 return;
             }
-#ifndef RPC_VERBOSE
+#ifdef RPC_VERBOSE
             FDEBUG("server read head {}", Fundamental::Utils::BufferToHex(head_, kRpcHeadLen));
 #endif
             switch (head_[0]) {
@@ -368,6 +368,9 @@ private:
 
     void read_body(uint32_t func_id, std::size_t size) {
         auto self(this->shared_from_this());
+#ifdef RPC_VERBOSE
+        FDEBUG("server try read size: {}", size);
+#endif
         async_buffer_read({ asio::mutable_buffer(body_.data(), size) }, [this, func_id, self](asio::error_code ec,
                                                                                               std::size_t length) {
             cancel_timer();
@@ -381,8 +384,8 @@ private:
                 on_net_err_(self, ec.message());
                 return;
             }
-#ifndef RPC_VERBOSE
-            FDEBUG("server read body {}", Fundamental::Utils::BufferToHex(body_.data(), length));
+#ifdef RPC_VERBOSE
+            FDEBUG("server read {} body {}", length, Fundamental::Utils::BufferToHex(body_.data(), length, 140));
 #endif
             read_head();
             try {
@@ -695,7 +698,7 @@ inline void ServerStreamReadWriter::read_head() {
             if (ec) {
                 set_status(rpc_stream_data_status::rpc_stream_failed, std::move(ec));
             } else {
-#ifndef RPC_VERBOSE
+#ifdef RPC_VERBOSE
                 FDEBUG("server stream read head {}",
                        Fundamental::Utils::BufferToHex(&read_packet_buffer.size, sizeof(read_packet_buffer.size)));
 #endif
@@ -720,9 +723,9 @@ inline void ServerStreamReadWriter::read_body() {
         if (ec) {
             set_status(rpc_stream_data_status::rpc_stream_failed, std::move(ec));
         } else {
-#ifndef RPC_VERBOSE
+#ifdef RPC_VERBOSE
             FDEBUG("server stream read {}{}", Fundamental::Utils::BufferToHex(&read_packet_buffer.type, 1),
-                   Fundamental::Utils::BufferToHex(read_packet_buffer.data.data(), read_packet_buffer.size));
+                   Fundamental::Utils::BufferToHex(read_packet_buffer.data.data(), read_packet_buffer.size, 140));
 #endif
             auto status = static_cast<rpc_stream_data_status>(read_packet_buffer.type);
             if (status < last_data_status_ || status >= rpc_stream_data_status::rpc_stream_status_max) {

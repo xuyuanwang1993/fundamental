@@ -579,6 +579,42 @@ TEST(rpc_test, test_echo_stream) {
     EXPECT_TRUE(stream->WriteDone());
     EXPECT_TRUE(!stream->Finish(0));
 }
+TEST(rpc_test, test_obj_echo) {
+    rpc_client client("127.0.0.1", 9000);
+    client.set_proxy(std::make_shared<network::rpc_service::CustomRpcProxy>(kProxyServiceName, kProxyServiceField,
+                                                                            kProxyServiceToken));
+    bool r = client.connect();
+    if (!r) {
+        EXPECT_TRUE(false && "connect timeout");
+        return;
+    }
+    std::int32_t c = 0;
+    std::string str;
+    str = std::string(781, 'a');
+    try {
+        auto ret = client.call<10000, std::string>("echo", str);
+        if (str != ret) {
+            FERR("error finished {}", c);
+        }
+    } catch (const std::exception& e) {
+        FERR("exception {}->{}", c, e.what());
+    }
+    while (c < 1000) {
+        str.push_back('a');
+        try {
+            auto ret = client.call<10000, std::string>("echo", str);
+            if (str != ret) {
+                FERR("error finished {}", c);
+                break;
+            }
+        } catch (const std::exception& e) {
+            FERR("exception {}->{}", c, e.what());
+            break;
+        }
+        ++c;
+    }
+    EXPECT_TRUE(c >= 1000);
+}
 #endif
 
 #if !defined(RPC_DISABLE_SSL) && 0
@@ -587,45 +623,39 @@ TEST(rpc_test, test_ssl) {
     Fundamental::ScopeGuard check_guard(
         [&]() { EXPECT_LE(check_timer.GetDuration<Fundamental::Timer::TimeScale::Millisecond>(), 100); });
 
-    try
-    {
+    try {
         rpc_client client("127.0.0.1", 9000);
         client.enable_ssl("server.crt");
         bool r = client.connect();
-        if (!r)
-        {
+        if (!r) {
             EXPECT_TRUE(false && "connect timeout");
             return;
         }
         std::size_t cnt = 10;
-        while (cnt > 0)
-        {
+        while (cnt > 0) {
             --cnt;
             client.call<std::string>("echo", std::to_string(cnt) + "test");
         }
+    } catch (const std::exception& e) {
+        std::cout << __func__ << ":" << e.what() << std::endl;
     }
-    catch (const std::exception& e)
-    { std::cout << __func__ << ":" << e.what() << std::endl; }
 
     std::cout << "finish ssl" << std::endl;
-    try
-    {
+    try {
         rpc_client client("127.0.0.1", 9000);
         bool r = client.connect();
-        if (!r)
-        {
+        if (!r) {
             EXPECT_TRUE(false && "connect timeout");
             return;
         }
         std::size_t cnt = 10;
-        while (cnt > 0)
-        {
+        while (cnt > 0) {
             --cnt;
             client.call<std::string>("echo", std::to_string(cnt) + "test nossl");
         }
+    } catch (const std::exception& e) {
+        std::cout << __func__ << ":" << e.what() << std::endl;
     }
-    catch (const std::exception& e)
-    { std::cout << __func__ << ":" << e.what() << std::endl; }
     std::cout << "finish no ssl" << std::endl;
 }
 TEST(rpc_test, test_ssl_proxy) {
@@ -638,8 +668,7 @@ TEST(rpc_test, test_ssl_proxy) {
         client.set_proxy(std::make_shared<network::rpc_service::CustomRpcProxy>(kProxyServiceName, kProxyServiceField,
                                                                                 kProxyServiceToken));
         bool r = client.connect();
-        if (!r)
-        {
+        if (!r) {
             EXPECT_TRUE(false && "connect timeout");
             return;
         }
@@ -662,8 +691,7 @@ TEST(rpc_test, test_ssl_proxy) {
         client.set_proxy(std::make_shared<network::rpc_service::CustomRpcProxy>(kProxyServiceName, kProxyServiceField,
                                                                                 kProxyServiceToken));
         bool r = client.connect();
-        if (!r)
-        {
+        if (!r) {
             EXPECT_TRUE(false && "connect timeout");
             return;
         }
@@ -692,8 +720,7 @@ TEST(rpc_test, test_ssl_proxy_echo_stream) {
     EXPECT_TRUE(stream != nullptr);
     std::size_t cnt  = 5;
     std::string base = "msg ";
-    while (cnt != 0)
-    {
+    while (cnt != 0) {
         EXPECT_TRUE(stream->Write(base + std::to_string(cnt)));
         --cnt;
         std::string tmp;
@@ -743,36 +770,36 @@ TEST(rpc_test, test_ssl_concept) {
 }
 #endif
 
-// TEST(rpc_test, test_ssl_echo_stream_mutithread) {
-//     std::vector<Fundamental::ThreadPoolTaskToken<void>> tasks;
-//     auto nums      = 1000;
-//     auto task_func = []() {
-//         rpc_client client;
-//         //client.enable_ssl("server.crt");
+TEST(rpc_test, test_ssl_echo_stream_mutithread) {
+    std::vector<Fundamental::ThreadPoolTaskToken<void>> tasks;
+    auto nums      = 1000;
+    auto task_func = []() {
+        rpc_client client;
+        //client.enable_ssl("server.crt");
 
-//         [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
-//         EXPECT_TRUE(r && client.has_connected());
-//         auto stream = client.upgrade_to_stream("test_echo_stream");
-//         EXPECT_TRUE(stream != nullptr);
-//         std::size_t cnt  = 5;
-//         std::string base = "msg ";
-//         while (cnt != 0) {
-//             EXPECT_TRUE(stream->Write(base + std::to_string(cnt)));
-//             --cnt;
-//             std::string tmp;
-//             EXPECT_TRUE(stream->Read(tmp));
-//             FINFO("ssl echo msg:{}", tmp);
-//         }
-//         EXPECT_TRUE(stream->WriteDone());
-//         EXPECT_TRUE(!stream->Finish(0));
-//     };
-//     while (nums > 0) {
-//         tasks.emplace_back(s_test_pool.Enqueue(task_func));
-//         nums--;
-//     }
-//     for (auto& f : tasks)
-//         EXPECT_NO_THROW(f.resultFuture.get());
-// }
+        [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
+        EXPECT_TRUE(r && client.has_connected());
+        auto stream = client.upgrade_to_stream("test_echo_stream");
+        EXPECT_TRUE(stream != nullptr);
+        std::size_t cnt  = 5;
+        std::string base = "msg ";
+        while (cnt != 0) {
+            EXPECT_TRUE(stream->Write(base + std::to_string(cnt)));
+            --cnt;
+            std::string tmp;
+            EXPECT_TRUE(stream->Read(tmp));
+            FINFO("ssl echo msg:{}", tmp);
+        }
+        EXPECT_TRUE(stream->WriteDone());
+        EXPECT_TRUE(!stream->Finish(0));
+    };
+    while (nums > 0) {
+        tasks.emplace_back(s_test_pool.Enqueue(task_func));
+        nums--;
+    }
+    for (auto& f : tasks)
+        EXPECT_NO_THROW(f.resultFuture.get());
+}
 
 // TEST(rpc_test, test_ssl_proxy_echo_stream_mutithread) {
 //     std::vector<Fundamental::ThreadPoolTaskToken<void>> tasks;
@@ -807,71 +834,32 @@ TEST(rpc_test, test_ssl_concept) {
 //         EXPECT_NO_THROW(f.resultFuture.get());
 // }
 
-TEST(rpc_test, test_obj_echo) {
-    rpc_client client("127.0.0.1", 9000);
-    client.set_proxy(std::make_shared<network::rpc_service::CustomRpcProxy>(kProxyServiceName, kProxyServiceField,
-                                                                            kProxyServiceToken));
-    bool r = client.connect();
-    if (!r)
-    {
-        EXPECT_TRUE(false && "connect timeout");
-        return;
-    }
 
-    std::int32_t cnt = 0;
-    TestProxyRequest request;
-
-    while (cnt < 1000)
-    {
-        request.f += 0.1f;
-        request.v += 1;
-        if (request.strs.size() < 5) request.strs.emplace_back(std::to_string(cnt));
-        try
-        {
-            auto ret = client.call<100, TestProxyRequest>("object_echo<TestProxyRequest>", request);
-            if (request != ret)
-            {
-                FERR("error finished {}", cnt);
-                break;
-            }
-        }
-        catch (const std::exception& e)
-        {
-            FERR("exception {}->{}", cnt,e.what());
-            break;
-        }
-
-        ++cnt;
-    }
-}
 
 int main(int argc, char** argv) {
     int mode = 0;
     if (argc > 1) mode = std::stoi(argv[1]);
     Fundamental::fs::SwitchToProgramDir(argv[0]);
     Fundamental::Logger::LoggerInitOptions options;
-    options.minimumLevel = Fundamental::LogLevel::debug;
-    options.logFormat    = "%^[%L]%H:%M:%S.%e%$[%t] %v ";
+    options.minimumLevel         = Fundamental::LogLevel::debug;
+    options.logFormat            = "%^[%L]%H:%M:%S.%e%$[%t] %v ";
+    options.logOutputProgramName = "test";
+    options.logOutputPath        = "output";
     Fundamental::Logger::Initialize(std::move(options));
     s_test_pool.Spawn(1);
-    if (mode == 0)
-    {
+    if (mode == 0) {
         ::testing::InitGoogleTest(&argc, argv);
         run_server();
         auto ret = RUN_ALL_TESTS();
         exit_server();
         FINFO("finish all test");
         return ret;
-    }
-    else if (mode == 1)
-    {
+    } else if (mode == 1) {
         std::promise<void> sync_p;
         server_task(sync_p);
         sync_p.get_future().get();
         exit_server();
-    }
-    else
-    {
+    } else {
         ::testing::InitGoogleTest(&argc, argv);
         network::io_context_pool::s_excutorNums = 10;
         network::io_context_pool::Instance().start();

@@ -6,8 +6,10 @@
 #include <memory>
 
 #include "fundamental/basic/allocator.hpp"
-namespace network {
-namespace proxy {
+namespace network
+{
+namespace proxy
+{
 class proxy_handler : public std::enable_shared_from_this<proxy_handler> {
     inline static constexpr std::size_t kCacheBufferSize = 32 * 1024; // 32k
     inline static constexpr std::size_t kMinPerReadSize  = 1200;
@@ -22,7 +24,9 @@ class proxy_handler : public std::enable_shared_from_this<proxy_handler> {
         explicit EndponitCacheStatus(decltype(Fundamental::MakePoolMemorySource()) dataSource) :
         cache_(dataSource.get()) {
         }
+        bool is_writing = false;
         std::deque<DataCahceItem, Fundamental::AllocatorType<DataCahceItem>> cache_;
+        std::string tag_;
         bool PrepareWriteCache();
         void PrepareReadCache();
         asio::mutable_buffer GetReadBuffer();
@@ -30,7 +34,8 @@ class proxy_handler : public std::enable_shared_from_this<proxy_handler> {
         void UpdateReadBuffer(std::size_t readBytes);
         void UpdateWriteBuffer(std::size_t writeBytes);
     };
-    enum TrafficProxyStatusMask : std::int32_t {
+    enum TrafficProxyStatusMask : std::int32_t
+    {
         ClientProxying                        = (1 << 0),
         ProxyDnsResolving                     = (1 << 2),
         ServerProxying                        = (1 << 3),
@@ -43,18 +48,21 @@ class proxy_handler : public std::enable_shared_from_this<proxy_handler> {
 public:
     void SetUp();
     ~proxy_handler();
-    static std::shared_ptr<proxy_handler> MakeShared(const std::string& proxy_host, const std::string& proxy_service,
+    static std::shared_ptr<proxy_handler> MakeShared(const std::string& proxy_host,
+                                                     const std::string& proxy_service,
                                                      asio::ip::tcp::socket&& socket) {
         return std::shared_ptr<proxy_handler>(new proxy_handler(proxy_host, proxy_service, std::move(socket)));
     }
 
 protected:
-    explicit proxy_handler(const std::string& proxy_host, const std::string& proxy_service,
+    explicit proxy_handler(const std::string& proxy_host,
+                           const std::string& proxy_service,
                            asio::ip::tcp::socket&& socket);
     void Process();
     void ProcessTrafficProxy();
-    void HandleDisconnect(asio::error_code ec, const std::string& callTag = "",
-                          std::int32_t closeMask = TrafficProxyCloseAll);
+    void HandleDisconnect(asio::error_code ec,
+                          const std::string& callTag = "",
+                          std::int32_t closeMask     = TrafficProxyCloseAll);
 
 protected:
     void StartDnsResolve(const std::string& host, const std::string& service);

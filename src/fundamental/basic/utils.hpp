@@ -68,11 +68,11 @@ namespace Utils {
 using fpid_t = std::uint32_t;
 fpid_t GetProcessId();
 void SetThreadName(const std::string& name);
-std::string BufferToHex(const void* buffer, std::size_t size);
-template <typename T>
-inline std::string BufferToHex(const T& v) {
+std::string BufferToHex(const void* buffer, std::size_t size,std::size_t group_size=0,std::int8_t spilt_char=0);
+template <typename T,typename=std::void_t<decltype(T::value_type)>>
+inline std::string BufferToHex(const T& v,std::size_t group_size=0,std::int8_t spilt_char=0) {
     using ValueType = typename T::value_type;
-    return BufferToHex(v.data(), v.size() * sizeof(ValueType));
+    return BufferToHex(v.data(), v.size() * sizeof(ValueType),group_size,spilt_char);
 }
 
 std::string BufferDumpAscii(const void* buffer, std::size_t size);
