@@ -25,6 +25,25 @@ using AllTestTypes = ::testing::Types<std::uint8_t,
                                       std::int64_t>;
 // declare
 TYPED_TEST_SUITE(IntegerCodecTest, AllTestTypes);
+TEST(IntegerCodecTestBool, TestBasic) {
+    std::uint8_t src[1] = {};
+    {
+        bool encode_v = false;
+        auto len      = VarintEncode(encode_v, src);
+        bool decode_v = 0;
+        auto len2     = VarintDecode(decode_v, src);
+        EXPECT_EQ(len, len2);
+        EXPECT_EQ(decode_v, encode_v);
+    }
+    {
+        bool encode_v = true;
+        auto len      = VarintEncode(encode_v, src);
+        bool decode_v = 0;
+        auto len2     = VarintDecode(decode_v, src);
+        EXPECT_EQ(len, len2);
+        EXPECT_EQ(decode_v, encode_v);
+    }
+}
 
 TYPED_TEST(IntegerCodecTest, TestAllNumberType) {
     auto max_extra_bytes                  = sizeof(this->kMin);

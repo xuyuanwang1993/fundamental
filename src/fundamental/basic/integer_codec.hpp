@@ -23,7 +23,7 @@ template <typename T, typename = std::enable_if_t<std::is_signed_v<T>>>
 [[nodiscard]] inline T ZigZagDecode(typename PairSignedWithUnsignedType<T>::UnsignedType value) noexcept {
     return static_cast<T>((value >> 1) ^ -(value & 1));
 }
-template <typename T, typename = std::enable_if_t<std::is_integral_v<T>>>
+template <typename T, typename = std::enable_if_t<std::disjunction_v<std::is_integral<T>, std::is_enum<T>,std::is_same<T,bool>>>>
 [[nodiscard]] constexpr inline std::size_t VarintEncodeGuessMaxSize() noexcept {
     return sizeof(T) + 1;
 }
@@ -38,9 +38,9 @@ struct SelectUnderlyingType<T, std::void_t<std::underlying_type_t<T>>> {
     using type = std::underlying_type_t<T>;
 };
 
-template <typename T, typename = std::enable_if_t<std::disjunction_v<std::is_integral<T>, std::is_enum<T>>>>
+template <typename T, typename = std::enable_if_t<std::disjunction_v<std::is_integral<T>, std::is_enum<T>,std::is_same<T,bool>>>>
 [[nodiscard]] inline std::size_t VarintEncode(T inValue, std::uint8_t* dst) noexcept {
-    using UnderlyingType =typename SelectUnderlyingType<T>::type;
+    using UnderlyingType = typename SelectUnderlyingType<T>::type;
     if constexpr (sizeof(UnderlyingType) == 1)
     {
         dst[0] = static_cast<std::uint8_t>(inValue);
@@ -78,13 +78,20 @@ template <typename T, typename = std::enable_if_t<std::disjunction_v<std::is_int
     return extra_bytes + 1;
 }
 
+[[nodiscard]] inline std::size_t VarintDecodePeekSize(const std::uint8_t* src) noexcept {
+    std::size_t extra_bytes = src[0] >> 4;
+    return extra_bytes + 1;
+}
+
+template <typename T>
 [[nodiscard]] inline bool VarintDecodeCheckSize(const std::uint8_t* src, std::size_t len) noexcept {
+    if constexpr (sizeof(T) == 1) return len >= 1;
     if (len == 0) return false;
     std::size_t extra_bytes = src[0] >> 4;
     return len >= (extra_bytes + 1);
 }
 
-template <typename T, typename = std::enable_if_t<std::disjunction_v<std::is_integral<T>, std::is_enum<T>>>>
+template <typename T, typename = std::enable_if_t<std::disjunction_v<std::is_integral<T>, std::is_enum<T>,std::is_same<T,bool>>>>
 [[nodiscard]] inline std::size_t VarintDecode(T& outValue, const std::uint8_t* src) noexcept {
     using UnderlyingType = typename SelectUnderlyingType<T>::type;
 

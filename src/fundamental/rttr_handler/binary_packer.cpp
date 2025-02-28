@@ -26,8 +26,9 @@ bool binary_unpack_set(const std::uint8_t*& data, std::size_t& len, rttr::varian
 bool binary_unpack_map(const std::uint8_t*& data, std::size_t& len, rttr::variant& var, bool ignore_invalid_properties);
 bool binary_unpack_string(const std::uint8_t*& data, std::size_t& len, std::string& out_str);
 bool binary_unpack_skip_buf(const std::uint8_t*& data, std::size_t& len, std::size_t skip_len);
+// for float double data
 template <typename T>
-void pack_basic_value(std::vector<std::uint8_t>& out, const T& value) {
+void pack_basic_fixed_value(std::vector<std::uint8_t>& out, const T& value) {
     constexpr std::size_t value_size = sizeof(value);
     auto offset                      = out.size();
     out.resize(offset + value_size);
@@ -47,7 +48,7 @@ void pack_basic_value(std::vector<std::uint8_t>& out, const T& value) {
 }
 
 template <typename T>
-void varint_pack_basic_value(std::vector<std::uint8_t>& out, const T& value) {
+void pack_basic_varint_value(std::vector<std::uint8_t>& out, const T& value) {
     constexpr std::size_t max_value_size = Fundamental::VarintEncodeGuessMaxSize<T>();
     auto offset                          = out.size();
     out.resize(offset + max_value_size);
@@ -56,6 +57,7 @@ void varint_pack_basic_value(std::vector<std::uint8_t>& out, const T& value) {
     if (write_size != max_value_size) out.resize(offset + write_size);
 }
 
+// update  object array map preallocate 4bytes
 void pack_update_item_size(std::vector<std::uint8_t>& out, std::size_t offset) {
     FASSERT(offset + 4 <= out.size());
     auto* write_ptr         = out.data() + offset;
@@ -83,7 +85,7 @@ void pack_append_data(std::vector<std::uint8_t>& out, const void* data, std::siz
 template <typename T>
 void binary_pack_string(std::vector<std::uint8_t>& out, const T& value) {
     std::uint32_t size = value.size();
-    pack_basic_value(out, size);
+    pack_basic_varint_value(out, size);
     pack_append_data(out, value.data(), size);
 }
 
@@ -92,68 +94,68 @@ bool binary_pack_basic_value(const type& t, const variant& var, std::vector<std:
     {
         if (t == type::get<bool>())
         {
-            if (!type_flag) pack_basic_value(out, bool_pack_data);
-            pack_basic_value(out, var.to_bool());
+            if (!type_flag) pack_basic_varint_value(out, bool_pack_data);
+            pack_basic_varint_value(out, var.to_bool());
         }
         else if (t == type::get<char>())
         {
-            if (!type_flag) pack_basic_value(out, char_pack_data);
-            pack_basic_value(out, var.to_int8());
+            if (!type_flag) pack_basic_varint_value(out, char_pack_data);
+            pack_basic_varint_value(out, var.to_int8());
         }
         else if (t == type::get<int8_t>())
         {
-            if (!type_flag) pack_basic_value(out, int8_pack_data);
-            pack_basic_value(out, var.to_int8());
+            if (!type_flag) pack_basic_varint_value(out, int8_pack_data);
+            pack_basic_varint_value(out, var.to_int8());
         }
         else if (t == type::get<int16_t>())
         {
-            if (!type_flag) pack_basic_value(out, int16_pack_data);
-            pack_basic_value(out, var.to_int16());
+            if (!type_flag) pack_basic_varint_value(out, int16_pack_data);
+            pack_basic_varint_value(out, var.to_int16());
         }
         else if (t == type::get<int32_t>())
         {
-            if (!type_flag) pack_basic_value(out, int32_pack_data);
-            pack_basic_value(out, var.to_int32());
+            if (!type_flag) pack_basic_varint_value(out, int32_pack_data);
+            pack_basic_varint_value(out, var.to_int32());
         }
         else if (t == type::get<int64_t>())
         {
-            if (!type_flag) pack_basic_value(out, int64_pack_data);
-            pack_basic_value(out, var.to_int64());
+            if (!type_flag) pack_basic_varint_value(out, int64_pack_data);
+            pack_basic_varint_value(out, var.to_int64());
         }
         else if (t == type::get<uint8_t>())
         {
-            if (!type_flag) pack_basic_value(out, uint8_pack_data);
-            pack_basic_value(out, var.to_uint8());
+            if (!type_flag) pack_basic_varint_value(out, uint8_pack_data);
+            pack_basic_varint_value(out, var.to_uint8());
         }
         else if (t == type::get<uint16_t>())
         {
-            if (!type_flag) pack_basic_value(out, uint16_pack_data);
-            pack_basic_value(out, var.to_uint16());
+            if (!type_flag) pack_basic_varint_value(out, uint16_pack_data);
+            pack_basic_varint_value(out, var.to_uint16());
         }
         else if (t == type::get<uint32_t>())
         {
-            if (!type_flag) pack_basic_value(out, uint32_pack_data);
-            pack_basic_value(out, var.to_uint32());
+            if (!type_flag) pack_basic_varint_value(out, uint32_pack_data);
+            pack_basic_varint_value(out, var.to_uint32());
         }
         else if (t == type::get<uint64_t>())
         {
-            if (!type_flag) pack_basic_value(out, uint64_pack_data);
-            pack_basic_value(out, var.to_uint64());
+            if (!type_flag) pack_basic_varint_value(out, uint64_pack_data);
+            pack_basic_varint_value(out, var.to_uint64());
         }
         else if (t == type::get<float>())
         {
-            if (!type_flag) pack_basic_value(out, float_pack_data);
-            pack_basic_value(out, var.to_float());
+            if (!type_flag) pack_basic_varint_value(out, float_pack_data);
+            pack_basic_fixed_value(out, var.to_float());
         }
         else if (t == type::get<double>())
         {
-            if (!type_flag) pack_basic_value(out, double_pack_data);
-            pack_basic_value(out, var.to_double());
+            if (!type_flag) pack_basic_varint_value(out, double_pack_data);
+            pack_basic_fixed_value(out, var.to_double());
         }
     }
     else if (t.is_enumeration())
     {
-        if (!type_flag) pack_basic_value(out, enum_pack_data);
+        if (!type_flag) pack_basic_varint_value(out, enum_pack_data);
         bool flag        = false;
         std::string data = var.to_string(&flag);
         if (!flag)
@@ -166,12 +168,12 @@ bool binary_pack_basic_value(const type& t, const variant& var, std::vector<std:
     }
     else if (t == type::get<std::string>())
     {
-        if (!type_flag) pack_basic_value(out, string_pack_data);
+        if (!type_flag) pack_basic_varint_value(out, string_pack_data);
         binary_pack_string(out, var.to_string());
     }
     else if (t == type::get<const char*>())
     {
-        if (!type_flag) pack_basic_value(out, string_pack_data);
+        if (!type_flag) pack_basic_varint_value(out, string_pack_data);
         auto str = var.get_value<const char*>();
         if (!str) throw std::invalid_argument("str can't be null");
         auto str_size = strlen(str);
@@ -185,13 +187,13 @@ bool binary_pack_basic_value(const type& t, const variant& var, std::vector<std:
     return true;
 }
 void binary_pack_array(const variant_sequential_view& view, std::vector<std::uint8_t>& out, bool& type_flag) {
-    if (!type_flag) pack_basic_value(out, array_pack_data);
+    if (!type_flag) pack_basic_varint_value(out, array_pack_data);
     type_flag          = true;
     std::size_t offset = out.size();
     out.resize(offset + 4 /*following data size*/);
     // write element nums
     std::uint32_t nums = view.get_size();
-    pack_basic_value(out, nums);
+    pack_basic_varint_value(out, nums);
     //
     bool flag = false;
 
@@ -213,13 +215,13 @@ void binary_pack_array(const variant_sequential_view& view, std::vector<std::uin
 static void binary_pack_associative_container(const variant_associative_view& view,
                                               std::vector<std::uint8_t>& out,
                                               bool& type_flag) {
-    if (!type_flag) pack_basic_value(out, view.is_key_only_type() ? set_pack_data : map_pack_data);
+    if (!type_flag) pack_basic_varint_value(out, view.is_key_only_type() ? set_pack_data : map_pack_data);
     type_flag          = true;
     std::size_t offset = out.size();
     out.resize(offset + 4 /*following data size*/);
     // write element nums
     std::uint32_t nums = view.get_size();
-    pack_basic_value(out, nums);
+    pack_basic_varint_value(out, nums);
     bool key_flag   = false;
     bool value_flag = false;
     if (view.is_key_only_type())
@@ -247,7 +249,7 @@ void binary_pack_object_recursively(const rttr::variant& var, std::vector<std::u
 
     auto prop_list = obj.get_derived_type().get_properties();
 
-    if (!type_flag) pack_basic_value(out, prop_list.empty() ? custom_object__pack_data : object_pack_data);
+    if (!type_flag) pack_basic_varint_value(out, prop_list.empty() ? custom_object_pack_data : object_pack_data);
     type_flag          = true;
     std::size_t offset = out.size();
     out.resize(offset + 4 /*following data size*/);
@@ -313,7 +315,7 @@ void do_binary_pack(const rttr::variant& var, std::vector<std::uint8_t>& out, bo
 
 bool binary_unpack_string(const std::uint8_t*& data, std::size_t& len, std::string& out_str) {
     std::uint32_t str_size = 0;
-    if (!unpack_basic_value(data, len, str_size))
+    if (!unpack_basic_varint_value(data, len, str_size))
     {
         return false;
     }
@@ -333,7 +335,24 @@ bool binary_unpack_peek_chunk_size(const std::uint8_t*& data,
                                    std::size_t& len,
                                    std::uint32_t& chunk_size,
                                    std::uint32_t& total_size) {
-    if (!unpack_basic_value(data, len, chunk_size))
+    if (!unpack_basic_fixed_value(data, len, chunk_size))
+    {
+        return false;
+    }
+    if (len < chunk_size)
+    {
+        FERR("chukn buffer is invalid");
+        return false;
+    }
+    total_size = len;
+    return true;
+}
+
+bool binary_unpack_peek_varint_chunk_size(const std::uint8_t*& data,
+                                          std::size_t& len,
+                                          std::uint32_t& chunk_size,
+                                          std::uint32_t& total_size) {
+    if (!unpack_basic_varint_value(data, len, chunk_size))
     {
         return false;
     }
@@ -354,7 +373,7 @@ bool do_binary_unpack(const std::uint8_t*& data,
                       bool ignore_invalid_properties) {
     if (type == unknown_pack_data)
     {
-        if (!unpack_basic_value(data, len, type)) return false;
+        if (!unpack_basic_varint_value(data, len, type)) return false;
     }
     switch (type)
     {
@@ -376,7 +395,7 @@ bool do_binary_unpack(const std::uint8_t*& data,
     case array_pack_data: return binary_unpack_array(data, len, var, ignore_invalid_properties);
     case set_pack_data: return binary_unpack_set(data, len, var, ignore_invalid_properties);
     case map_pack_data: return binary_unpack_map(data, len, var, ignore_invalid_properties);
-    case custom_object__pack_data:
+    case custom_object_pack_data:
     {
         std::uint32_t object_size = 0;
         std::uint32_t total_size  = 0;
@@ -466,77 +485,77 @@ bool binary_unpack_basic_value(const std::uint8_t*& data, std::size_t& len, rttr
     case bool_pack_data:
     {
         bool v = false;
-        if (!unpack_basic_value(data, len, v)) return false;
+        if (!unpack_basic_varint_value(data, len, v)) return false;
         var = v;
         break;
     }
     case char_pack_data:
     {
         char v = 0;
-        if (!unpack_basic_value(data, len, v)) return false;
+        if (!unpack_basic_varint_value(data, len, v)) return false;
         var = v;
         break;
     }
     case int8_pack_data:
     {
         std::int8_t v = 0;
-        if (!unpack_basic_value(data, len, v)) return false;
+        if (!unpack_basic_varint_value(data, len, v)) return false;
         var = v;
         break;
     }
     case int16_pack_data:
     {
         std::int16_t v = 0;
-        if (!unpack_basic_value(data, len, v)) return false;
+        if (!unpack_basic_varint_value(data, len, v)) return false;
         var = v;
         break;
     }
     case int32_pack_data:
     {
         std::int32_t v = 0;
-        if (!unpack_basic_value(data, len, v)) return false;
+        if (!unpack_basic_varint_value(data, len, v)) return false;
         var = v;
         break;
     }
     case int64_pack_data:
     {
         std::int64_t v = 0;
-        if (!unpack_basic_value(data, len, v)) return false;
+        if (!unpack_basic_varint_value(data, len, v)) return false;
         var = v;
         break;
     }
     case uint8_pack_data:
     {
         std::uint8_t v = 0;
-        if (!unpack_basic_value(data, len, v)) return false;
+        if (!unpack_basic_varint_value(data, len, v)) return false;
         var = v;
         break;
     }
     case uint16_pack_data:
     {
         std::uint16_t v = 0;
-        if (!unpack_basic_value(data, len, v)) return false;
+        if (!unpack_basic_varint_value(data, len, v)) return false;
         var = v;
         break;
     }
     case uint32_pack_data:
     {
         std::uint32_t v = 0;
-        if (!unpack_basic_value(data, len, v)) return false;
+        if (!unpack_basic_varint_value(data, len, v)) return false;
         var = v;
         break;
     }
     case float_pack_data:
     {
         float v = 0;
-        if (!unpack_basic_value(data, len, v)) return false;
+        if (!unpack_basic_fixed_value(data, len, v)) return false;
         var = v;
         break;
     }
     case double_pack_data:
     {
         double v = 0;
-        if (!unpack_basic_value(data, len, v)) return false;
+        if (!unpack_basic_fixed_value(data, len, v)) return false;
         var = v;
         break;
     }
@@ -550,7 +569,7 @@ bool binary_unpack_basic_value(const std::uint8_t*& data, std::size_t& len, rttr
     case uint64_pack_data:
     {
         std::uint64_t v = 0;
-        if (!unpack_basic_value(data, len, v)) return false;
+        if (!unpack_basic_varint_value(data, len, v)) return false;
         var = v;
         break;
     }
@@ -587,10 +606,10 @@ bool binary_unpack_array(const std::uint8_t*& data,
     std::uint32_t total_size  = 0;
     if (!binary_unpack_peek_chunk_size(data, len, object_size, total_size)) return false;
     std::uint32_t item_nums = 0;
-    if (!unpack_basic_value(data, len, item_nums)) return false;
+    if (!unpack_basic_varint_value(data, len, item_nums)) return false;
     view.set_size(item_nums);
     PackerDataType data_type;
-    if (!unpack_basic_value(data, len, data_type)) return false;
+    if (!unpack_basic_varint_value(data, len, data_type)) return false;
     for (size_t i = 0; i < item_nums; ++i)
     {
         auto v = view.get_value(i);
@@ -620,9 +639,9 @@ bool binary_unpack_set(const std::uint8_t*& data,
     std::uint32_t total_size  = 0;
     if (!binary_unpack_peek_chunk_size(data, len, object_size, total_size)) return false;
     std::uint32_t item_nums = 0;
-    if (!unpack_basic_value(data, len, item_nums)) return false;
+    if (!unpack_basic_varint_value(data, len, item_nums)) return false;
     PackerDataType data_type;
-    if (!unpack_basic_value(data, len, data_type)) return false;
+    if (!unpack_basic_varint_value(data, len, data_type)) return false;
     auto item_var = view.get_key_type().create();
     if (!item_var.is_valid())
     { // no default ctor
@@ -657,9 +676,9 @@ bool binary_unpack_map(const std::uint8_t*& data,
     std::uint32_t total_size  = 0;
     if (!binary_unpack_peek_chunk_size(data, len, object_size, total_size)) return false;
     std::uint32_t item_nums = 0;
-    if (!unpack_basic_value(data, len, item_nums)) return false;
+    if (!unpack_basic_varint_value(data, len, item_nums)) return false;
     PackerDataType key_data_type;
-    if (!unpack_basic_value(data, len, key_data_type)) return false;
+    if (!unpack_basic_varint_value(data, len, key_data_type)) return false;
     PackerDataType value_data_type = PackerDataType::unknown_pack_data;
     auto item_key_var              = view.get_key_type().create();
     if (!item_key_var.is_valid())
@@ -691,7 +710,7 @@ bool binary_unpack_map(const std::uint8_t*& data,
 
         if (value_data_type == PackerDataType::unknown_pack_data)
         {
-            if (!unpack_basic_value(data, len, value_data_type)) return false;
+            if (!unpack_basic_varint_value(data, len, value_data_type)) return false;
         }
         if (!do_binary_unpack(data, len, item_value_var, item_value_var, value_data_type, ignore_invalid_properties))
             return false;
@@ -701,7 +720,7 @@ bool binary_unpack_map(const std::uint8_t*& data,
 }
 bool binary_unpack_skip_item(const std::uint8_t*& data, std::size_t& len) {
     PackerDataType type = unknown_pack_data;
-    if (!unpack_basic_value(data, len, type)) return false;
+    if (!unpack_basic_varint_value(data, len, type)) return false;
     switch (type)
     {
     case bool_pack_data:
@@ -709,16 +728,27 @@ bool binary_unpack_skip_item(const std::uint8_t*& data, std::size_t& len) {
     case int8_pack_data:
     case uint8_pack_data: return binary_unpack_skip_buf(data, len, 1);
     case int16_pack_data:
-    case uint16_pack_data: return binary_unpack_skip_buf(data, len, 2);
+    case uint16_pack_data:
     case int32_pack_data:
-    case float_pack_data:
-    case uint32_pack_data: return binary_unpack_skip_buf(data, len, 4);
+    case uint32_pack_data:
     case int64_pack_data:
     case uint64_pack_data:
+    {
+        if (len < 1) return false;
+        std::size_t size = Fundamental::VarintDecodePeekSize(data);
+        return binary_unpack_skip_buf(data, len, size);
+    }
+    case float_pack_data: return binary_unpack_skip_buf(data, len, 4);
     case double_pack_data: return binary_unpack_skip_buf(data, len, 8);
-    case string_pack_data: // perform as an object with std::uint32_t size and data
-    case enum_pack_data:   // perform as string
-    case custom_object__pack_data:
+    case string_pack_data:        // perform as an object with std::uint32_t size and data
+    case enum_pack_data:          // perform as string
+    case custom_object_pack_data: // perform as a string
+    {
+        std::uint32_t object_size = 0;
+        std::uint32_t total_size  = 0;
+        if (!binary_unpack_peek_varint_chunk_size(data, len, object_size, total_size)) return false;
+        return binary_unpack_skip_buf(data, len, object_size);
+    }
     case array_pack_data:
     case set_pack_data:
     case map_pack_data:

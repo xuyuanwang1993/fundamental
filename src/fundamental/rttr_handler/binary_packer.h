@@ -4,11 +4,12 @@
 #include <cstring>
 
 #include "fundamental/basic/buffer.hpp"
-#include "fundamental/basic/log.h"
 #include "fundamental/basic/integer_codec.hpp"
+#include "fundamental/basic/log.h"
 
 #include <rttr/type>
-namespace Fundamental::io {
+namespace Fundamental::io
+{
 // throw when pack failed
 template <typename T>
 inline void binary_pack(std::vector<std::uint8_t>& out, const T& in);
@@ -24,16 +25,26 @@ template <typename... Args>
 [[nodiscard]] inline std::vector<std::uint8_t> binary_batch_pack(const Args&... args);
 // return false when unpack failed
 template <typename T>
-inline bool binary_unpack(const void* data, std::size_t len, T& out, bool ignore_invalid_properties = true,
-                          std::size_t index = 0);
+inline bool binary_unpack(const void* data,
+                          std::size_t len,
+                          T& out,
+                          bool ignore_invalid_properties = true,
+                          std::size_t index              = 0);
 template <typename Tuple, typename = decltype(std::tuple_size<Tuple>::value)>
-inline bool binary_unpack_tuple(const void* data, std::size_t len, Tuple& t, bool ignore_invalid_properties = true,
-                                std::size_t index = 0);
+inline bool binary_unpack_tuple(const void* data,
+                                std::size_t len,
+                                Tuple& t,
+                                bool ignore_invalid_properties = true,
+                                std::size_t index              = 0);
 template <typename... Args>
-inline bool binary_bacth_unpack(const void* data, std::size_t len, bool ignore_invalid_properties, std::size_t index,
+inline bool binary_bacth_unpack(const void* data,
+                                std::size_t len,
+                                bool ignore_invalid_properties,
+                                std::size_t index,
                                 Args&&... args);
 
-enum PackerDataType : std::uint8_t {
+enum PackerDataType : std::uint8_t
+{
     unknown_pack_data,
     bool_pack_data,
     char_pack_data,
@@ -53,29 +64,39 @@ enum PackerDataType : std::uint8_t {
     set_pack_data,
     map_pack_data,
     object_pack_data,
-    custom_object__pack_data,
+    custom_object_pack_data,
 };
 
-namespace internal {
+namespace internal
+{
 void do_binary_pack(const rttr::variant& var, std::vector<std::uint8_t>& out, bool& type_flag);
-bool do_binary_unpack(const std::uint8_t*& data, std::size_t& len, rttr::variant& var, rttr::instance dst_obj,
-                      PackerDataType type, bool ignore_invalid_properties);
+bool do_binary_unpack(const std::uint8_t*& data,
+                      std::size_t& len,
+                      rttr::variant& var,
+                      rttr::instance dst_obj,
+                      PackerDataType type,
+                      bool ignore_invalid_properties);
 bool binary_unpack_skip_item(const std::uint8_t*& data, std::size_t& len);
 
 template <typename T>
-inline bool unpack_basic_value(const std::uint8_t*& data, std::size_t& len, T& value) {
+inline bool unpack_basic_fixed_value(const std::uint8_t*& data, std::size_t& len, T& value) {
     constexpr std::size_t value_size = sizeof(value);
-    if (len < value_size) {
+    if (len < value_size)
+    {
         FERR("read basic value failed");
         return false;
     }
 
-    if constexpr (value_size > 1 && Fundamental::NeedConvertEndian<Fundamental::Endian::LittleEndian>()) {
+    if constexpr (value_size > 1 && Fundamental::NeedConvertEndian<Fundamental::Endian::LittleEndian>())
+    {
         std::uint8_t* p_dst = (std::uint8_t*)(&value);
-        for (std::size_t i = 0; i < value_size; ++i) {
+        for (std::size_t i = 0; i < value_size; ++i)
+        {
             p_dst[value_size - 1 - i] = data[i];
         }
-    } else {
+    }
+    else
+    {
         std::memcpy(&value, data, value_size);
     }
     data = data + value_size;
@@ -84,8 +105,8 @@ inline bool unpack_basic_value(const std::uint8_t*& data, std::size_t& len, T& v
 }
 
 template <typename T>
-inline bool varint_unpack_basic_value(const std::uint8_t*& data, std::size_t& len, T& value) {
-    if (!Fundamental::VarintDecodeCheckSize(data, len))
+inline bool unpack_basic_varint_value(const std::uint8_t*& data, std::size_t& len, T& value) {
+    if (!Fundamental::VarintDecodeCheckSize<T>(data, len))
     {
         FERR("read basic value failed");
         return false;
@@ -98,17 +119,21 @@ inline bool varint_unpack_basic_value(const std::uint8_t*& data, std::size_t& le
 }
 
 template <typename T>
-inline bool binary_unpack_helper(const std::uint8_t*& data, std::size_t& len, T& out,
-                                 bool ignore_invalid_properties = true, std::size_t index = 0) {
+inline bool binary_unpack_helper(const std::uint8_t*& data,
+                                 std::size_t& len,
+                                 T& out,
+                                 bool ignore_invalid_properties = true,
+                                 std::size_t index              = 0) {
     auto type = rttr::type::get<T>();
     if (!type.is_valid()) return false;
-    while (index != 0) {
+    while (index != 0)
+    {
         if (!internal::binary_unpack_skip_item(data, len)) return false;
         --index;
     }
     rttr::variant var(out);
     PackerDataType data_type = unknown_pack_data;
-    if (!internal::unpack_basic_value(data, len, data_type)) return false;
+    if (!internal::unpack_basic_varint_value(data, len, data_type)) return false;
     if (!internal::do_binary_unpack(data, len, var, out, data_type, ignore_invalid_properties)) return false;
     if (data_type != object_pack_data) out = var.get_value<T>();
     return true;
@@ -116,16 +141,20 @@ inline bool binary_unpack_helper(const std::uint8_t*& data, std::size_t& len, T&
 
 template <std::size_t Index = 0, typename Tuple, typename = decltype(std::tuple_size<Tuple>::value)>
 inline void binary_pack_tuple_helper(std::vector<std::uint8_t>& out, const Tuple& in) {
-    if constexpr (Index < std::tuple_size<Tuple>::value) {
+    if constexpr (Index < std::tuple_size<Tuple>::value)
+    {
         binary_pack(out, std::get<Index>(in));
         binary_pack_tuple_helper<Index + 1>(out, in);
     }
 }
 
 template <std::size_t Index = 0, typename Tuple, typename = decltype(std::tuple_size<Tuple>::value)>
-inline bool binary_unpack_tuple_helper(const std::uint8_t*& data, std::size_t& len, Tuple& t,
+inline bool binary_unpack_tuple_helper(const std::uint8_t*& data,
+                                       std::size_t& len,
+                                       Tuple& t,
                                        bool ignore_invalid_properties) {
-    if constexpr (Index < std::tuple_size<Tuple>::value) {
+    if constexpr (Index < std::tuple_size<Tuple>::value)
+    {
         auto& item = std::get<Index>(t);
         if (!binary_unpack_helper(data, len, item, ignore_invalid_properties)) return false;
         return binary_unpack_tuple_helper<Index + 1>(data, len, t, ignore_invalid_properties);
@@ -174,17 +203,24 @@ template <typename... Args>
 
 // return false when unpack failed
 template <typename T>
-inline bool binary_unpack(const void* data, std::size_t len, T& out, bool ignore_invalid_properties,
+inline bool binary_unpack(const void* data,
+                          std::size_t len,
+                          T& out,
+                          bool ignore_invalid_properties,
                           std::size_t index) {
     auto* p_data = static_cast<const std::uint8_t*>(data);
     return internal::binary_unpack_helper(p_data, len, out, ignore_invalid_properties, index);
 }
 
 template <typename Tuple, typename = decltype(std::tuple_size<Tuple>::value)>
-inline bool binary_unpack_tuple(const void* data, std::size_t len, Tuple& t, bool ignore_invalid_properties,
+inline bool binary_unpack_tuple(const void* data,
+                                std::size_t len,
+                                Tuple& t,
+                                bool ignore_invalid_properties,
                                 std::size_t index) {
     auto* p_data = static_cast<const std::uint8_t*>(data);
-    while (index != 0) {
+    while (index != 0)
+    {
         if (!internal::binary_unpack_skip_item(p_data, len)) return false;
         --index;
     }
@@ -192,7 +228,10 @@ inline bool binary_unpack_tuple(const void* data, std::size_t len, Tuple& t, boo
 }
 
 template <typename... Args>
-inline bool binary_bacth_unpack(const void* data, std::size_t len, bool ignore_invalid_properties, std::size_t index,
+inline bool binary_bacth_unpack(const void* data,
+                                std::size_t len,
+                                bool ignore_invalid_properties,
+                                std::size_t index,
                                 Args&&... args) {
     auto tuple = std::tie(args...);
     return binary_unpack_tuple(data, len, tuple, ignore_invalid_properties, index);
