@@ -23,15 +23,15 @@ BraceWrapping:
   AfterClass: false                  # class 定义后不换行
   AfterStruct: false                 # struct 定义后不换行
   AfterUnion: false                  # union 定义后不换行
-  AfterCaseLabel: true               # case 标签后换行
+  AfterCaseLabel: false               # case 标签后不换行
   AfterFunction: false               # 函数定义后不换行
   AfterNamespace: true               # namespace 定义后换行
-  AfterControlStatement: true        # 控制语句后换行
+  AfterControlStatement: false        # 控制语句后不换行
   SplitEmptyFunction: true           # 拆分空函数
   SplitEmptyRecord: true             # 拆分空记录
   SplitEmptyNamespace: true          # 拆分空命名空间
-  BeforeCatch: true                  # catch 前换行
-  BeforeElse: true                   # else 前换行
+  BeforeCatch: false                  # catch 前不换行
+  BeforeElse: false                   # else 前不换行
   IndentBraces: false                # 不对大括号进行额外缩进
 
 BreakConstructorInitializers: AfterColon

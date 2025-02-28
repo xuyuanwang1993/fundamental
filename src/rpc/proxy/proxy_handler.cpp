@@ -221,7 +221,7 @@ void proxy_handler::EndponitCacheStatus::UpdateReadBuffer(std::size_t readBytes)
 void proxy_handler::EndponitCacheStatus::UpdateWriteBuffer(std::size_t writeBytes) {
     auto& front = cache_.front();
 #ifndef RPC_VERBOSE
-    FDEBUG("proxy write {}", Fundamental::Utils::BufferToHex(front.data.data() + front.readOffset, writeBytes));
+    FDEBUG("proxy write {}", Fundamental::Utils::BufferToHex(front.data.data() + front.writeOffset, writeBytes));
 #endif
     front.writeOffset += writeBytes;
 }

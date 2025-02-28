@@ -21,8 +21,10 @@
 
 using asio::ip::tcp;
 
-namespace network {
-namespace rpc_service {
+namespace network
+{
+namespace rpc_service
+{
 struct rpc_server_ssl_config {
     std::function<std::string(std::string)> passwd_cb;
     std::string certificate_path;
@@ -234,10 +236,11 @@ private:
 #endif
     }
     void process_rpc_request() {
-        rpc_header* header      = (rpc_header*)(head_);
-        req_id_                 = header->req_id;
-        const uint32_t body_len = header->body_len;
-        req_type_               = header->req_type;
+        rpc_header header;
+        header.DeSerialize(head_, kRpcHeadLen);
+        req_id_                 = header.req_id;
+        const uint32_t body_len = header.body_len;
+        req_type_               = header.req_type;
         switch (req_type_) {
         case request_type::rpc_req:
         case request_type::rpc_subscribe:
@@ -251,15 +254,15 @@ private:
                 if (body_.size() < body_len) {
                     body_.resize(body_len);
                 }
-                read_body(header->func_id, body_len);
+                read_body(header.func_id, body_len);
             } else if (req_type_ == request_type::rpc_req) {
-                handle_none_param_request(header->func_id);
+                handle_none_param_request(header.func_id);
             } else {
                 response_interal(req_id_, msgpack_codec::pack_args_str(result_code::FAIL, "bad request"));
             }
         } break;
         case request_type::rpc_stream: {
-            process_rpc_stream(header->func_id);
+            process_rpc_stream(header.func_id);
         } break;
         case request_type::rpc_heartbeat: {
             cancel_timer();
@@ -466,9 +469,9 @@ private:
     void write() {
         auto& msg   = write_queue_.front();
         write_size_ = (uint32_t)msg.content.size();
-        header_     = { RPC_MAGIC_NUM, msg.req_type, write_size_, msg.req_id };
+        rpc_header { RPC_MAGIC_NUM, msg.req_type, write_size_, msg.req_id }.Serialize(write_head_buffer, kRpcHeadLen);
         std::array<asio::const_buffer, 2> write_buffers;
-        write_buffers[0] = asio::buffer(&header_, sizeof(rpc_header));
+        write_buffers[0] = asio::buffer(write_head_buffer, kRpcHeadLen);
         write_buffers[1] = asio::buffer(msg.content.data(), write_size_);
 
         auto self = this->shared_from_this();
@@ -573,7 +576,7 @@ private:
     std::uint64_t req_id_;
     request_type req_type_;
 
-    rpc_header header_;
+    std::uint8_t write_head_buffer[kRpcHeadLen];
 
     uint32_t write_size_ = 0;
 

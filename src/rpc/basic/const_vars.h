@@ -4,16 +4,22 @@
 #include <memory>
 #include <system_error>
 
+#include "fundamental/basic/buffer.hpp"
+#include "fundamental/basic/log.h"
 #include "fundamental/basic/utils.hpp"
 
-namespace network {
-namespace rpc_service {
-enum class result_code : std::int16_t {
+namespace network
+{
+namespace rpc_service
+{
+enum class result_code : std::int16_t
+{
     OK   = 0,
     FAIL = 1,
 };
 
-enum class request_type : uint8_t {
+enum class request_type : uint8_t
+{
     rpc_req,
     rpc_subscribe,
     rpc_unsubscribe,
@@ -23,7 +29,8 @@ enum class request_type : uint8_t {
     rpc_stream
 };
 
-enum class rpc_stream_data_status : std::uint8_t {
+enum class rpc_stream_data_status : std::uint8_t
+{
     rpc_stream_none,       // init status
     rpc_stream_data,       // size+data
     rpc_stream_write_done, // size=0
@@ -38,31 +45,55 @@ struct message_type {
     std::string content;
 };
 
-struct rpc_stream_packet
-{
+struct rpc_stream_packet {
     std::uint32_t size;
     std::uint8_t type;
     std::vector<std::uint8_t> data;
 };
 
 static const uint8_t RPC_MAGIC_NUM = 39;
-#pragma pack(1)
 struct rpc_header {
     uint8_t magic;
     request_type req_type;
     uint32_t body_len;
     uint64_t req_id;
     uint32_t func_id;
+    void Serialize(void* dst, std::size_t len) {
+        FASSERT(len >= HeadLen());
+        Fundamental::BufferWriter writer;
+        writer.SetBuffer((std::uint8_t*)dst, len);
+        writer.WriteValue(&magic);
+        writer.WriteEnum(req_type);
+        writer.WriteValue(&body_len);
+        writer.WriteValue(&req_id);
+        writer.WriteValue(&func_id);
+    }
+
+    void DeSerialize(const void* src, std::size_t len) {
+        FASSERT(len >= HeadLen());
+        Fundamental::BufferReader reader;
+        reader.SetBuffer((const std::uint8_t*)src, len);
+        reader.ReadValue(&magic);
+        reader.ReadValue(&req_type);
+        reader.ReadValue(&body_len);
+        reader.ReadValue(&req_id);
+        reader.ReadValue(&func_id);
+    }
+    static constexpr std::size_t HeadLen() {
+        return sizeof(std::uint8_t) + sizeof(request_type) + sizeof(std::uint32_t) + sizeof(std::uint64_t) +
+               sizeof(std::uint32_t);
+    }
 };
-#pragma pack()
 
 static constexpr std::size_t MAX_BUF_LEN     = 1024LLU * 1024 * 1024 * 4;
-static constexpr std::size_t kRpcHeadLen        = sizeof(rpc_header);
+static constexpr std::size_t kRpcHeadLen     = rpc_header::HeadLen();
 static constexpr std::size_t INIT_BUF_SIZE   = 2 * 1024;
 static constexpr std::size_t kSslPreReadSize = 3;
 
-namespace error {
-enum class rpc_errors : std::int32_t {
+namespace error
+{
+enum class rpc_errors : std::int32_t
+{
     rpc_success        = 0,
     rpc_failed         = 1,
     rpc_timeout        = 2,

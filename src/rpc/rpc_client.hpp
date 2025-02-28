@@ -19,8 +19,10 @@
 
 #include "fundamental/basic/log.h"
 
-namespace network {
-namespace rpc_service {
+namespace network
+{
+namespace rpc_service
+{
 class req_result {
 public:
     req_result() = default;
@@ -65,14 +67,16 @@ struct future_result {
     }
 };
 
-enum class CallModel {
+enum class CallModel
+{
     future,
     callback
 };
 const constexpr auto FUTURE = CallModel::future;
 
 const constexpr size_t DEFAULT_TIMEOUT = 5000; // milliseconds
-enum rpc_client_ssl_level {
+enum rpc_client_ssl_level
+{
     rpc_client_ssl_level_none,
     rpc_client_ssl_level_optional,
     rpc_client_ssl_level_required
@@ -282,7 +286,8 @@ public:
     }
 
     template <size_t TIMEOUT = DEFAULT_TIMEOUT, typename... Args>
-    void async_call(const std::string& rpc_name, std::function<void(asio::error_code, string_view)> cb,
+    void async_call(const std::string& rpc_name,
+                    std::function<void(asio::error_code, string_view)> cb,
                     Args&&... args) {
         if (has_upgrade) throw std::runtime_error("client has already upgrade");
         if (!has_connected_) {
@@ -524,8 +529,9 @@ private:
         auto& msg   = outbox_[0];
         write_size_ = (uint32_t)msg.content.size();
         std::array<asio::const_buffer, 2> write_buffers;
-        header_          = { RPC_MAGIC_NUM, msg.req_type, write_size_, msg.req_id, msg.func_id };
-        write_buffers[0] = asio::buffer(&header_, sizeof(rpc_header));
+        rpc_header { RPC_MAGIC_NUM, msg.req_type, write_size_, msg.req_id, msg.func_id }.Serialize(write_head_,
+                                                                                                   kRpcHeadLen);
+        write_buffers[0] = asio::buffer(write_head_, kRpcHeadLen);
         write_buffers[1] = asio::buffer((char*)msg.content.data(), write_size_);
 
         async_write_buffers(std::move(write_buffers), [this](const asio::error_code& ec, const size_t length) {
@@ -543,7 +549,7 @@ private:
             }
 #ifndef RPC_VERBOSE
             auto& msg = outbox_[0];
-            FDEBUG("client write header:{} body:{}", Fundamental::Utils::BufferToHex(&header_, sizeof(rpc_header)),
+            FDEBUG("client write header:{} body:{}", Fundamental::Utils::BufferToHex(write_head_, kRpcHeadLen),
                    Fundamental::Utils::BufferToHex(msg.content.data(), msg.content.size()));
 #endif
             outbox_.pop_front();
@@ -567,13 +573,14 @@ private:
 #ifndef RPC_VERBOSE
                                   FDEBUG("client read head: {}", Fundamental::Utils::BufferToHex(head_, kRpcHeadLen));
 #endif
-                                  rpc_header* header      = (rpc_header*)(head_);
-                                  const uint32_t body_len = header->body_len;
+                                  rpc_header header;
+                                  header.DeSerialize(head_, kRpcHeadLen);
+                                  const uint32_t body_len = header.body_len;
                                   if (body_len > 0 && body_len < MAX_BUF_LEN) {
                                       if (body_.size() < body_len) {
                                           body_.resize(body_len);
                                       }
-                                      read_body(header->req_id, header->req_type, body_len);
+                                      read_body(header.req_id, header.req_type, body_len);
                                       return;
                                   }
 
@@ -617,7 +624,6 @@ private:
                     error_callback(asio::error::make_error_code(asio::error::invalid_argument));
                     return;
                 }
-
             } else {
                 FWARN("read failed {}", ec.message());
                 has_connected_ = false;
@@ -650,33 +656,35 @@ private:
             std::shared_ptr<call_t> cl = nullptr;
             {
                 std::unique_lock<std::mutex> lock(cb_mtx_);
-                cl = std::move(callback_map_[req_id]);
+                auto iter = callback_map_.find(req_id);
+                FASSERT(iter != callback_map_.end(), "internal server error invalid req_id {}", req_id);
+                cl = iter->second;
+                FASSERT(cl != nullptr, "internal error");
+                callback_map_.erase(iter);
             }
 
-            assert(cl);
             if (!cl->has_timeout()) {
                 cl->cancel();
                 cl->callback(ec, data);
             } else {
                 cl->callback(asio::error::make_error_code(asio::error::timed_out), {});
             }
-
-            std::unique_lock<std::mutex> lock(cb_mtx_);
-            callback_map_.erase(req_id);
         } else {
-            std::unique_lock<std::mutex> lock(cb_mtx_);
-            auto& f = future_map_[req_id];
-            if (ec) {
-                if (f) {
-                    f->set_value(req_result { "" });
-                    future_map_.erase(req_id);
-                    return;
-                }
+            std::shared_ptr<std::promise<req_result>> req_p = nullptr;
+            {
+                std::unique_lock<std::mutex> lock(cb_mtx_);
+                auto iter = future_map_.find(req_id);
+                FASSERT(iter != future_map_.end(), "internal server error invalid req_id {}", req_id);
+                req_p = iter->second;
+                FASSERT(req_p != nullptr, "internal error");
+                future_map_.erase(iter);
             }
 
-            assert(f);
-            f->set_value(req_result { data });
-            future_map_.erase(req_id);
+            if (ec) {
+                req_p->set_value(req_result { "" });
+                return;
+            }
+            req_p->set_value(req_result { data });
         }
     }
 
@@ -909,7 +917,7 @@ private:
     char head_[kRpcHeadLen] = {};
     std::vector<char> body_;
 
-    rpc_header header_;
+    std::uint8_t write_head_[kRpcHeadLen] = {};
 
     std::mutex sub_mtx_;
     std::unordered_map<std::string, std::function<void(string_view)>> sub_map_;
@@ -1129,7 +1137,6 @@ inline void ClientStreamReadWriter::handle_write() {
             write_cache_.clear();
             set_status(rpc_stream_data_status::rpc_stream_finish,
                        error::make_error_code(error::rpc_errors::rpc_success));
-
         } else {
             write_cache_.pop_front();
             handle_write();
