@@ -53,6 +53,58 @@ TYPED_TEST(IntegerCodecTest, TestAllNumberType) {
             EXPECT_EQ(len, len2);
             EXPECT_EQ(decode_v, encode_v);
         }
+        enum Test_Enum : ValueType
+        {
+            Test_Enum_V0 = this->kMin,
+            Test_Enum_V1 = 1,
+            Test_Enum_V2 = -1,
+            Test_Enum_V3 = this->kMax,
+        };
+        {
+            auto enum_v               = Test_Enum::Test_Enum_V0;
+            auto len                  = VarintEncode(enum_v, src);
+            decltype(enum_v) decode_v = static_cast<Test_Enum>(0);
+
+            auto len2 = VarintDecode(decode_v, src);
+            EXPECT_EQ(len, len2);
+            EXPECT_EQ(decode_v, enum_v);
+        }
+        {
+            auto enum_v               = Test_Enum::Test_Enum_V0;
+            auto len                  = VarintEncode(enum_v, src);
+            decltype(enum_v) decode_v = static_cast<Test_Enum>(0);
+
+            auto len2 = VarintDecode(decode_v, src);
+            EXPECT_EQ(len, len2);
+            EXPECT_EQ(decode_v, enum_v);
+        }
+        {
+            auto enum_v               = Test_Enum::Test_Enum_V1;
+            auto len                  = VarintEncode(enum_v, src);
+            decltype(enum_v) decode_v = static_cast<Test_Enum>(0);
+
+            auto len2 = VarintDecode(decode_v, src);
+            EXPECT_EQ(len, len2);
+            EXPECT_EQ(decode_v, enum_v);
+        }
+        {
+            auto enum_v               = Test_Enum::Test_Enum_V2;
+            auto len                  = VarintEncode(enum_v, src);
+            decltype(enum_v) decode_v = static_cast<Test_Enum>(0);
+
+            auto len2 = VarintDecode(decode_v, src);
+            EXPECT_EQ(len, len2);
+            EXPECT_EQ(decode_v, enum_v);
+        }
+        {
+            auto enum_v               = Test_Enum::Test_Enum_V3;
+            auto len                  = VarintEncode(enum_v, src);
+            decltype(enum_v) decode_v = static_cast<Test_Enum>(0);
+
+            auto len2 = VarintDecode(decode_v, src);
+            EXPECT_EQ(len, len2);
+            EXPECT_EQ(decode_v, enum_v);
+        }
     }
     else
     {
@@ -66,6 +118,58 @@ TYPED_TEST(IntegerCodecTest, TestAllNumberType) {
             auto len2          = VarintDecode(decode_v, src);
             EXPECT_EQ(len, len2);
             EXPECT_EQ(decode_v, encode_v);
+        }
+        enum Test_Enum : ValueType
+        {
+            Test_Enum_V0 = this->kMin,
+            Test_Enum_V1 = 1,
+            Test_Enum_V2 = (this->kMin / 2 + this->kMax / 2),
+            Test_Enum_V3 = this->kMax,
+        };
+        {
+            auto enum_v               = Test_Enum::Test_Enum_V0;
+            auto len                  = VarintEncode(enum_v, src);
+            decltype(enum_v) decode_v = static_cast<Test_Enum>(0);
+
+            auto len2 = VarintDecode(decode_v, src);
+            EXPECT_EQ(len, len2);
+            EXPECT_EQ(decode_v, enum_v);
+        }
+        {
+            auto enum_v               = Test_Enum::Test_Enum_V0;
+            auto len                  = VarintEncode(enum_v, src);
+            decltype(enum_v) decode_v = static_cast<Test_Enum>(0);
+
+            auto len2 = VarintDecode(decode_v, src);
+            EXPECT_EQ(len, len2);
+            EXPECT_EQ(decode_v, enum_v);
+        }
+        {
+            auto enum_v               = Test_Enum::Test_Enum_V1;
+            auto len                  = VarintEncode(enum_v, src);
+            decltype(enum_v) decode_v = static_cast<Test_Enum>(0);
+
+            auto len2 = VarintDecode(decode_v, src);
+            EXPECT_EQ(len, len2);
+            EXPECT_EQ(decode_v, enum_v);
+        }
+        {
+            auto enum_v               = Test_Enum::Test_Enum_V2;
+            auto len                  = VarintEncode(enum_v, src);
+            decltype(enum_v) decode_v = static_cast<Test_Enum>(0);
+
+            auto len2 = VarintDecode(decode_v, src);
+            EXPECT_EQ(len, len2);
+            EXPECT_EQ(decode_v, enum_v);
+        }
+        {
+            auto enum_v               = Test_Enum::Test_Enum_V3;
+            auto len                  = VarintEncode(enum_v, src);
+            decltype(enum_v) decode_v = static_cast<Test_Enum>(0);
+
+            auto len2 = VarintDecode(decode_v, src);
+            EXPECT_EQ(len, len2);
+            EXPECT_EQ(decode_v, enum_v);
         }
     }
 }

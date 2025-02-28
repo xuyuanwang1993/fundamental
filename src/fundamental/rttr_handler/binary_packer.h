@@ -5,6 +5,8 @@
 
 #include "fundamental/basic/buffer.hpp"
 #include "fundamental/basic/log.h"
+#include "fundamental/basic/integer_codec.hpp"
+
 #include <rttr/type>
 namespace Fundamental::io {
 // throw when pack failed
@@ -78,6 +80,20 @@ inline bool unpack_basic_value(const std::uint8_t*& data, std::size_t& len, T& v
     }
     data = data + value_size;
     len -= value_size;
+    return true;
+}
+
+template <typename T>
+inline bool varint_unpack_basic_value(const std::uint8_t*& data, std::size_t& len, T& value) {
+    if (!Fundamental::VarintDecodeCheckSize(data, len))
+    {
+        FERR("read basic value failed");
+        return false;
+    }
+
+    auto peek_size = Fundamental::VarintDecode(value, data);
+    data           = data + peek_size;
+    len -= peek_size;
     return true;
 }
 
