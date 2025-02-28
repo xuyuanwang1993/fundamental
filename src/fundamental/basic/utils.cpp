@@ -26,8 +26,10 @@
 #include <pthread.h>
 #include <sstream>
 
-namespace Fundamental {
-namespace Utils {
+namespace Fundamental
+{
+namespace Utils
+{
 fpid_t GetProcessId() {
     fpid_t ret = 0;
 #if TARGET_PLATFORM_LINUX
@@ -46,12 +48,17 @@ void SetThreadName(const std::string& name) {
 #endif
 }
 
-std::string BufferToHex(const void* buffer, std::size_t size) {
+std::string BufferToHex(const void* buffer, std::size_t size, std::size_t group_size, std::int8_t spilt_char) {
     std::ostringstream oss;
     oss << std::hex << std::setfill('0');
     const std::uint8_t* ptr = static_cast<const std::uint8_t*>(buffer);
     for (size_t i = 0; i < size; ++i) {
         oss << std::setw(2) << static_cast<int>(ptr[i]);
+        if (group_size > 0 && i > 0 && (i % group_size == 0))
+            oss << '\n';
+        else if (spilt_char > 0) {
+            if (i > 0) oss << static_cast<char>(spilt_char);
+        }
     }
     return oss.str();
 }
