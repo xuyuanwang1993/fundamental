@@ -53,6 +53,17 @@ protected:
     }
 };
 
+
+template <std::size_t N>
+struct PowerOfTwo {
+    static constexpr std::size_t value = 2 * PowerOfTwo<N - 1>::value;
+};
+
+template <>
+struct PowerOfTwo<0> {
+    static constexpr std::size_t value = 1;
+};
+
 namespace Utils {
 using fpid_t = std::uint32_t;
 fpid_t GetProcessId();

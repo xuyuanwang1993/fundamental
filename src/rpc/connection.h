@@ -303,6 +303,10 @@ private:
                         close();
                         return;
                     }
+#ifndef RPC_VERBOSE
+                    FDEBUG("server proxy request read {}",
+                           Fundamental::Utils::BufferToHex(proxy_buffer->data(), proxy_buffer->size()));
+#endif
                     do {
                         ProxyRequest request;
                         if (!request.FromBuf(proxy_buffer->data(), proxy_buffer->size())) {
@@ -345,6 +349,9 @@ private:
                 close();
                 return;
             }
+#ifndef RPC_VERBOSE
+            FDEBUG("server read head {}", Fundamental::Utils::BufferToHex(head_, kRpcHeadLen));
+#endif
             switch (head_[0]) {
             case RPC_MAGIC_NUM: process_rpc_request(); break;
             case network::proxy::ProxyRequest::kMagicNum: process_proxy_request(); break;
@@ -358,7 +365,8 @@ private:
 
     void read_body(uint32_t func_id, std::size_t size) {
         auto self(this->shared_from_this());
-        async_read(size, [this, func_id, self](asio::error_code ec, std::size_t length) {
+        async_buffer_read({ asio::mutable_buffer(body_.data(), size) }, [this, func_id, self](asio::error_code ec,
+                                                                                              std::size_t length) {
             cancel_timer();
 
             if (!socket_.is_open()) {
@@ -370,6 +378,9 @@ private:
                 on_net_err_(self, ec.message());
                 return;
             }
+#ifndef RPC_VERBOSE
+            FDEBUG("server read body {}", Fundamental::Utils::BufferToHex(body_.data(), length));
+#endif
             read_head();
             try {
                 switch (req_type_) {
@@ -461,7 +472,7 @@ private:
         write_buffers[1] = asio::buffer(msg.content.data(), write_size_);
 
         auto self = this->shared_from_this();
-        async_write(write_buffers, [this, self](asio::error_code ec, std::size_t length) {
+        async_write_buffers(write_buffers, [this, self](asio::error_code ec, std::size_t length) {
             if (ec) {
                 FDEBUG("rpc write failed {}", ec.message());
                 on_net_err_(shared_from_this(), ec.message());
@@ -492,19 +503,8 @@ private:
         }
     }
 
-    template <typename Handler>
-    void async_read(size_t size_to_read, Handler handler) {
-        if (is_ssl()) {
-#ifndef RPC_DISABLE_SSL
-            asio::async_read(*ssl_stream_, asio::buffer(body_.data(), size_to_read), std::move(handler));
-#endif
-        } else {
-            asio::async_read(socket_, asio::buffer(body_.data(), size_to_read), std::move(handler));
-        }
-    }
-
     template <typename BufferType, typename Handler>
-    void async_write(const BufferType& buffers, Handler handler) {
+    void async_write_buffers(const BufferType& buffers, Handler handler) {
         if (is_ssl()) {
 #ifndef RPC_DISABLE_SSL
             asio::async_write(*ssl_stream_, buffers, std::move(handler));
@@ -685,22 +685,27 @@ inline std::error_code ServerStreamReadWriter::GetLastError() const {
 }
 inline void ServerStreamReadWriter::read_head() {
 
-    conn_->async_buffer_read({ asio::buffer(&read_packet_buffer.size, sizeof(read_packet_buffer.size)) },
-                             [this](asio::error_code ec, std::size_t length) {
-                                 if (last_data_status_ >= rpc_stream_data_status::rpc_stream_finish) return;
-                                 if (ec) {
-                                     set_status(rpc_stream_data_status::rpc_stream_failed, std::move(ec));
-                                 } else {
-                                     read_packet_buffer.size = le32toh(read_packet_buffer.size);
-                                     try {
-                                         read_packet_buffer.data.resize(read_packet_buffer.size);
-                                         read_body();
-                                     } catch (...) {
-                                         set_status(rpc_stream_data_status::rpc_stream_failed,
-                                                    error::make_error_code(error::rpc_errors::rpc_memory_error));
-                                     }
-                                 }
-                             });
+    conn_->async_buffer_read(
+        { asio::buffer(&read_packet_buffer.size, sizeof(read_packet_buffer.size)) },
+        [this](asio::error_code ec, std::size_t length) {
+            if (last_data_status_ >= rpc_stream_data_status::rpc_stream_finish) return;
+            if (ec) {
+                set_status(rpc_stream_data_status::rpc_stream_failed, std::move(ec));
+            } else {
+#ifndef RPC_VERBOSE
+                FDEBUG("server stream read head {}",
+                       Fundamental::Utils::BufferToHex(&read_packet_buffer.size, sizeof(read_packet_buffer.size)));
+#endif
+                read_packet_buffer.size = le32toh(read_packet_buffer.size);
+                try {
+                    read_packet_buffer.data.resize(read_packet_buffer.size);
+                    read_body();
+                } catch (...) {
+                    set_status(rpc_stream_data_status::rpc_stream_failed,
+                               error::make_error_code(error::rpc_errors::rpc_memory_error));
+                }
+            }
+        });
 }
 inline void ServerStreamReadWriter::read_body() {
     std::vector<asio::mutable_buffer> buffers;
@@ -712,6 +717,10 @@ inline void ServerStreamReadWriter::read_body() {
         if (ec) {
             set_status(rpc_stream_data_status::rpc_stream_failed, std::move(ec));
         } else {
+#ifndef RPC_VERBOSE
+            FDEBUG("server stream read {}{}", Fundamental::Utils::BufferToHex(&read_packet_buffer.type, 1),
+                   Fundamental::Utils::BufferToHex(read_packet_buffer.data.data(), read_packet_buffer.size));
+#endif
             auto status = static_cast<rpc_stream_data_status>(read_packet_buffer.type);
             if (status < last_data_status_ || status >= rpc_stream_data_status::rpc_stream_status_max) {
                 set_status(rpc_stream_data_status::rpc_stream_failed,
@@ -779,7 +788,7 @@ inline void ServerStreamReadWriter::handle_write() {
         write_buffers.emplace_back(asio::const_buffer(item.data.data(), item.data.size()));
     }
 
-    conn_->async_write(std::move(write_buffers), [this](asio::error_code ec, std::size_t length) {
+    conn_->async_write_buffers(std::move(write_buffers), [this](asio::error_code ec, std::size_t length) {
         if (last_data_status_ >= rpc_stream_data_status::rpc_stream_finish) return;
         if (ec) {
             set_status(rpc_stream_data_status::rpc_stream_failed, ec);

@@ -4,7 +4,8 @@
 #ifdef AllocatorTracker
     #include <iostream>
 #endif
-namespace Fundamental {
+namespace Fundamental
+{
 template <typename _Tp>
 using AllocatorType = std::pmr::polymorphic_allocator<_Tp>;
 
@@ -27,10 +28,13 @@ template <typename... Args>
 decltype(auto) MakeMonoBufferMemorySource(Args&&... args) {
     return MakeSharedMemorySource<std::pmr::monotonic_buffer_resource>(std::forward<Args>(args)...);
 }
-namespace internal {
-template <size_t ObjectSize, bool ThreadSafe,
-          typename PoolSourceType = std::conditional_t<ThreadSafe, std::pmr::synchronized_pool_resource,
-                                                       std::pmr::unsynchronized_pool_resource>>
+namespace internal
+{
+template <
+    size_t ObjectSize,
+    bool ThreadSafe,
+    typename PoolSourceType =
+        std::conditional_t<ThreadSafe, std::pmr::synchronized_pool_resource, std::pmr::unsynchronized_pool_resource>>
 inline std::pmr::memory_resource* GetObjectPoolSource() {
     static std::pmr::memory_resource* s_object_pool_source =
         new PoolSourceType(std::pmr::pool_options { 16, ObjectSize * 16 });
@@ -65,9 +69,8 @@ struct ObjectPoolAllocator : std::pmr::polymorphic_allocator<ObjectType> {
     template <typename... _CtorArgs>
     [[nodiscard]] ObjectType* NewObject(_CtorArgs&&... __ctor_args) {
         auto* __p = std::pmr::polymorphic_allocator<ObjectType>::allocate(1);
-        __try {
-            std::pmr::polymorphic_allocator<ObjectType>::construct(__p, std::forward<_CtorArgs>(__ctor_args)...);
-        }
+        __try
+        { std::pmr::polymorphic_allocator<ObjectType>::construct(__p, std::forward<_CtorArgs>(__ctor_args)...); }
         __catch(...) {
             std::pmr::polymorphic_allocator<ObjectType>::deallocate(__p, 1);
             __throw_exception_again;

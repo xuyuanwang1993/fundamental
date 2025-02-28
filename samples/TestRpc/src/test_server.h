@@ -1,8 +1,9 @@
 #pragma once
 #include <cstddef>
 #include <cstdint>
-#include <string>
 #include <future>
+#include <string>
+#include <vector>
 
 struct person {
     std::int32_t id;
@@ -12,6 +13,18 @@ struct person {
 struct dummy1 {
     std::size_t id;
     std::string str;
+};
+
+struct TestProxyRequest {
+    std::int32_t v = 0;
+    float f = 0.f;
+    std::vector<std::string> strs;
+    bool operator==(const TestProxyRequest& other)const {
+        return other.f == f && other.v == v && other.strs == strs;
+    }
+    bool operator!=(const TestProxyRequest& other)const {
+        return !(this->operator==(other));
+    }
 };
 
 constexpr const char* kProxyServiceName  = "rpc_service";

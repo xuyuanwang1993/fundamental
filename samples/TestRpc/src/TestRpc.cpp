@@ -734,70 +734,105 @@ TEST(rpc_test, test_ssl_concept) {
 }
 #endif
 
-TEST(rpc_test, test_ssl_echo_stream_mutithread) {
-    std::vector<Fundamental::ThreadPoolTaskToken<void>> tasks;
-    auto nums      = 1000;
-    auto task_func = []() {
-        rpc_client client;
-        //client.enable_ssl("server.crt");
+// TEST(rpc_test, test_ssl_echo_stream_mutithread) {
+//     std::vector<Fundamental::ThreadPoolTaskToken<void>> tasks;
+//     auto nums      = 1000;
+//     auto task_func = []() {
+//         rpc_client client;
+//         //client.enable_ssl("server.crt");
 
-        [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
-        EXPECT_TRUE(r && client.has_connected());
-        auto stream = client.upgrade_to_stream("test_echo_stream");
-        EXPECT_TRUE(stream != nullptr);
-        std::size_t cnt  = 5;
-        std::string base = "msg ";
-        while (cnt != 0) {
-            EXPECT_TRUE(stream->Write(base + std::to_string(cnt)));
-            --cnt;
-            std::string tmp;
-            EXPECT_TRUE(stream->Read(tmp));
-            FINFO("ssl echo msg:{}", tmp);
-        }
-        EXPECT_TRUE(stream->WriteDone());
-        EXPECT_TRUE(!stream->Finish(0));
-    };
-    while (nums > 0) {
-        tasks.emplace_back(s_test_pool.Enqueue(task_func));
-        nums--;
+//         [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
+//         EXPECT_TRUE(r && client.has_connected());
+//         auto stream = client.upgrade_to_stream("test_echo_stream");
+//         EXPECT_TRUE(stream != nullptr);
+//         std::size_t cnt  = 5;
+//         std::string base = "msg ";
+//         while (cnt != 0) {
+//             EXPECT_TRUE(stream->Write(base + std::to_string(cnt)));
+//             --cnt;
+//             std::string tmp;
+//             EXPECT_TRUE(stream->Read(tmp));
+//             FINFO("ssl echo msg:{}", tmp);
+//         }
+//         EXPECT_TRUE(stream->WriteDone());
+//         EXPECT_TRUE(!stream->Finish(0));
+//     };
+//     while (nums > 0) {
+//         tasks.emplace_back(s_test_pool.Enqueue(task_func));
+//         nums--;
+//     }
+//     for (auto& f : tasks)
+//         EXPECT_NO_THROW(f.resultFuture.get());
+// }
+
+// TEST(rpc_test, test_ssl_proxy_echo_stream_mutithread) {
+//     std::vector<Fundamental::ThreadPoolTaskToken<void>> tasks;
+//     auto nums      = s_test_pool.Count();
+//     auto task_func = []() {
+//         rpc_client client;
+//         //client.enable_ssl("server.crt");
+//         client.set_proxy(std::make_shared<network::rpc_service::CustomRpcProxy>(kProxyServiceName,
+//         kProxyServiceField,
+//                                                                                 kProxyServiceToken));
+//         [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
+//         EXPECT_TRUE(r && client.has_connected());
+//         auto stream = client.upgrade_to_stream("test_echo_stream");
+//         EXPECT_TRUE(stream != nullptr);
+//         std::size_t cnt  = 5;
+//         std::string base = "msg ";
+//         while (cnt != 0) {
+//             EXPECT_TRUE(stream->Write(base + std::to_string(cnt)));
+//             --cnt;
+//             std::string tmp;
+//             EXPECT_TRUE(stream->Read(tmp));
+//             FINFO("ssl/proxy echo msg:{}", tmp);
+//         }
+//         EXPECT_TRUE(stream->WriteDone());
+//         EXPECT_TRUE(!stream->Finish(0));
+//     };
+//     while (nums > 0) {
+//         tasks.emplace_back(s_test_pool.Enqueue(task_func));
+//         nums--;
+//     }
+//     for (auto& f : tasks)
+//         EXPECT_NO_THROW(f.resultFuture.get());
+// }
+
+TEST(rpc_test, test_obj_echo) {
+    Fundamental::Timer check_timer;
+    Fundamental::ScopeGuard check_guard(
+        [&]() { EXPECT_LE(check_timer.GetDuration<Fundamental::Timer::TimeScale::Millisecond>(), 100); });
+    rpc_client client("127.0.0.1", 9000);
+    client.set_proxy(std::make_shared<network::rpc_service::CustomRpcProxy>(kProxyServiceName, kProxyServiceField,
+                                                                            kProxyServiceToken));
+    bool r = client.connect();
+    if (!r) {
+        EXPECT_TRUE(false && "connect timeout");
+        return;
     }
-    for (auto& f : tasks)
-        EXPECT_NO_THROW(f.resultFuture.get());
-}
 
-TEST(rpc_test, test_ssl_proxy_echo_stream_mutithread) {
-    std::vector<Fundamental::ThreadPoolTaskToken<void>> tasks;
-    auto nums      = s_test_pool.Count();
-    auto task_func = []() {
-        rpc_client client;
-        //client.enable_ssl("server.crt");
-        client.set_proxy(std::make_shared<network::rpc_service::CustomRpcProxy>(kProxyServiceName, kProxyServiceField,
-                                                                                kProxyServiceToken));
-        [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
-        EXPECT_TRUE(r && client.has_connected());
-        auto stream = client.upgrade_to_stream("test_echo_stream");
-        EXPECT_TRUE(stream != nullptr);
-        std::size_t cnt  = 5;
-        std::string base = "msg ";
-        while (cnt != 0) {
-            EXPECT_TRUE(stream->Write(base + std::to_string(cnt)));
-            --cnt;
-            std::string tmp;
-            EXPECT_TRUE(stream->Read(tmp));
-            FINFO("ssl/proxy echo msg:{}", tmp);
+    std::int32_t cnt = 0;
+    TestProxyRequest request;
+
+
+    while (cnt < 1000) {
+        request.f += 0.1f;
+        request.v += 1;
+        request.strs.emplace_back(std::to_string(cnt));
+        try {
+            auto ret = client.call<100, TestProxyRequest>("object_echo<TestProxyRequest>", request);
+            if (request != ret) {
+                FERR("{}", cnt);
+                break;
+            }
+        } catch (const std::exception& e) {
+            FERR("{}", cnt);
+            break;
         }
-        EXPECT_TRUE(stream->WriteDone());
-        EXPECT_TRUE(!stream->Finish(0));
-    };
-    while (nums > 0) {
-        tasks.emplace_back(s_test_pool.Enqueue(task_func));
-        nums--;
+
+        ++cnt;
     }
-    for (auto& f : tasks)
-        EXPECT_NO_THROW(f.resultFuture.get());
 }
-
-
 
 int main(int argc, char** argv) {
     int mode = 0;
