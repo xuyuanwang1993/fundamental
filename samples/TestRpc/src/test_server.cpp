@@ -28,6 +28,11 @@ RTTR_REGISTRATION {
         .constructor()(rttr::policy::ctor::as_object)
         .property("id", &dummy1::id)
         .property("str", &dummy1::str);
+    rttr::registration::class_<TestProxyRequest>("TestProxyRequest")
+        .constructor()(rttr::policy::ctor::as_object)
+        .property("f", &TestProxyRequest::f)
+        .property("v", &TestProxyRequest::v)
+        .property("strs", &TestProxyRequest::strs);
 }
 
 struct dummy {
@@ -223,6 +228,11 @@ int get_int(rpc_conn conn, int val) {
 dummy1 get_dummy(rpc_conn conn, dummy1 d) {
     return d;
 }
+template <typename ObjType>
+ObjType object_echo(rpc_conn conn, ObjType d) {
+    return d;
+}
+
 std::unique_ptr<std::thread> s_thread;
 static network::proxy::ProxyManager s_manager;
 void server_task(std::promise<void>& sync_p) {
@@ -251,6 +261,8 @@ void server_task(std::promise<void>& sync_p) {
     server.register_handler("test_write_stream", test_write_stream);
     server.register_handler("test_broken_stream", test_broken_stream);
     server.register_handler("test_echo_stream", test_echo_stream);
+    server.register_handler("object_echo<int>", object_echo<int>);
+    server.register_handler("object_echo<TestProxyRequest>", object_echo<TestProxyRequest>);
     server.on_net_err.Connect([](std::shared_ptr<connection> conn, std::string reason) {
         std::cout << "remote client address: " << conn->remote_address() << " networking error, reason: " << reason
                   << "\n";

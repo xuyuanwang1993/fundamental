@@ -212,11 +212,17 @@ asio::const_buffer proxy_handler::EndponitCacheStatus::GetWriteBuffer() {
 }
 void proxy_handler::EndponitCacheStatus::UpdateReadBuffer(std::size_t readBytes) {
     auto& back = cache_.back();
+#ifndef RPC_VERBOSE
+    FDEBUG("proxy read {}", Fundamental::Utils::BufferToHex(back.data.data() + back.readOffset, readBytes));
+#endif
     back.readOffset += readBytes;
 }
 
 void proxy_handler::EndponitCacheStatus::UpdateWriteBuffer(std::size_t writeBytes) {
     auto& front = cache_.front();
+#ifndef RPC_VERBOSE
+    FDEBUG("proxy write {}", Fundamental::Utils::BufferToHex(front.data.data() + front.readOffset, writeBytes));
+#endif
     front.writeOffset += writeBytes;
 }
 

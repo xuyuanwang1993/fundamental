@@ -32,6 +32,7 @@ if(F_BUILD_STATIC)
         add_subdirectory(GtestSample)
         add_subdirectory(TestParallel)
         add_subdirectory(TestRandomGenerator)
+        add_subdirectory(TestIntegerCodec)
     endif()
 
     if(IMPORT_BENCHMARK)

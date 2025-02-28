@@ -19,12 +19,13 @@
 using namespace rttr;
 
 static nlohmann::json json_from_string(const std::string& str, bool& ok) {
-    try {
+    try
+    {
         ok = true;
         return nlohmann::json::parse(str);
-    } catch (const std::exception& e) {
-        ok = false;
     }
+    catch (const std::exception& e)
+    { ok = false; }
     return {};
 }
 
@@ -33,13 +34,15 @@ static std::string json_to_string(const nlohmann::json& object, bool& ok) {
     return object.dump(4);
 }
 
-enum class color {
+enum class color
+{
     red,
     green,
     blue
 };
 
-enum class unregister_color {
+enum class unregister_color
+{
     n_red,
     n_green,
     n_blue
@@ -104,6 +107,67 @@ struct CustomObject2 {
     }
 };
 
+struct TestVarObject {
+    bool v1          = false;
+    std::int8_t v2   = 1;
+    std::uint8_t v3  = 2;
+    std::int16_t v4  = 3;
+    std::uint16_t v5 = 4;
+    std::int32_t v6  = 5;
+    std::uint32_t v7 = 6;
+    std::int64_t v8  = 7;
+    std::uint64_t v9 = 8;
+    std::string v10  = "1";
+    float v11        = 0.1f;
+    double v12       = 0.1;
+    TestVarObject& update() {
+        v1 = !v1;
+        v2 += 1;
+        v3 += 1;
+        v4 += 1;
+        v5 += 1;
+        v6 += 1;
+        v7 += 1;
+        v8 += 1;
+        v9 += 1;
+        v10.push_back('1');
+        v11 += 0.1f;
+        v12 += 0.1;
+        return *this;
+    }
+    bool operator==(const TestVarObject& other) const noexcept {
+        return v1 == other.v1 && v2 == other.v2 && v3 == other.v3 && v4 == other.v4 && v5 == other.v5 &&
+               v6 == other.v6 && v7 == other.v7 && v8 == other.v8 && v9 == other.v9 && v10 == other.v10 &&
+               v11 == other.v11 && v12 == other.v12;
+    }
+    bool operator!=(const TestVarObject& other) const noexcept {
+        return !(operator==(other));
+    }
+    bool operator>(const TestVarObject& other) const noexcept {
+        return v2 > other.v2;
+    }
+    bool operator>=(const TestVarObject& other) const noexcept {
+        return v2 >= other.v2;
+    }
+    bool operator<(const TestVarObject& other) const noexcept {
+        return v2 < other.v2;
+    }
+    bool operator<=(const TestVarObject& other) const noexcept {
+        return v2 <= other.v2;
+    }
+};
+
+struct TestVarObject2 {
+    TestVarObject ob1;
+    std::vector<TestVarObject> obj2;
+    std::set<TestVarObject> obj3;
+    std::map<TestVarObject, int> obj4;
+    TestVarObject ob5;
+    bool operator==(const TestVarObject2& other) const noexcept {
+        return ob1 == other.ob1 && obj2 == other.obj2 && obj3 == other.obj3 && obj4 == other.obj4 && ob5 == other.ob5;
+    }
+};
+
 RTTR_REGISTRATION {
     rttr::registration::class_<point2d>("point2d")
         .constructor()(rttr::policy::ctor::as_object)
@@ -149,9 +213,95 @@ RTTR_REGISTRATION {
             .constructor()(rttr::policy::ctor::as_object)
             .property("is", &register_type::is);
     }
+    {
+        using register_type = TestVarObject;
+        rttr::registration::class_<register_type>("TestVarObject")
+            .constructor()(rttr::policy::ctor::as_object)
+            .property("1", &register_type::v1)
+            .property("2", &register_type::v2)
+            .property("3", &register_type::v3)
+            .property("4", &register_type::v4)
+            .property("5", &register_type::v5)
+            .property("6", &register_type::v6)
+            .property("7", &register_type::v7)
+            .property("8", &register_type::v8)
+            .property("9", &register_type::v9)
+            .property("a", &register_type::v10)
+            .property("b", &register_type::v11)
+            .property("c", &register_type::v12);
+    }
+    {
+        using register_type = TestVarObject2;
+        rttr::registration::class_<register_type>("TestVarObject2")
+            .constructor()(rttr::policy::ctor::as_object)
+            .property("1", &register_type::ob1)
+            .property("2", &register_type::obj2)
+            .property("3", &register_type::obj3)
+            .property("4", &register_type::obj4)
+            .property("5", &register_type::ob5);
+    }
 }
 int main(int argc, char* argv[]) {
     using namespace Fundamental::io;
+    TestVarObject basic_object;
+    std::int32_t cnt = 5;
+    TestVarObject2 obj;
+    while (cnt > 0)
+    {
+        --cnt;
+        obj.ob1 = basic_object.update();
+        obj.obj2.push_back(basic_object.update());
+        obj.obj3.insert(basic_object.update());
+        obj.obj4.emplace(basic_object.update(), cnt);
+        obj.ob5   = basic_object.update();
+        auto data = binary_pack(obj);
+        FINFOS << "TestVarObject2 gen buf:" << Fundamental::Utils::BufferToHex(data.data(), data.size());
+        TestVarObject2 obj2;
+
+        FINFOS << binary_unpack(data.data(), data.size(), obj2, true, 0);
+        FASSERT(obj == obj2);
+        data = binary_pack(obj2.ob1);
+        binary_pack(data, obj2.obj2);
+        binary_pack(data, obj2.obj3);
+        binary_pack(data, obj2.obj4);
+        binary_pack(data, obj2.ob5);
+        FINFOS << "TestVarObject2 gen buf 2:" << Fundamental::Utils::BufferToHex(data.data(), data.size());
+        TestVarObject2 obj3;
+        FINFOS << binary_unpack(data.data(), data.size(), obj3.ob1, true, 0);
+        FINFOS << binary_unpack(data.data(), data.size(), obj3.obj2, true, 1);
+        FINFOS << binary_unpack(data.data(), data.size(), obj3.obj3, true, 2);
+        FINFOS << binary_unpack(data.data(), data.size(), obj3.obj4, true, 3);
+        FINFOS << binary_unpack(data.data(), data.size(), obj3.ob5, true, 4);
+        FASSERT(obj == obj3);
+        data = binary_pack(basic_object.v1);
+        binary_pack(data, basic_object.v2);
+        binary_pack(data, basic_object.v3);
+        binary_pack(data, basic_object.v4);
+        binary_pack(data, basic_object.v5);
+        binary_pack(data, basic_object.v6);
+        binary_pack(data, basic_object.v7);
+        binary_pack(data, basic_object.v8);
+        binary_pack(data, basic_object.v9);
+        binary_pack(data, basic_object.v10);
+        binary_pack(data, basic_object.v11);
+        binary_pack(data, basic_object.v12);
+        FINFOS << "TestVarObject gen buf :" << Fundamental::Utils::BufferToHex(data.data(), data.size());
+        TestVarObject new_object;
+        std::size_t offset = 0;
+        FINFOS << binary_unpack(data.data(), data.size(), new_object.v1, true, offset++);
+        FINFOS << binary_unpack(data.data(), data.size(), new_object.v2, true, offset++);
+        FINFOS << binary_unpack(data.data(), data.size(), new_object.v3, true, offset++);
+        FINFOS << binary_unpack(data.data(), data.size(), new_object.v4, true, offset++);
+        FINFOS << binary_unpack(data.data(), data.size(), new_object.v5, true, offset++);
+        FINFOS << binary_unpack(data.data(), data.size(), new_object.v6, true, offset++);
+        FINFOS << binary_unpack(data.data(), data.size(), new_object.v7, true, offset++);
+        FINFOS << binary_unpack(data.data(), data.size(), new_object.v8, true, offset++);
+        FINFOS << binary_unpack(data.data(), data.size(), new_object.v9, true, offset++);
+        FINFOS << binary_unpack(data.data(), data.size(), new_object.v10, true, offset++);
+        FINFOS << binary_unpack(data.data(), data.size(), new_object.v11, true, offset++);
+        FINFOS << binary_unpack(data.data(), data.size(), new_object.v12, true, offset++);
+        FASSERT(new_object == basic_object);
+    }
 
     {
         int a            = 2;
