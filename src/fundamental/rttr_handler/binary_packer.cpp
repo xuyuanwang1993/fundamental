@@ -495,19 +495,19 @@ bool binary_unpack_array(const std::uint8_t*& data,
                          rttr::variant& var,
                          bool ignore_invalid_properties) {
     auto type = var.get_type();
-    if (!type.is_sequential_container()) {
+    if (!type.is_sequential_container() && !type.get_wrapped_type().is_sequential_container()) {
         FERR("invalid array value type");
         return false;
     }
     auto view                 = var.create_sequential_view();
+    view.clear();
     std::uint32_t object_size = 0;
     std::uint32_t total_size  = 0;
     if (!binary_unpack_peek_chunk_size(data, len, object_size, total_size)) return false;
     std::uint32_t item_nums = 0;
     if (!unpack_basic_varint_value(data, len, item_nums)) return false;
     view.set_size(item_nums);
-    PackerDataType data_type;
-    if (!unpack_basic_varint_value(data, len, data_type)) return false;
+    PackerDataType data_type = PackerDataType::unknown_pack_data;
     for (size_t i = 0; i < item_nums; ++i) {
         auto v = view.get_value(i);
         if (!do_binary_unpack(data, len, v, v, data_type, ignore_invalid_properties)) {
@@ -525,18 +525,17 @@ bool binary_unpack_set(const std::uint8_t*& data,
                        bool ignore_invalid_properties) {
 
     auto type = var.get_type();
-    if (!type.is_associative_container()) {
+    if (!type.is_associative_container() && !type.get_wrapped_type().is_associative_container()) {
         FERR("invalid set value type");
         return false;
     }
     auto view                 = var.create_associative_view();
+    view.clear();
     std::uint32_t object_size = 0;
     std::uint32_t total_size  = 0;
     if (!binary_unpack_peek_chunk_size(data, len, object_size, total_size)) return false;
     std::uint32_t item_nums = 0;
     if (!unpack_basic_varint_value(data, len, item_nums)) return false;
-    PackerDataType data_type;
-    if (!unpack_basic_varint_value(data, len, data_type)) return false;
     auto item_var = view.get_key_type().create();
     if (!item_var.is_valid()) { // no default ctor
         std::uint64_t storage = 0;
@@ -546,6 +545,7 @@ bool binary_unpack_set(const std::uint8_t*& data,
             return false;
         }
     }
+    PackerDataType data_type = PackerDataType::unknown_pack_data;
     for (size_t i = 0; i < item_nums; ++i) {
         if (!do_binary_unpack(data, len, item_var, item_var, data_type, ignore_invalid_properties)) return false;
         view.insert(item_var);
@@ -558,20 +558,19 @@ bool binary_unpack_map(const std::uint8_t*& data,
                        rttr::variant& var,
                        bool ignore_invalid_properties) {
     auto type = var.get_type();
-    if (!type.is_associative_container()) {
+    if (!type.is_associative_container() && !type.get_wrapped_type().is_associative_container()) {
         FERR("invalid map value type");
         return false;
     }
     auto view                 = var.create_associative_view();
+    view.clear();
     std::uint32_t object_size = 0;
     std::uint32_t total_size  = 0;
     if (!binary_unpack_peek_chunk_size(data, len, object_size, total_size)) return false;
     std::uint32_t item_nums = 0;
     if (!unpack_basic_varint_value(data, len, item_nums)) return false;
-    PackerDataType key_data_type;
-    if (!unpack_basic_varint_value(data, len, key_data_type)) return false;
-    PackerDataType value_data_type = PackerDataType::unknown_pack_data;
-    auto item_key_var              = view.get_key_type().create();
+
+    auto item_key_var = view.get_key_type().create();
     if (!item_key_var.is_valid()) { // no default ctor
         std::uint64_t storage = 0;
         item_key_var          = storage;
@@ -580,6 +579,7 @@ bool binary_unpack_map(const std::uint8_t*& data,
             return false;
         }
     }
+    auto v_type=view.get_value_type();
     auto item_value_var = view.get_value_type().create();
     if (!item_value_var.is_valid()) { // no default ctor
         std::uint64_t storage = 0;
@@ -589,14 +589,12 @@ bool binary_unpack_map(const std::uint8_t*& data,
             return false;
         }
     }
+    PackerDataType key_data_type   = PackerDataType::unknown_pack_data;
+    PackerDataType value_data_type = PackerDataType::unknown_pack_data;
     for (size_t i = 0; i < item_nums; ++i) {
 
         if (!do_binary_unpack(data, len, item_key_var, item_key_var, key_data_type, ignore_invalid_properties))
             return false;
-
-        if (value_data_type == PackerDataType::unknown_pack_data) {
-            if (!unpack_basic_varint_value(data, len, value_data_type)) return false;
-        }
         if (!do_binary_unpack(data, len, item_value_var, item_value_var, value_data_type, ignore_invalid_properties))
             return false;
         view.insert(item_key_var, item_value_var);

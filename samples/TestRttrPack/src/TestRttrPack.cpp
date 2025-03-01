@@ -2,6 +2,7 @@
 
 #include "fundamental/basic/buffer.hpp"
 #include "fundamental/basic/log.h"
+#include "fundamental/basic/random_generator.hpp"
 #include "fundamental/basic/utils.hpp"
 #include "fundamental/rttr_handler/binary_packer.h"
 
@@ -19,13 +20,12 @@
 using namespace rttr;
 
 static nlohmann::json json_from_string(const std::string& str, bool& ok) {
-    try
-    {
+    try {
         ok = true;
         return nlohmann::json::parse(str);
+    } catch (const std::exception& e) {
+        ok = false;
     }
-    catch (const std::exception& e)
-    { ok = false; }
     return {};
 }
 
@@ -107,6 +107,48 @@ struct CustomObject2 {
     }
 };
 
+struct TestContainerEle {
+    int x;
+    int y;
+    bool operator==(const TestContainerEle& other) const noexcept {
+        return other.x == x && other.y == y;
+    }
+    bool operator!=(const TestContainerEle& other) const noexcept {
+        return !operator==(other);
+    }
+    bool operator>(const TestContainerEle& other) const noexcept {
+        return x > other.x && y > other.y;
+    }
+    bool operator<(const TestContainerEle& other) const noexcept {
+        return x < other.x || y < other.y;
+    }
+};
+
+struct TestContainer {
+    TestContainerEle obj;
+    std::vector<std::string> empty_v;
+    std::vector<TestContainerEle> no_empty_v;
+    std::vector<std::vector<TestContainerEle>> objects_v;
+    std::set<std::string> empty_set;
+    std::set<TestContainerEle> objects_set;
+    std::map<std::string, std::string> empty_map;
+    std::map<TestContainerEle, std::set<TestContainerEle>> no_empty_map;
+    void update() {
+        auto g = Fundamental::DefaultNumberGenerator<int>();
+        obj.x  = g();
+        obj.y  = g();
+        no_empty_v.push_back(obj);
+        objects_v.push_back(no_empty_v);
+        objects_set.insert(obj);
+        no_empty_map[obj] = objects_set;
+    }
+    bool operator==(const TestContainer& other) const noexcept {
+        return obj == other.obj && empty_v == other.empty_v && no_empty_v == other.no_empty_v &&
+               empty_set == other.empty_set && objects_set == other.objects_set && empty_map == other.empty_map &&
+               no_empty_map == other.no_empty_map;
+    }
+};
+
 struct TestVarObject {
     bool v1          = false;
     std::int8_t v2   = 1;
@@ -166,29 +208,6 @@ struct TestVarObject2 {
     bool operator==(const TestVarObject2& other) const noexcept {
         return ob1 == other.ob1 && obj2 == other.obj2 && obj3 == other.obj3 && obj4 == other.obj4 && ob5 == other.ob5;
     }
-};
-
-struct InputSwapVid {
-    std::uint64_t swap_req_vid;   
-    std::uint64_t swap_offer_vid;
-};
-
-struct PsiVidRelation {
-    std::vector<InputSwapVid>
-        swap_vid;
-    std::vector<std::uint64_t> res_relation_req_vid;
-    std::vector<std::uint64_t> res_relation_offer_vid;
-};
-
-struct PisRelationReq {
-    static constexpr const char *kRpcName="fongwell::rpc::PisRelationReq";
-    std::uint64_t psi_id = 0;
-    PsiVidRelation swap_psi_relation;
-    bool report_offer = false;
-    std::string offer_agent_id;
-    std::string id_index_str;
-    bool end_normal   = false;
-    bool psi_send_fin = false;
 };
 
 RTTR_REGISTRATION {
@@ -263,55 +282,58 @@ RTTR_REGISTRATION {
             .property("4", &register_type::obj4)
             .property("5", &register_type::ob5);
     }
-        {
-        using RegisterType = InputSwapVid;
-        rttr::registration::class_<RegisterType>("fongwell::rpc::InputSwapVid")
+
+    {
+        using register_type = TestContainerEle;
+        rttr::registration::class_<register_type>("TestContainerEle")
             .constructor()(rttr::policy::ctor::as_object)
-            .property("swap_req_vid", &RegisterType::swap_req_vid)
-            .property("swap_offer_vid", &RegisterType::swap_offer_vid);
+            .property("x", &register_type::x)
+            .property("y", &register_type::y);
     }
 
     {
-        using RegisterType = PsiVidRelation;
-        rttr::registration::class_<RegisterType>("fongwell::rpc::PsiVidRelation")
+        using register_type = TestContainer;
+        rttr::registration::class_<register_type>("TestContainer")
             .constructor()(rttr::policy::ctor::as_object)
-            .property("res_relation_offer_vid", &RegisterType::res_relation_offer_vid)
-            .property("swap_vid", &RegisterType::swap_vid)
-            .property("res_relation_req_vid", &RegisterType::res_relation_req_vid);
-    }
-    {
-        using RegisterType = PisRelationReq;
-        rttr::registration::class_<RegisterType>("fongwell::rpc::PisRelationReq")
-            .constructor()(rttr::policy::ctor::as_object)
-            .property("end_normal", &RegisterType::end_normal)
-            .property("id_index_str", &RegisterType::id_index_str)
-            .property("offer_agent_id", &RegisterType::offer_agent_id)
-            .property("psi_id", &RegisterType::psi_id)
-            .property("psi_send_fin", &RegisterType::psi_send_fin)
-            .property("report_offer", &RegisterType::report_offer)
-            .property("swap_psi_relation", &RegisterType::swap_psi_relation);
+            .property("1", &register_type::objects_set)
+            .property("2", &register_type::objects_v)
+            .property("3", &register_type::no_empty_map)
+            .property("4", &register_type::no_empty_v)
+            .property("5", &register_type::obj)
+            .property("6", &register_type::empty_map)
+            .property("7", &register_type::empty_set)
+            .property("8", &register_type::empty_v);
     }
 }
 int main(int argc, char* argv[]) {
-
-    PisRelationReq r;
-    r.end_normal=true;
-    r.report_offer=false;
-    r.psi_send_fin=false;
-    r.offer_agent_id="2547f9fe-e89d-4f97-bc92-a28a51018eb4";
-    r.psi_id=1740736348766016425;
-    auto data=Fundamental::io::binary_pack(r);
-    FINFO("{}",Fundamental::Utils::BufferToHex(data));
-    PisRelationReq r1; 
-    auto test=Fundamental::io::binary_unpack<PisRelationReq>(data.data(),data.size(),r1);
-    if(1) return 0;
-
     using namespace Fundamental::io;
+    auto type = rttr::type::get<std::set<TestContainerEle>>();
+
+    constructor ctor = type.get_constructor();
+    auto ctors       = type.get_constructors();
+    for (auto& item : ctors) {
+        if (item.get_instantiated_type() == type) ctor = item;
+    }
+    auto v = type.create();
+
+    if (1) {
+        int cnt = 0;
+        TestContainer obj;
+        while (cnt < 100) {
+            obj.update();
+            auto data = binary_pack(obj);
+            TestContainer tmp;
+            binary_unpack(data.data(), data.size(), tmp, true, 0);
+            FASSERT(tmp == obj);
+            ++cnt;
+        }
+        return 0;
+    }
+
     TestVarObject basic_object;
     std::int32_t cnt = 5;
     TestVarObject2 obj;
-    while (cnt > 0)
-    {
+    while (cnt > 0) {
         --cnt;
         obj.ob1 = basic_object.update();
         obj.obj2.push_back(basic_object.update());
