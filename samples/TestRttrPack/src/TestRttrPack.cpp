@@ -168,6 +168,29 @@ struct TestVarObject2 {
     }
 };
 
+struct InputSwapVid {
+    std::uint64_t swap_req_vid;   
+    std::uint64_t swap_offer_vid;
+};
+
+struct PsiVidRelation {
+    std::vector<InputSwapVid>
+        swap_vid;
+    std::vector<std::uint64_t> res_relation_req_vid;
+    std::vector<std::uint64_t> res_relation_offer_vid;
+};
+
+struct PisRelationReq {
+    static constexpr const char *kRpcName="fongwell::rpc::PisRelationReq";
+    std::uint64_t psi_id = 0;
+    PsiVidRelation swap_psi_relation;
+    bool report_offer = false;
+    std::string offer_agent_id;
+    std::string id_index_str;
+    bool end_normal   = false;
+    bool psi_send_fin = false;
+};
+
 RTTR_REGISTRATION {
     rttr::registration::class_<point2d>("point2d")
         .constructor()(rttr::policy::ctor::as_object)
@@ -240,8 +263,49 @@ RTTR_REGISTRATION {
             .property("4", &register_type::obj4)
             .property("5", &register_type::ob5);
     }
+        {
+        using RegisterType = InputSwapVid;
+        rttr::registration::class_<RegisterType>("fongwell::rpc::InputSwapVid")
+            .constructor()(rttr::policy::ctor::as_object)
+            .property("swap_req_vid", &RegisterType::swap_req_vid)
+            .property("swap_offer_vid", &RegisterType::swap_offer_vid);
+    }
+
+    {
+        using RegisterType = PsiVidRelation;
+        rttr::registration::class_<RegisterType>("fongwell::rpc::PsiVidRelation")
+            .constructor()(rttr::policy::ctor::as_object)
+            .property("res_relation_offer_vid", &RegisterType::res_relation_offer_vid)
+            .property("swap_vid", &RegisterType::swap_vid)
+            .property("res_relation_req_vid", &RegisterType::res_relation_req_vid);
+    }
+    {
+        using RegisterType = PisRelationReq;
+        rttr::registration::class_<RegisterType>("fongwell::rpc::PisRelationReq")
+            .constructor()(rttr::policy::ctor::as_object)
+            .property("end_normal", &RegisterType::end_normal)
+            .property("id_index_str", &RegisterType::id_index_str)
+            .property("offer_agent_id", &RegisterType::offer_agent_id)
+            .property("psi_id", &RegisterType::psi_id)
+            .property("psi_send_fin", &RegisterType::psi_send_fin)
+            .property("report_offer", &RegisterType::report_offer)
+            .property("swap_psi_relation", &RegisterType::swap_psi_relation);
+    }
 }
 int main(int argc, char* argv[]) {
+
+    PisRelationReq r;
+    r.end_normal=true;
+    r.report_offer=false;
+    r.psi_send_fin=false;
+    r.offer_agent_id="2547f9fe-e89d-4f97-bc92-a28a51018eb4";
+    r.psi_id=1740736348766016425;
+    auto data=Fundamental::io::binary_pack(r);
+    FINFO("{}",Fundamental::Utils::BufferToHex(data));
+    PisRelationReq r1; 
+    auto test=Fundamental::io::binary_unpack<PisRelationReq>(data.data(),data.size(),r1);
+    if(1) return 0;
+
     using namespace Fundamental::io;
     TestVarObject basic_object;
     std::int32_t cnt = 5;
