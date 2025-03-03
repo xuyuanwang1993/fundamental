@@ -233,6 +233,8 @@ class RTTR_API variant_associative_view
          */
         void clear();
 
+        bool reserve_key();
+        bool reserve_key_value();
         /*!
          * \brief Returns a range containing all elements with the given \p key in the container.
          *
