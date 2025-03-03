@@ -95,14 +95,14 @@ void auto_disconnect(rpc_conn conn, std::int32_t v) {
 
 // if you want to response later, you can use async model, you can control when
 // to response
-void delay_echo(rpc_conn conn, const std::string& src) {
-    FINFO("delay echo request:{}", src);
+void delay_echo(rpc_conn conn, const std::string& src, std::int64_t delay_msec) {
+    FINFO("delay echo request {}:{} ", delay_msec, src.substr(0, src.size() > 100 ? 100 : src.size()));
     auto sp = conn.lock();
     sp->set_delay(true);
     auto req_id = sp->request_id(); // note: you need keep the request id at that
 
     auto h = s_delay_queue.AddDelayTask(
-        50,
+        delay_msec,
         [conn, req_id, src] {
             auto conn_sp = conn.lock();
             if (conn_sp) {
@@ -237,7 +237,7 @@ std::unique_ptr<std::thread> s_thread;
 static network::proxy::ProxyManager s_manager;
 void server_task(std::promise<void>& sync_p) {
 
-    auto s_server = std::make_shared<rpc_server>(9000, 3600);
+    auto s_server = std::make_shared<rpc_server>(9000, 2);
     auto& server  = *s_server;
     server.enable_ssl({ nullptr, "server.crt", "server.key", "dh2048.pem" });
     dummy d;

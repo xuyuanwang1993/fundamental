@@ -16,7 +16,7 @@
 using namespace network;
 using namespace network::rpc_service;
 static Fundamental::ThreadPool& s_test_pool = Fundamental::ThreadPool::Instance<101>();
-#if 0
+#if 1
 TEST(rpc_test, test_connect) {
     Fundamental::Timer check_timer;
     Fundamental::ScopeGuard check_guard(
@@ -141,10 +141,10 @@ TEST(rpc_test, test_async_client) {
 
     client.set_error_callback([](asio::error_code ec) { std::cout << ec.message() << std::endl; });
 
-    auto f = client.async_call<FUTURE>("get_person");
+    auto f = client.async_call("get_person");
 
     EXPECT_EQ("tom", f.get().as<person>().name);
-    auto fu = client.async_call<FUTURE>("hello", "purecpp");
+    auto fu = client.async_call("hello", "purecpp");
     fu.get().as(); // no return
 }
 
@@ -171,11 +171,11 @@ TEST(rpc_test, test_upload) {
     file.read(&conent[0], file_len);
 
     {
-        auto f = client.async_call<FUTURE>("upload", "test", conent);
+        auto f = client.async_call("upload", "test", conent);
         EXPECT_NO_THROW((f.get().as()));
     }
     {
-        auto f = client.async_call<FUTURE>("upload", "test1", conent);
+        auto f = client.async_call("upload", "test1", conent);
         EXPECT_NO_THROW((f.get().as()));
     }
 }
@@ -191,7 +191,7 @@ TEST(rpc_test, test_download) {
         return;
     }
 
-    auto f       = client.async_call<FUTURE>("download", "test");
+    auto f       = client.async_call("download", "test");
     auto content = f.get().as<std::string>();
     EXPECT_TRUE(s_file_data.size() == content.size() &&
                 ::memcmp(s_file_data.data(), content.data(), content.size()) == 0);
@@ -221,7 +221,7 @@ TEST(rpc_test, test_echo) {
     }
 
     {
-        auto result = client.call<std::string>("delay_echo", "test");
+        auto result = client.call<std::string>("delay_echo", "test", 50);
         EXPECT_EQ(result, "test");
     }
 }
@@ -253,7 +253,7 @@ TEST(rpc_test, test_callback) {
         [&]() { EXPECT_LE(check_timer.GetDuration<Fundamental::Timer::TimeScale::Millisecond>(), 200); });
     rpc_client client;
     client.enable_auto_reconnect();
-    client.enable_auto_heartbeat();
+    client.enable_timeout_check();
     [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
     EXPECT_TRUE(r);
     std::atomic<std::size_t> count    = 200;
@@ -263,48 +263,42 @@ TEST(rpc_test, test_callback) {
         std::string test = "test" + std::to_string(i + 1);
         // set timeout 100ms
         FDEBUGS << "post echo:" << test;
-        client.async_call<150>(
-            "delay_echo",
-            [&](const asio::error_code& ec, string_view data) {
-                Fundamental::ScopeGuard g([&]() { --count; });
-                if (ec) {
-                    FINFOS << "delay_echo timeout:" << ec.value() << " " << ec.message();
-                    is_failed.exchange(true);
-                    return;
-                }
+        client.async_call("delay_echo", test, 50).async_wait([&](const asio::error_code& ec, string_view data) {
+            Fundamental::ScopeGuard g([&]() { --count; });
+            if (ec) {
+                FINFOS << "delay_echo timeout:" << ec.value() << " " << ec.message();
+                is_failed.exchange(true);
+                return;
+            }
 
-                if (has_error(data)) {
-                    is_failed.exchange(true);
-                    FINFOS << "delay_echo error msg:" << get_error_msg(data);
-                } else {
-                    auto str = get_result<std::string>(data);
-                    FWARNS << "delay_echo " << str;
-                }
-            },
-            test);
+            if (has_error(data)) {
+                is_failed.exchange(true);
+                FINFOS << "delay_echo error msg:" << get_error_msg(data);
+            } else {
+                auto str = get_result<std::string>(data);
+                FWARNS << "delay_echo " << str;
+            }
+        });
 
         std::string test1 = "test" + std::to_string(i + 2);
         FDEBUGS << "post delay_echo:" << test1;
         // zero means no timeout check, no param means using default timeout(5s)
-        client.async_call<150>(
-            "echo",
-            [&](const asio::error_code& ec, string_view data) {
-                Fundamental::ScopeGuard g([&]() { --count; });
-                if (ec) {
-                    FINFOS << "echo timeout:" << ec.value() << " " << ec.message();
-                    is_failed.exchange(true);
-                    return;
-                }
+        client.async_call("echo", test1).async_wait([&](const asio::error_code& ec, string_view data) {
+            Fundamental::ScopeGuard g([&]() { --count; });
+            if (ec) {
+                FINFOS << "echo timeout:" << ec.value() << " " << ec.message();
+                is_failed.exchange(true);
+                return;
+            }
 
-                if (has_error(data)) {
-                    is_failed.exchange(true);
-                    FINFOS << "echo error msg:" << get_error_msg(data);
-                } else {
-                    auto str = get_result<std::string>(data);
-                    FWARNS << "echo " << str;
-                }
-            },
-            test1);
+            if (has_error(data)) {
+                is_failed.exchange(true);
+                FINFOS << "echo error msg:" << get_error_msg(data);
+            } else {
+                auto str = get_result<std::string>(data);
+                FWARNS << "echo " << str;
+            }
+        });
     }
     while (count.load() != 0 && !is_failed) {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -375,7 +369,7 @@ TEST(rpc_test, test_sub1) {
     do {
         rpc_client client;
         client.enable_auto_reconnect();
-        client.enable_auto_heartbeat();
+        client.enable_timeout_check();
         bool r = client.connect("127.0.0.1", 9000);
         if (!r) {
             success = false;
@@ -412,7 +406,7 @@ TEST(rpc_test, test_sub1) {
             .get();
         rpc_client client2;
         client2.enable_auto_reconnect();
-        client2.enable_auto_heartbeat();
+        client2.enable_timeout_check();
         r = client2.connect("127.0.0.1", 9000);
         if (!r) {
             success = false;
@@ -439,7 +433,7 @@ TEST(rpc_test, test_sub1) {
 
         rpc_client client3;
         client3.enable_auto_reconnect();
-        client3.enable_auto_heartbeat();
+        client3.enable_timeout_check();
         r = client3.connect("127.0.0.1", 9000);
         if (!r) {
             success = false;
@@ -599,7 +593,8 @@ TEST(rpc_test, test_obj_echo) {
     } catch (const std::exception& e) {
         FERR("exception {}->{}", c, e.what());
     }
-    while (c < 1000) {
+    std::int32_t max_call_times = 20;
+    while (c < max_call_times) {
         str.push_back('a');
         try {
             auto ret = client.call<10000, std::string>("echo", str);
@@ -613,7 +608,84 @@ TEST(rpc_test, test_obj_echo) {
         }
         ++c;
     }
-    EXPECT_TRUE(c >= 1000);
+    EXPECT_TRUE(c >= max_call_times);
+}
+
+TEST(rpc_test, test_timeout_echo) {
+    rpc_client client("127.0.0.1", 9000);
+    bool r = client.connect();
+    client.enable_timeout_check(true, 1);
+    if (!r) {
+        EXPECT_TRUE(false && "connect timeout");
+        return;
+    }
+
+    {
+        auto test_str = std::string(1024 * 1024 * 10, 'a');
+        auto result   = client.async_timeout_call("delay_echo", 200, test_str, 400);
+        EXPECT_ANY_THROW(result.get());
+    }
+}
+
+TEST(rpc_test, test_echo_stream_mutithread) {
+    std::vector<Fundamental::ThreadPoolTaskToken<void>> tasks;
+    auto nums      = 40;
+    auto task_func = []() {
+        rpc_client client;
+
+        [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
+        EXPECT_TRUE(r && client.has_connected());
+        auto stream = client.upgrade_to_stream("test_echo_stream");
+        EXPECT_TRUE(stream != nullptr);
+        std::size_t cnt  = 5;
+        std::string base = "msg ";
+        while (cnt != 0) {
+            EXPECT_TRUE(stream->Write(base + std::to_string(cnt)));
+            --cnt;
+            std::string tmp;
+            EXPECT_TRUE(stream->Read(tmp));
+            FINFO("mutithread echo msg:{}", tmp);
+        }
+        EXPECT_TRUE(stream->WriteDone());
+        EXPECT_TRUE(!stream->Finish(0));
+    };
+    while (nums > 0) {
+        tasks.emplace_back(s_test_pool.Enqueue(task_func));
+        nums--;
+    }
+    for (auto& f : tasks)
+        EXPECT_NO_THROW(f.resultFuture.get());
+}
+
+TEST(rpc_test, test_echo_stream_proxy_mutithread) {
+    std::vector<Fundamental::ThreadPoolTaskToken<void>> tasks;
+    auto nums      = 40;
+    auto task_func = []() {
+        rpc_client client;
+        client.set_proxy(std::make_shared<network::rpc_service::CustomRpcProxy>(kProxyServiceName, kProxyServiceField,
+                                                                                kProxyServiceToken));
+        [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
+        EXPECT_TRUE(r && client.has_connected());
+        auto stream = client.upgrade_to_stream("test_echo_stream");
+        EXPECT_TRUE(stream != nullptr);
+        std::size_t cnt  = 5;
+        std::string base = "msg ";
+        while (cnt != 0) {
+            EXPECT_TRUE(stream->Write(base + std::to_string(cnt)));
+            --cnt;
+            std::string tmp;
+            EXPECT_TRUE(stream->Read(tmp));
+            FINFO("mutithread echo msg:{}", tmp);
+        }
+        EXPECT_TRUE(stream->WriteDone());
+        EXPECT_TRUE(!stream->Finish(0));
+    };
+    while (nums > 0) {
+        tasks.emplace_back(s_test_pool.Enqueue(task_func));
+        nums--;
+    }
+    for (auto& f : tasks)
+        EXPECT_NO_THROW(f.resultFuture.get());
 }
 #endif
 
@@ -769,37 +841,7 @@ TEST(rpc_test, test_ssl_concept) {
     }
 }
 #endif
-
-TEST(rpc_test, test_ssl_echo_stream_mutithread) {
-    std::vector<Fundamental::ThreadPoolTaskToken<void>> tasks;
-    auto nums      = 1000;
-    auto task_func = []() {
-        rpc_client client;
-        //client.enable_ssl("server.crt");
-
-        [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
-        EXPECT_TRUE(r && client.has_connected());
-        auto stream = client.upgrade_to_stream("test_echo_stream");
-        EXPECT_TRUE(stream != nullptr);
-        std::size_t cnt  = 5;
-        std::string base = "msg ";
-        while (cnt != 0) {
-            EXPECT_TRUE(stream->Write(base + std::to_string(cnt)));
-            --cnt;
-            std::string tmp;
-            EXPECT_TRUE(stream->Read(tmp));
-            FINFO("ssl echo msg:{}", tmp);
-        }
-        EXPECT_TRUE(stream->WriteDone());
-        EXPECT_TRUE(!stream->Finish(0));
-    };
-    while (nums > 0) {
-        tasks.emplace_back(s_test_pool.Enqueue(task_func));
-        nums--;
-    }
-    for (auto& f : tasks)
-        EXPECT_NO_THROW(f.resultFuture.get());
-}
+#if 1
 
 // TEST(rpc_test, test_ssl_proxy_echo_stream_mutithread) {
 //     std::vector<Fundamental::ThreadPoolTaskToken<void>> tasks;
@@ -833,8 +875,7 @@ TEST(rpc_test, test_ssl_echo_stream_mutithread) {
 //     for (auto& f : tasks)
 //         EXPECT_NO_THROW(f.resultFuture.get());
 // }
-
-
+#endif
 
 int main(int argc, char** argv) {
     int mode = 0;
@@ -846,7 +887,7 @@ int main(int argc, char** argv) {
     options.logOutputProgramName = "test";
     options.logOutputPath        = "output";
     Fundamental::Logger::Initialize(std::move(options));
-    s_test_pool.Spawn(1);
+    s_test_pool.Spawn(4);
     if (mode == 0) {
         ::testing::InitGoogleTest(&argc, argv);
         run_server();

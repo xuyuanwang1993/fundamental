@@ -79,8 +79,8 @@ public:
 
 public:
     connection(tcp::socket socket, std::size_t timeout_seconds, router& router) :
-    socket_(std::move(socket)), body_(INIT_BUF_SIZE), timer_(socket_.get_executor()), timeout_seconds_(timeout_seconds),
-    has_closed_(false), router_(router) {
+    socket_(std::move(socket)), body_(INIT_BUF_SIZE), timeout_check_timer_(socket_.get_executor()),
+    timeout_seconds_(timeout_seconds), has_closed_(false), router_(router) {
     }
 
     ~connection() {
@@ -267,6 +267,7 @@ private:
         case request_type::rpc_heartbeat: {
             cancel_timer();
             read_head();
+            response_interal(req_id_, "", network::rpc_service::request_type::rpc_heartbeat);
             return;
         }
         default: {
@@ -366,72 +367,79 @@ private:
         });
     }
 
-    void read_body(uint32_t func_id, std::size_t size) {
+    void read_body(uint32_t func_id, std::size_t size, std::size_t start_offset = 0) {
         auto self(this->shared_from_this());
 #ifdef RPC_VERBOSE
-        FDEBUG("server try read size: {}", size);
+        FDEBUG("server try read size: {}", size - start_offset);
 #endif
-        async_buffer_read({ asio::mutable_buffer(body_.data(), size) }, [this, func_id, self](asio::error_code ec,
-                                                                                              std::size_t length) {
-            cancel_timer();
+        async_buffer_read_some(
+            { asio::mutable_buffer(body_.data() + start_offset, size - start_offset) },
+            [this, func_id, self, size, start_offset](asio::error_code ec, std::size_t length) {
+                cancel_timer();
 
-            if (!socket_.is_open()) {
-                on_net_err_(self, "socket already closed");
-                return;
-            }
-            if (ec) {
-                // do't close socket, wait for write done
-                on_net_err_(self, ec.message());
-                return;
-            }
-#ifdef RPC_VERBOSE
-            FDEBUG("server read {} body {}", length, Fundamental::Utils::BufferToHex(body_.data(), length, 140));
-#endif
-            read_head();
-            try {
-                switch (req_type_) {
-                case request_type::rpc_req: process_request(func_id, body_.data(), length); break;
-                case request_type::rpc_subscribe: {
-                    msgpack_codec codec;
-                    auto p              = codec.unpack_tuple<std::tuple<std::string>>(body_.data(), length);
-                    auto new_subscriber = std::get<0>(p);
-                    auto ret            = subscribers_.insert(new_subscriber);
-                    if (ret.second) {
-                        on_new_subscriber_added(new_subscriber, weak_from_this());
-                    }
-                    response_interal(req_id_, msgpack_codec::pack_args_str(result_code::OK, ""));
-                } break;
-                case request_type::rpc_unsubscribe: {
-                    msgpack_codec codec;
-                    auto p                  = codec.unpack_tuple<std::tuple<std::string>>(body_.data(), length);
-                    auto removed_subscriber = std::get<0>(p);
-                    auto iter               = subscribers_.find(removed_subscriber);
-                    if (iter != subscribers_.end()) {
-                        subscribers_.erase(iter);
-                        on_subscribers_removed({ removed_subscriber }, weak_from_this());
-                    }
-                    response_interal(req_id_, msgpack_codec::pack_args_str(result_code::OK, ""));
-                } break;
-                case request_type::rpc_publish: {
-                    msgpack_codec codec;
-                    auto p    = codec.unpack_tuple<std::tuple<std::string, std::string>>(body_.data(), length);
-                    auto& key = std::get<0>(p);
-                    auto& msg = std::get<1>(p);
-                    on_publish_msg(std::move(key), std::move(msg));
-                    response_interal(req_id_, msgpack_codec::pack_args_str(result_code::OK, ""));
-                } break;
-                default: {
-                    auto result = msgpack_codec::pack_args_str(
-                        result_code::FAIL,
-                        Fundamental::StringFormat("bad request type:{}", static_cast<std::int32_t>(req_type_)));
-                    response_interal(req_id_, std::move(result));
-                } break;
+                if (!socket_.is_open()) {
+                    on_net_err_(self, "socket already closed");
+                    return;
                 }
-            } catch (const std::exception& ex) {
-                auto result = msgpack_codec::pack_args_str(result_code::FAIL, ex.what());
-                response_interal(req_id_, std::move(result));
-            }
-        });
+                if (ec) {
+                    // do't close socket, wait for write done
+                    on_net_err_(self, ec.message());
+                    return;
+                }
+                auto current_read_offset = start_offset + length;
+                if (current_read_offset < size) {
+                    reset_timer();
+                    read_body(func_id, size, current_read_offset);
+                    return;
+                }
+#ifdef RPC_VERBOSE
+                FDEBUG("server read {} body {}", size, Fundamental::Utils::BufferToHex(body_.data(), size, 140));
+#endif
+                read_head();
+                try {
+                    switch (req_type_) {
+                    case request_type::rpc_req: process_request(func_id, body_.data(), size); break;
+                    case request_type::rpc_subscribe: {
+                        msgpack_codec codec;
+                        auto p              = codec.unpack_tuple<std::tuple<std::string>>(body_.data(), size);
+                        auto new_subscriber = std::get<0>(p);
+                        auto ret            = subscribers_.insert(new_subscriber);
+                        if (ret.second) {
+                            on_new_subscriber_added(new_subscriber, weak_from_this());
+                        }
+                        response_interal(req_id_, msgpack_codec::pack_args_str(result_code::OK, ""));
+                    } break;
+                    case request_type::rpc_unsubscribe: {
+                        msgpack_codec codec;
+                        auto p                  = codec.unpack_tuple<std::tuple<std::string>>(body_.data(), size);
+                        auto removed_subscriber = std::get<0>(p);
+                        auto iter               = subscribers_.find(removed_subscriber);
+                        if (iter != subscribers_.end()) {
+                            subscribers_.erase(iter);
+                            on_subscribers_removed({ removed_subscriber }, weak_from_this());
+                        }
+                        response_interal(req_id_, msgpack_codec::pack_args_str(result_code::OK, ""));
+                    } break;
+                    case request_type::rpc_publish: {
+                        msgpack_codec codec;
+                        auto p    = codec.unpack_tuple<std::tuple<std::string, std::string>>(body_.data(), size);
+                        auto& key = std::get<0>(p);
+                        auto& msg = std::get<1>(p);
+                        on_publish_msg(std::move(key), std::move(msg));
+                        response_interal(req_id_, msgpack_codec::pack_args_str(result_code::OK, ""));
+                    } break;
+                    default: {
+                        auto result = msgpack_codec::pack_args_str(
+                            result_code::FAIL,
+                            Fundamental::StringFormat("bad request type:{}", static_cast<std::int32_t>(req_type_)));
+                        response_interal(req_id_, std::move(result));
+                    } break;
+                    }
+                } catch (const std::exception& ex) {
+                    auto result = msgpack_codec::pack_args_str(result_code::FAIL, ex.what());
+                    response_interal(req_id_, std::move(result));
+                }
+            });
     }
     void handle_none_param_request(uint32_t func_id) {
         read_head();
@@ -448,7 +456,7 @@ private:
     }
 
     void process_rpc_stream(uint32_t func_id) {
-        timer_.cancel();
+        timeout_check_timer_.cancel();
         // allocate rpc stream
         rpc_stream_rw_ = std::make_shared<ServerStreamReadWriter>(this->shared_from_this());
         route_result_t ret =
@@ -509,6 +517,17 @@ private:
         }
     }
 
+    template <typename Handler>
+    void async_buffer_read_some(std::vector<asio::mutable_buffer> buffers, Handler handler) {
+        if (is_ssl()) {
+#ifndef RPC_DISABLE_SSL
+            ssl_stream_->async_read_some(std::move(buffers), std::move(handler));
+#endif
+        } else {
+            socket_.async_read_some(std::move(buffers), std::move(handler));
+        }
+    }
+
     template <typename BufferType, typename Handler>
     void async_write_buffers(const BufferType& buffers, Handler handler) {
         if (is_ssl()) {
@@ -526,8 +545,8 @@ private:
         }
 
         auto self(this->shared_from_this());
-        timer_.expires_after(std::chrono::seconds(timeout_seconds_));
-        timer_.async_wait([this, self](const asio::error_code& ec) {
+        timeout_check_timer_.expires_after(std::chrono::seconds(timeout_seconds_));
+        timeout_check_timer_.async_wait([this, self](const asio::error_code& ec) {
             if (has_closed()) {
                 return;
             }
@@ -545,7 +564,7 @@ private:
             return;
         }
 
-        timer_.cancel();
+        timeout_check_timer_.cancel();
     }
 
     void close() {
@@ -567,7 +586,7 @@ private:
             ssl_stream_ = nullptr;
         }
 #endif
-        timer_.cancel();
+        timeout_check_timer_.cancel();
         asio::error_code ignored_ec;
         socket_.shutdown(tcp::socket::shutdown_both, ignored_ec);
         socket_.close(ignored_ec);
@@ -583,7 +602,7 @@ private:
 
     uint32_t write_size_ = 0;
 
-    asio::steady_timer timer_;
+    asio::steady_timer timeout_check_timer_;
     std::size_t timeout_seconds_;
     int64_t conn_id_ = 0;
     std::atomic_bool has_closed_;

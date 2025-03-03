@@ -50,7 +50,7 @@ public:
     Fundamental::Signal<void()> on_release;
 
 public:
-    rpc_server(unsigned short port, size_t timeout_seconds = 15) :
+    rpc_server(unsigned short port, size_t timeout_seconds = 30) :
     acceptor_(io_context_pool::Instance().get_io_context()), timeout_seconds_(timeout_seconds) {
         protocal_helper::init_acceptor(acceptor_, port);
     }

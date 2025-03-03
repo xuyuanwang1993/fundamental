@@ -108,7 +108,7 @@ void proxy_handler::HandShake() {
                               HandleDisconnect(ec, "HandShake");
                               return;
                           }
-                          FDEBUG("handshake sucess");
+                          FDEBUG("proxy handshake sucess");
                       });
     StartClientRead();
 }

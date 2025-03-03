@@ -112,14 +112,14 @@ public:
     }
     std::string message(int value) const override {
         switch (static_cast<rpc_errors>(value)) {
-        case rpc_errors::rpc_success: return "success";
-        case rpc_errors::rpc_failed: return "failed";
-        case rpc_errors::rpc_timeout: return "timeout";
-        case rpc_errors::rpc_broken_pipe: return "broken pipe";
-        case rpc_errors::rpc_pack_failed: return "pack failed";
-        case rpc_errors::rpc_unpack_failed: return "unpack failed";
-        case rpc_errors::rpc_bad_request: return "bad request";
-        case rpc_errors::rpc_internal_error: return "internal error";
+        case rpc_errors::rpc_success: return "rpc success";
+        case rpc_errors::rpc_failed: return "rpc failed";
+        case rpc_errors::rpc_timeout: return "rpc timeout";
+        case rpc_errors::rpc_broken_pipe: return "rpc broken pipe";
+        case rpc_errors::rpc_pack_failed: return "rpc pack failed";
+        case rpc_errors::rpc_unpack_failed: return "rpc unpack failed";
+        case rpc_errors::rpc_bad_request: return "rpc bad request";
+        case rpc_errors::rpc_internal_error: return "rpc internal error";
         case rpc_errors::rpc_memory_error: return "rpc memory error";
         default: return "network.rpc error";
         }
