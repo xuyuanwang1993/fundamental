@@ -13,10 +13,14 @@ namespace internal
 {
 void binary_pack_array(const variant_sequential_view& view, std::vector<std::uint8_t>& out, bool& type_flag);
 void binary_pack_object_recursively(const rttr::variant& var, std::vector<std::uint8_t>& out, bool& type_flag);
+void binary_pack_associative_container(const variant_associative_view& view,
+                                       std::vector<std::uint8_t>& out,
+                                       bool& type_flag);
 bool binary_unpack_object_recursively(const std::uint8_t*& data,
                                       std::size_t& len,
                                       rttr::instance dst_obj,
                                       bool ignore_invalid_properties);
+
 bool binary_unpack_basic_value(const std::uint8_t*& data, std::size_t& len, rttr::variant& var, PackerDataType type);
 bool binary_unpack_array(const std::uint8_t*& data,
                          std::size_t& len,
@@ -163,9 +167,9 @@ void binary_pack_array(const variant_sequential_view& view, std::vector<std::uin
     // update data size
     pack_update_item_size(out, offset);
 }
-static void binary_pack_associative_container(const variant_associative_view& view,
-                                              std::vector<std::uint8_t>& out,
-                                              bool& type_flag) {
+void binary_pack_associative_container(const variant_associative_view& view,
+                                       std::vector<std::uint8_t>& out,
+                                       bool& type_flag) {
     if (!type_flag) pack_basic_varint_value(out, view.is_key_only_type() ? set_pack_data : map_pack_data);
     type_flag          = true;
     std::size_t offset = out.size();
@@ -173,12 +177,13 @@ static void binary_pack_associative_container(const variant_associative_view& vi
     // write element nums
     std::uint32_t nums = view.get_size();
     pack_basic_varint_value(out, nums);
-    bool key_flag   = false;
-    bool value_flag = false;
+    bool key_flag     = false;
+    bool value_flag   = false;
     if (view.is_key_only_type()) {
         for (auto& item : view) {
             do_binary_pack(item.first, out, key_flag);
         }
+
     } else {
         for (auto& item : view) {
             do_binary_pack(item.first, out, key_flag);
@@ -297,7 +302,7 @@ bool do_binary_unpack(const std::uint8_t*& data,
                       std::size_t& len,
                       rttr::variant& var,
                       rttr::instance dst_obj,
-                      PackerDataType type,
+                      PackerDataType &type,
                       bool ignore_invalid_properties) {
     if (type == unknown_pack_data) {
         if (!unpack_basic_varint_value(data, len, type)) return false;
@@ -374,7 +379,8 @@ bool binary_unpack_object_recursively(const std::uint8_t*& data,
         auto& prop      = iter->second;
         auto object_var = prop.get_value(obj);
         if (!object_var.is_valid()) return false;
-        if (!do_binary_unpack(data, len, object_var, object_var, PackerDataType::unknown_pack_data,
+        auto data_type=PackerDataType::unknown_pack_data;
+        if (!do_binary_unpack(data, len, object_var, object_var, data_type,
                               ignore_invalid_properties)) {
             FERR("unpack \"{}\" failed", prop_name);
             return false;
@@ -496,10 +502,11 @@ bool binary_unpack_array(const std::uint8_t*& data,
                          bool ignore_invalid_properties) {
     auto type = var.get_type();
     if (!type.is_sequential_container() && !type.get_wrapped_type().is_sequential_container()) {
-        FERR("invalid array value type");
+        FERR("invalid array value type {} {}", std::string(type.get_name()),
+             std::string(type.get_wrapped_type().get_name()));
         return false;
     }
-    auto view                 = var.create_sequential_view();
+    auto view = var.create_sequential_view();
     view.clear();
     std::uint32_t object_size = 0;
     std::uint32_t total_size  = 0;
@@ -510,6 +517,9 @@ bool binary_unpack_array(const std::uint8_t*& data,
     PackerDataType data_type = PackerDataType::unknown_pack_data;
     for (size_t i = 0; i < item_nums; ++i) {
         auto v = view.get_value(i);
+#ifdef DEBUG
+        [[maybe_unused]] auto value_type = v.get_type();
+#endif
         if (!do_binary_unpack(data, len, v, v, data_type, ignore_invalid_properties)) {
             FERR("unpack index {} failed", i);
             return false;
@@ -526,30 +536,45 @@ bool binary_unpack_set(const std::uint8_t*& data,
 
     auto type = var.get_type();
     if (!type.is_associative_container() && !type.get_wrapped_type().is_associative_container()) {
-        FERR("invalid set value type");
+        FERR("invalid set value type {}  {}", std::string(type.get_name()),
+             std::string(type.get_wrapped_type().get_name()));
         return false;
     }
-    auto view                 = var.create_associative_view();
-    view.clear();
+    auto view = var.create_associative_view();
+
     std::uint32_t object_size = 0;
     std::uint32_t total_size  = 0;
     if (!binary_unpack_peek_chunk_size(data, len, object_size, total_size)) return false;
     std::uint32_t item_nums = 0;
+
     if (!unpack_basic_varint_value(data, len, item_nums)) return false;
-    auto item_var = view.get_key_type().create();
-    if (!item_var.is_valid()) { // no default ctor
-        std::uint64_t storage = 0;
-        item_var              = storage;
-        if (!item_var.convert(view.get_key_type())) {
-            FERR("{} not a basic type", std::string(view.get_key_type().get_name()));
-            return false;
-        }
+
+    view.clear();
+    if (!view.reserve_key()) {
+        FERR("invalid set type {}", std::string(type.get_name()));
+        return false;
     }
+    auto iter = view.begin();
+    if (iter == view.end()) {
+        FERR("invalid set type call reserve_key {}", std::string(type.get_name()));
+        return false;
+    }
+    auto item_var = iter.get_key();
+    if (!item_var.convert(view.get_key_type())) {
+        FERR("set  convert from {} to {} failed", std::string(item_var.get_type().get_name()),
+             std::string(view.get_key_type().get_name()));
+        return false;
+    }
+#ifdef DEBUG
+    [[maybe_unused]] auto key_type = item_var.get_type();
+#endif
+    view.clear();
     PackerDataType data_type = PackerDataType::unknown_pack_data;
     for (size_t i = 0; i < item_nums; ++i) {
         if (!do_binary_unpack(data, len, item_var, item_var, data_type, ignore_invalid_properties)) return false;
         view.insert(item_var);
     }
+
     return true;
 }
 
@@ -559,40 +584,46 @@ bool binary_unpack_map(const std::uint8_t*& data,
                        bool ignore_invalid_properties) {
     auto type = var.get_type();
     if (!type.is_associative_container() && !type.get_wrapped_type().is_associative_container()) {
-        FERR("invalid map value type");
+        FERR("invalid map value type {}", std::string(type.get_name()));
         return false;
     }
     auto view                 = var.create_associative_view();
-    view.clear();
     std::uint32_t object_size = 0;
     std::uint32_t total_size  = 0;
     if (!binary_unpack_peek_chunk_size(data, len, object_size, total_size)) return false;
     std::uint32_t item_nums = 0;
     if (!unpack_basic_varint_value(data, len, item_nums)) return false;
 
-    auto item_key_var = view.get_key_type().create();
-    if (!item_key_var.is_valid()) { // no default ctor
-        std::uint64_t storage = 0;
-        item_key_var          = storage;
-        if (!item_key_var.convert(view.get_key_type())) {
-            FERR("{} not a basic type", std::string(view.get_key_type().get_name()));
-            return false;
-        }
+    view.clear();
+    if (!view.reserve_key_value()) {
+        FERR("invalid map type {}", std::string(type.get_name()));
+        return false;
     }
-    auto v_type=view.get_value_type();
-    auto item_value_var = view.get_value_type().create();
-    if (!item_value_var.is_valid()) { // no default ctor
-        std::uint64_t storage = 0;
-        item_value_var        = storage;
-        if (!item_value_var.convert(view.get_value_type())) {
-            FERR("{} not a basic type", std::string(view.get_value_type().get_name()));
-            return false;
-        }
+    auto iter = view.begin();
+    if (iter == view.end()) {
+        FERR("invalid map type call reserve_key_value {}", std::string(type.get_name()));
+        return false;
     }
+    auto item_key_var = iter.get_key();
+    if (!item_key_var.convert(view.get_key_type())) {
+        FERR("map key convert from {} to {} failed", std::string(item_key_var.get_type().get_name()),
+             std::string(view.get_key_type().get_name()));
+        return false;
+    }
+    auto item_value_var = iter.get_value();
+    if (!item_value_var.convert(view.get_value_type())) {
+        FERR("map value convert from {} to {} failed", std::string(item_value_var.get_type().get_name()),
+             std::string(view.get_value_type().get_name()));
+        return false;
+    }
+#ifdef DEBUG
+    [[maybe_unused]] auto key_type   = item_key_var.get_type();
+    [[maybe_unused]] auto value_type = item_value_var.get_type();
+#endif
+    view.clear();
     PackerDataType key_data_type   = PackerDataType::unknown_pack_data;
     PackerDataType value_data_type = PackerDataType::unknown_pack_data;
     for (size_t i = 0; i < item_nums; ++i) {
-
         if (!do_binary_unpack(data, len, item_key_var, item_key_var, key_data_type, ignore_invalid_properties))
             return false;
         if (!do_binary_unpack(data, len, item_value_var, item_value_var, value_data_type, ignore_invalid_properties))

@@ -57,7 +57,7 @@ std::string BufferToHex(const void* buffer, std::size_t size, std::size_t group_
         if (group_size > 0 && i > 0 && (i % group_size == 0))
             oss << '\n';
         else if (spilt_char > 0) {
-            if (i > 0) oss << static_cast<char>(spilt_char);
+            oss << static_cast<char>(spilt_char);
         }
     }
     return oss.str();

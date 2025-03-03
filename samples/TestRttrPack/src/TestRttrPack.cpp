@@ -6,6 +6,7 @@
 #include "fundamental/basic/utils.hpp"
 #include "fundamental/rttr_handler/binary_packer.h"
 
+#include "fundamental/rttr_handler/serializer.h"
 #include <iostream>
 #include <list>
 #include <map>
@@ -16,7 +17,6 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-
 using namespace rttr;
 
 static nlohmann::json json_from_string(const std::string& str, bool& ok) {
@@ -117,10 +117,10 @@ struct TestContainerEle {
         return !operator==(other);
     }
     bool operator>(const TestContainerEle& other) const noexcept {
-        return x > other.x && y > other.y;
+        return x > other.x;
     }
     bool operator<(const TestContainerEle& other) const noexcept {
-        return x < other.x || y < other.y;
+        return x < other.x;
     }
 };
 
@@ -133,6 +133,7 @@ struct TestContainer {
     std::set<TestContainerEle> objects_set;
     std::map<std::string, std::string> empty_map;
     std::map<TestContainerEle, std::set<TestContainerEle>> no_empty_map;
+    std::map<TestContainerEle, std::map<TestContainerEle, std::set<TestContainerEle>>> no_empty_map2;
     void update() {
         auto g = Fundamental::DefaultNumberGenerator<int>();
         obj.x  = g();
@@ -140,12 +141,13 @@ struct TestContainer {
         no_empty_v.push_back(obj);
         objects_v.push_back(no_empty_v);
         objects_set.insert(obj);
-        no_empty_map[obj] = objects_set;
+        no_empty_map[obj]  = objects_set;
+        no_empty_map2[obj] = no_empty_map;
     }
     bool operator==(const TestContainer& other) const noexcept {
         return obj == other.obj && empty_v == other.empty_v && no_empty_v == other.no_empty_v &&
                empty_set == other.empty_set && objects_set == other.objects_set && empty_map == other.empty_map &&
-               no_empty_map == other.no_empty_map;
+               no_empty_map == other.no_empty_map && no_empty_map2 == other.no_empty_map2;
     }
 };
 
@@ -302,7 +304,8 @@ RTTR_REGISTRATION {
             .property("5", &register_type::obj)
             .property("6", &register_type::empty_map)
             .property("7", &register_type::empty_set)
-            .property("8", &register_type::empty_v);
+            .property("8", &register_type::empty_v)
+            .property("9", &register_type::no_empty_map2);
     }
 }
 int main(int argc, char* argv[]) {
@@ -316,10 +319,11 @@ int main(int argc, char* argv[]) {
     }
     auto v = type.create();
 
-    if (1) {
+    {
         int cnt = 0;
+
         TestContainer obj;
-        while (cnt < 100) {
+        while (cnt < 20) {
             obj.update();
             auto data = binary_pack(obj);
             TestContainer tmp;
@@ -327,9 +331,7 @@ int main(int argc, char* argv[]) {
             FASSERT(tmp == obj);
             ++cnt;
         }
-        return 0;
     }
-
     TestVarObject basic_object;
     std::int32_t cnt = 5;
     TestVarObject2 obj;

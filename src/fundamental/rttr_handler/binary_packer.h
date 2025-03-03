@@ -74,7 +74,7 @@ bool do_binary_unpack(const std::uint8_t*& data,
                       std::size_t& len,
                       rttr::variant& var,
                       rttr::instance dst_obj,
-                      PackerDataType type,
+                      PackerDataType &type,
                       bool ignore_invalid_properties);
 bool binary_unpack_skip_item(const std::uint8_t*& data, std::size_t& len);
 
