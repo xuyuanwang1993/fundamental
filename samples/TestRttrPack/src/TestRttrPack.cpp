@@ -2,9 +2,11 @@
 
 #include "fundamental/basic/buffer.hpp"
 #include "fundamental/basic/log.h"
+#include "fundamental/basic/random_generator.hpp"
 #include "fundamental/basic/utils.hpp"
 #include "fundamental/rttr_handler/binary_packer.h"
 
+#include "fundamental/rttr_handler/serializer.h"
 #include <iostream>
 #include <list>
 #include <map>
@@ -15,17 +17,15 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-
 using namespace rttr;
 
 static nlohmann::json json_from_string(const std::string& str, bool& ok) {
-    try
-    {
+    try {
         ok = true;
         return nlohmann::json::parse(str);
+    } catch (const std::exception& e) {
+        ok = false;
     }
-    catch (const std::exception& e)
-    { ok = false; }
     return {};
 }
 
@@ -104,6 +104,50 @@ struct CustomObject2 {
     }
     bool operator!=(const CustomObject& other) const noexcept {
         return is != other.is;
+    }
+};
+
+struct TestContainerEle {
+    int x;
+    int y;
+    bool operator==(const TestContainerEle& other) const noexcept {
+        return other.x == x && other.y == y;
+    }
+    bool operator!=(const TestContainerEle& other) const noexcept {
+        return !operator==(other);
+    }
+    bool operator>(const TestContainerEle& other) const noexcept {
+        return x > other.x;
+    }
+    bool operator<(const TestContainerEle& other) const noexcept {
+        return x < other.x;
+    }
+};
+
+struct TestContainer {
+    TestContainerEle obj;
+    std::vector<std::string> empty_v;
+    std::vector<TestContainerEle> no_empty_v;
+    std::vector<std::vector<TestContainerEle>> objects_v;
+    std::set<std::string> empty_set;
+    std::set<TestContainerEle> objects_set;
+    std::map<std::string, std::string> empty_map;
+    std::map<TestContainerEle, std::set<TestContainerEle>> no_empty_map;
+    std::map<TestContainerEle, std::map<TestContainerEle, std::set<TestContainerEle>>> no_empty_map2;
+    void update() {
+        auto g = Fundamental::DefaultNumberGenerator<int>();
+        obj.x  = g();
+        obj.y  = g();
+        no_empty_v.push_back(obj);
+        objects_v.push_back(no_empty_v);
+        objects_set.insert(obj);
+        no_empty_map[obj]  = objects_set;
+        no_empty_map2[obj] = no_empty_map;
+    }
+    bool operator==(const TestContainer& other) const noexcept {
+        return obj == other.obj && empty_v == other.empty_v && no_empty_v == other.no_empty_v &&
+               empty_set == other.empty_set && objects_set == other.objects_set && empty_map == other.empty_map &&
+               no_empty_map == other.no_empty_map && no_empty_map2 == other.no_empty_map2;
     }
 };
 
@@ -240,14 +284,58 @@ RTTR_REGISTRATION {
             .property("4", &register_type::obj4)
             .property("5", &register_type::ob5);
     }
+
+    {
+        using register_type = TestContainerEle;
+        rttr::registration::class_<register_type>("TestContainerEle")
+            .constructor()(rttr::policy::ctor::as_object)
+            .property("x", &register_type::x)
+            .property("y", &register_type::y);
+    }
+
+    {
+        using register_type = TestContainer;
+        rttr::registration::class_<register_type>("TestContainer")
+            .constructor()(rttr::policy::ctor::as_object)
+            .property("1", &register_type::objects_set)
+            .property("2", &register_type::objects_v)
+            .property("3", &register_type::no_empty_map)
+            .property("4", &register_type::no_empty_v)
+            .property("5", &register_type::obj)
+            .property("6", &register_type::empty_map)
+            .property("7", &register_type::empty_set)
+            .property("8", &register_type::empty_v)
+            .property("9", &register_type::no_empty_map2);
+    }
 }
 int main(int argc, char* argv[]) {
     using namespace Fundamental::io;
+    auto type = rttr::type::get<std::set<TestContainerEle>>();
+
+    constructor ctor = type.get_constructor();
+    auto ctors       = type.get_constructors();
+    for (auto& item : ctors) {
+        if (item.get_instantiated_type() == type) ctor = item;
+    }
+    auto v = type.create();
+
+    {
+        int cnt = 0;
+
+        TestContainer obj;
+        while (cnt < 20) {
+            obj.update();
+            auto data = binary_pack(obj);
+            TestContainer tmp;
+            binary_unpack(data.data(), data.size(), tmp, true, 0);
+            FASSERT(tmp == obj);
+            ++cnt;
+        }
+    }
     TestVarObject basic_object;
     std::int32_t cnt = 5;
     TestVarObject2 obj;
-    while (cnt > 0)
-    {
+    while (cnt > 0) {
         --cnt;
         obj.ob1 = basic_object.update();
         obj.obj2.push_back(basic_object.update());

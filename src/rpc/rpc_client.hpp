@@ -550,7 +550,7 @@ private:
 #ifdef RPC_VERBOSE
             auto& msg = outbox_[0];
             FDEBUG("client write header:{} body:{}", Fundamental::Utils::BufferToHex(write_head_, kRpcHeadLen),
-                   Fundamental::Utils::BufferToHex(msg.content.data(), msg.content.size(),140));
+                   Fundamental::Utils::BufferToHex(msg.content.data(), msg.content.size(), 140));
 #endif
             outbox_.pop_front();
 
@@ -606,7 +606,7 @@ private:
 
             if (!ec) {
 #ifdef RPC_VERBOSE
-                FDEBUG("client read body: {}", Fundamental::Utils::BufferToHex(body_.data(), body_len,140));
+                FDEBUG("client read body: {}", Fundamental::Utils::BufferToHex(body_.data(), body_len, 140));
 #endif
                 // entier body
                 if (req_type == request_type::rpc_res) {
@@ -975,7 +975,8 @@ inline bool ClientStreamReadWriter::Write(U&& response) {
     if (last_data_status_ >= rpc_stream_data_status::rpc_stream_finish) return false;
     rpc_buffer_type data;
     try {
-        data = msgpack_codec::pack(std::forward<U>(response));
+        data   = msgpack_codec::pack(std::forward<U>(response));
+        auto test = msgpack_codec::unpack<std::decay_t<U>>(data.data(), data.size());
     } catch (const std::exception& e) {
         set_status(rpc_stream_data_status::rpc_stream_failed,
                    error::make_error_code(error::rpc_errors::rpc_pack_failed));
@@ -1064,7 +1065,7 @@ inline void ClientStreamReadWriter::read_body() {
         } else {
 #ifdef RPC_VERBOSE
             FDEBUG("client stream read :{:x} {}", read_packet_buffer.type,
-                   Fundamental::Utils::BufferToHex(read_packet_buffer.data.data(), read_packet_buffer.size,140));
+                   Fundamental::Utils::BufferToHex(read_packet_buffer.data.data(), read_packet_buffer.size, 140));
 #endif
             auto status = static_cast<rpc_stream_data_status>(read_packet_buffer.type);
             if (status < last_data_status_ || status >= rpc_stream_data_status::rpc_stream_finish) {
@@ -1130,7 +1131,7 @@ inline void ClientStreamReadWriter::handle_write() {
         auto& item = write_cache_.front();
         FDEBUG("client stream write {}{}{}", Fundamental::Utils::BufferToHex(&item.size, sizeof(item.size)),
                Fundamental::Utils::BufferToHex(&item.type, sizeof(item.type)),
-               Fundamental::Utils::BufferToHex(item.data.data(), item.data.size(),140));
+               Fundamental::Utils::BufferToHex(item.data.data(), item.data.size(), 140));
 #endif
         auto packet_type = write_cache_.front().type;
         if (packet_type == static_cast<std::uint8_t>(rpc_stream_data_status::rpc_stream_finish)) {
