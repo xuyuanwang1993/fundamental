@@ -348,7 +348,7 @@ private:
                     // switch to proxy connection,don't need timer check any more
                     cancel_timer();
                     b_waiting_process_any_data.exchange(false);
-#ifdef RPC_VERBOSE
+#ifndef RPC_VERBOSE
                     FDEBUG("server proxy request read {}",
                            Fundamental::Utils::BufferToHex(proxy_buffer->data(), proxy_buffer->size(), 140));
 #endif
@@ -387,14 +387,14 @@ private:
                 return;
             }
             if (ec) {
-                FDEBUG("rpc read head failed {}", ec.message());
+                FDEBUG("{:p} rpc read head failed {}", (void*)this, ec.message());
                 on_net_err_(self, ec.message());
                 close();
                 return;
             }
             b_waiting_process_any_data.exchange(false);
-#ifdef RPC_VERBOSE
-            FDEBUG("server read head {}", Fundamental::Utils::BufferToHex(head_, kRpcHeadLen));
+#ifndef RPC_VERBOSE
+            FDEBUG("server {:p} read head {}", (void*)this, Fundamental::Utils::BufferToHex(head_, kRpcHeadLen));
 #endif
             switch (head_[0]) {
             case RPC_MAGIC_NUM: process_rpc_request(); break;
@@ -409,8 +409,8 @@ private:
 
     void read_body(uint32_t func_id, std::size_t size, std::size_t start_offset = 0) {
         auto self(this->shared_from_this());
-#ifdef RPC_VERBOSE
-        FDEBUG("server try read size: {}", size - start_offset);
+#ifndef RPC_VERBOSE
+        FDEBUG("server {:p} try read size: {}", (void*)this, size - start_offset);
 #endif
         async_buffer_read_some(
             { asio::mutable_buffer(body_.data() + start_offset, size - start_offset) },
@@ -426,15 +426,17 @@ private:
                 }
                 b_waiting_process_any_data.exchange(false);
                 auto current_read_offset = start_offset + length;
-#ifdef RPC_VERBOSE
-                FDEBUG("server read some need:{}  current: {} new:{}", size, current_read_offset, length);
+#ifndef RPC_VERBOSE
+                FDEBUG("server {:p} read some need:{}  current: {} new:{}", (void*)this, size, current_read_offset,
+                       length);
 #endif
                 if (current_read_offset < size) {
                     read_body(func_id, size, current_read_offset);
                     return;
                 }
-#ifdef RPC_VERBOSE
-                FDEBUG("server read {} body {}", size, Fundamental::Utils::BufferToHex(body_.data(), size, 140));
+#ifndef RPC_VERBOSE
+                FDEBUG("server {:p} read {} body {}", (void*)this, size,
+                       Fundamental::Utils::BufferToHex(body_.data(), size, 140));
 #endif
                 read_head();
                 try {
@@ -522,8 +524,8 @@ private:
         if (write_buffers_.empty()) {
             auto& msg   = write_queue_.front();
             write_size_ = (uint32_t)msg.content.size();
-            rpc_header { RPC_MAGIC_NUM, msg.req_type, write_size_, msg.req_id }.Serialize(write_head_buffer,
-                                                                                          kRpcHeadLen);
+            rpc_header { RPC_MAGIC_NUM, msg.req_type, write_size_, msg.req_id, static_cast<std::uint32_t>(conn_id_) }
+                .Serialize(write_head_buffer, kRpcHeadLen);
 
             write_buffers_.emplace_back(asio::buffer(write_head_buffer, kRpcHeadLen));
             if (write_size_ > 0) write_buffers_.emplace_back(asio::buffer(msg.content.data(), write_size_));
@@ -533,7 +535,7 @@ private:
         async_write_buffers_some(std::vector<asio::const_buffer>(write_buffers_.begin(), write_buffers_.end()),
                                  [this, self](asio::error_code ec, std::size_t length) {
                                      if (ec) {
-                                         FDEBUG("rpc write failed {}", ec.message());
+                                         FDEBUG("{:p} rpc write failed {}", (void*)this, ec.message());
                                          on_net_err_(shared_from_this(), ec.message());
                                          close();
                                          return;
@@ -543,8 +545,8 @@ private:
                                          return;
                                      }
                                      b_waiting_process_any_data.exchange(false);
-#ifdef RPC_VERBOSE
-                                     FDEBUG("server write some size:{}", length);
+#ifndef RPC_VERBOSE
+                                     FDEBUG("server {:p} write some size:{}", (void*)this, length);
 #endif
                                      while (length != 0) {
                                          auto current_size = write_buffers_.front().size();
@@ -706,6 +708,7 @@ private:
 
 inline ServerStreamReadWriter::ServerStreamReadWriter(std::shared_ptr<connection> conn) :
 conn_(conn), timeout_check_timer_(conn_->socket_.get_executor()) {
+    FDEBUG("build stream writer {:p} with connection:{:p}", (void*)this, (void*)conn_.get());
     read_head();
 }
 inline ServerStreamReadWriter::~ServerStreamReadWriter() {
@@ -811,9 +814,10 @@ inline void ServerStreamReadWriter::read_head() {
         if (ec) {
             set_status(rpc_stream_data_status::rpc_stream_failed, std::move(ec));
         } else {
-#ifdef RPC_VERBOSE
-            FDEBUG("server stream read head {}",
-                   Fundamental::Utils::BufferToHex(&read_packet_buffer.size, sizeof(read_packet_buffer.size)));
+#ifndef RPC_VERBOSE
+            FDEBUG("server {:p} stream read head size data:{} type:{}", (void*)this,
+                   Fundamental::Utils::BufferToHex(&read_packet_buffer.size, sizeof(read_packet_buffer.size)),
+                   static_cast<std::uint32_t>(read_packet_buffer.type));
 #endif
             b_waiting_process_any_data.exchange(false);
 
@@ -821,6 +825,8 @@ inline void ServerStreamReadWriter::read_head() {
                 auto status = static_cast<rpc_stream_data_status>(read_packet_buffer.type);
                 if ((status != rpc_stream_data_status::rpc_stream_heartbeat && status < last_data_status_) ||
                     status >= rpc_stream_data_status::rpc_stream_status_max) {
+                    FDEBUG("server {:p} rpc_bad_request status:{} last_data_status:{}", (void*)this,
+                           static_cast<std::uint32_t>(status), static_cast<std::uint32_t>(last_data_status_.load()));
                     set_status(rpc_stream_data_status::rpc_stream_failed,
                                error::make_error_code(error::rpc_errors::rpc_bad_request));
                     return;
@@ -843,11 +849,6 @@ inline void ServerStreamReadWriter::read_head() {
                     read_head();
                 } break;
                 case rpc_stream_data_status::rpc_stream_write_done: {
-                    if (last_data_status_ == rpc_stream_data_status::rpc_stream_write_done) {
-                        set_status(rpc_stream_data_status::rpc_stream_failed,
-                                   error::make_error_code(error::rpc_errors::rpc_bad_request));
-                        return;
-                    }
                     read_head();
                     set_status(status, error::make_error_code(error::rpc_errors::rpc_success));
                 } break;
@@ -860,8 +861,11 @@ inline void ServerStreamReadWriter::read_head() {
                     set_status(status, error::make_error_code(error::rpc_errors::rpc_success));
                 } break;
                 default: {
+                    FDEBUG("server {:p} rpc_bad_request   unsupported status:{} last_data_status:{}", (void*)this,
+                           static_cast<std::uint32_t>(status), static_cast<std::uint32_t>(last_data_status_.load()));
                     set_status(rpc_stream_data_status::rpc_stream_failed,
                                error::make_error_code(error::rpc_errors::rpc_bad_request));
+                    abort();
                     break;
                 }
                 }
@@ -883,17 +887,17 @@ inline void ServerStreamReadWriter::read_body(std::uint32_t offset) {
         } else {
             b_waiting_process_any_data.exchange(false);
             auto current_read_offset = offset + length;
-#ifdef RPC_VERBOSE
-            FDEBUG("server stream read some need:{}  current: {} new:{}", read_packet_buffer.size, current_read_offset,
-                   length);
+#ifndef RPC_VERBOSE
+            FDEBUG("server {:p} stream read some need:{}  current: {} new:{}", (void*)this, read_packet_buffer.size,
+                   current_read_offset, length);
 #endif
             if (current_read_offset < read_packet_buffer.size) {
 
                 read_body(current_read_offset);
                 return;
             }
-#ifdef RPC_VERBOSE
-            FDEBUG("server stream read {}",
+#ifndef RPC_VERBOSE
+            FDEBUG("server {:p} stream read {}", (void*)this,
                    Fundamental::Utils::BufferToHex(read_packet_buffer.data.data(), read_packet_buffer.size, 140));
 #endif
             read_head();
@@ -913,7 +917,7 @@ inline void ServerStreamReadWriter::set_status(rpc_stream_data_status status, st
     last_data_status_ = status;
     cv_.notify_all();
     if (last_data_status_.load() >= rpc_stream_data_status::rpc_stream_finish) {
-        FDEBUG("rpc stream connection finish success:{} {}",
+        FDEBUG("rpc {:p} stream connection finish success:{} {}", (void*)this,
                last_data_status_.load() == rpc_stream_data_status::rpc_stream_finish, last_err_.message());
         cancel_timer();
         conn_->close();
@@ -947,8 +951,8 @@ inline void ServerStreamReadWriter::handle_write() {
             }
             b_waiting_process_any_data.exchange(false);
 
-#ifdef RPC_VERBOSE
-            FDEBUG("server stream write some size:{}", length);
+#ifndef RPC_VERBOSE
+            FDEBUG("server {:p} stream write some size:{}",(void*)this, length);
 #endif
             while (length != 0) {
                 auto current_size = write_buffers_.front().size();

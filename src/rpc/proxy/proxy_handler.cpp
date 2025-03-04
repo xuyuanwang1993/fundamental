@@ -15,7 +15,7 @@ proxy_handler::proxy_handler(const std::string& proxy_host,
 proxy_host(proxy_host), proxy_service(proxy_service), socket_(std::move(socket)), proxy_socket_(socket_.get_executor()),
 resolver(socket_.get_executor()), cachePool(Fundamental::MakePoolMemorySource()), client2server(cachePool),
 server2client(cachePool) {
-#ifdef RPC_VERBOSE
+#ifndef RPC_VERBOSE
     client2server.tag_ = "client2server";
     server2client.tag_ = "server2client";
 #endif
@@ -69,8 +69,7 @@ void proxy_handler::StartDnsResolve(const std::string& host, const std::string& 
     FDEBUG("start proxy dns resolve {}:{}", host, service);
     status |= ProxyDnsResolving;
     resolver.async_resolve(
-        asio::ip::tcp::v4(), host, service,
-        [ref = shared_from_this(), this](asio::error_code ec, decltype(resolver)::results_type result) {
+        host, service, [ref = shared_from_this(), this](asio::error_code ec, decltype(resolver)::results_type result) {
             status ^= ProxyDnsResolving;
             if (ec || result.empty()) {
                 HandleDisconnect(ec, "dns resolve");
@@ -81,11 +80,10 @@ void proxy_handler::StartDnsResolve(const std::string& host, const std::string& 
 }
 
 void proxy_handler::StartConnect(asio::ip::tcp::resolver::results_type&& result) {
-    FDEBUG("start connect to {}:{}  {}:{}", result.begin()->host_name(), result.begin()->service_name(),
-           result.begin()->endpoint().address().to_string(), result.begin()->endpoint().port());
     status |= ServerConnecting;
     asio::async_connect(proxy_socket_, result,
-                        [this, self = shared_from_this()](std::error_code ec, asio::ip::tcp::endpoint) {
+                        [this, self = shared_from_this()](std::error_code ec, asio::ip::tcp::endpoint endpoint) {
+                            FDEBUG("proxy connect to {}:{}", endpoint.address().to_string(), endpoint.port());
                             if (ec) {
                                 HandleDisconnect(ec, "connect");
                                 return;
@@ -215,14 +213,14 @@ void proxy_handler::EndponitCacheStatus::PrepareReadCache() {
 }
 asio::mutable_buffer proxy_handler::EndponitCacheStatus::GetReadBuffer() {
     auto& back = cache_.back();
-#ifdef RPC_VERBOSE
+#ifndef RPC_VERBOSE
     FDEBUG("proxy {} try read {:p} size current_offset:{}", tag_, (void*)&back, back.readOffset);
 #endif
     return asio::buffer(back.data.data() + back.readOffset, kCacheBufferSize - back.readOffset);
 }
 asio::const_buffer proxy_handler::EndponitCacheStatus::GetWriteBuffer() {
     auto& front = cache_.front();
-#ifdef RPC_VERBOSE
+#ifndef RPC_VERBOSE
     FDEBUG("proxy {} try write {:p} size {}-{}={}", tag_, (void*)&front, front.readOffset, front.writeOffset,
            front.readOffset - front.writeOffset);
 #endif
@@ -232,7 +230,7 @@ void proxy_handler::EndponitCacheStatus::UpdateReadBuffer(std::size_t readBytes)
     if (readBytes == 0) return;
     auto& back = cache_.back();
 
-#ifdef RPC_VERBOSE
+#ifndef RPC_VERBOSE
     FDEBUG("proxy {} read {:p} {} {} --> {}", tag_, (void*)&back, readBytes, back.readOffset,
            Fundamental::Utils::BufferToHex(back.data.data() + back.readOffset, readBytes, 140));
 #endif
@@ -245,7 +243,7 @@ void proxy_handler::EndponitCacheStatus::UpdateWriteBuffer(std::size_t writeByte
     is_writing = false;
     if (writeBytes == 0) return;
     auto& front = cache_.front();
-#ifdef RPC_VERBOSE
+#ifndef RPC_VERBOSE
     FDEBUG("proxy {} write {:p} {} {} --> {}", (void*)&front, tag_, writeBytes, front.writeOffset,
            Fundamental::Utils::BufferToHex(front.data.data() + front.writeOffset, writeBytes, 140));
 #endif

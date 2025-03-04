@@ -4,8 +4,10 @@
 #include "eventpp/eventdispatcher.h"
 #include "eventpp/eventqueue.h"
 #include <functional>
+#include <future>
 #include <set>
-namespace Fundamental {
+namespace Fundamental
+{
 using EQ = eventpp::EventQueue<EventType, void(const EventPointerType&), EventPolicy>;
 using EventHandleType =
     decltype(std::declval<EQ>().appendListener(std::declval<EventType>(), std::declval<EventCallbackType>()));
@@ -98,6 +100,10 @@ public:
                                                     eventpp::internal_::HasTypeCallback<PoliciesType>::value,
                                                     std::function<ReturnType(Args...)>>::Type;
     using HandleType = typename eventpp::CallbackList<ReturnType(Args...), PoliciesType>::Handle;
+    struct SignalFuture {
+        HandleType handle;
+        std::promise<void> p;
+    };
 
 public:
     /// @brief bind excutors for this signal
@@ -106,6 +112,14 @@ public:
     /// will be add to the process deque top
     /// @return the handle which can be used to cancel the excutor binding
     HandleType Connect(const Callback_& callback, bool append_mode = true);
+    std::shared_ptr<SignalFuture> MakeSignalFuture() {
+        auto ret    = std::make_shared<SignalFuture>();
+        ret->handle = Connect([ret, this](Args...) -> void {
+            DisConnect(ret->handle);
+            ret->p.set_value();
+        });
+        return ret;
+    }
     bool DisConnect(HandleType handle);
     void Emit(Args... args);
     void operator()(Args... args);
@@ -122,7 +136,8 @@ private:
 
 template <typename PoliciesType, typename ReturnType, typename... Args>
 inline typename SignalBase<ReturnType(Args...), PoliciesType>::HandleType SignalBase<
-    ReturnType(Args...), PoliciesType>::Connect(const Callback_& callback, bool append_mode) {
+    ReturnType(Args...),
+    PoliciesType>::Connect(const Callback_& callback, bool append_mode) {
     if (append_mode) {
         return _connections.append(callback);
     } else {
@@ -137,7 +152,7 @@ inline bool SignalBase<ReturnType(Args...), PoliciesType>::DisConnect(HandleType
 
 template <typename PoliciesType, typename ReturnType, typename... Args>
 inline void SignalBase<ReturnType(Args...), PoliciesType>::Emit(Args... args) {
-    _connections(std::forward<Args>(args)...);
+    operator()(std::forward<Args>(args)...);
 }
 
 template <typename PoliciesType, typename ReturnType, typename... Args>

@@ -16,13 +16,67 @@
 using namespace network;
 using namespace network::rpc_service;
 static Fundamental::ThreadPool& s_test_pool = Fundamental::ThreadPool::Instance<101>();
-#if 1
+TEST(rpc_test, test_echo_stream_proxy_mutithread) {
+    std::vector<Fundamental::ThreadPoolTaskToken<void>> tasks;
+    auto nums      = 40;
+    auto task_func = []() {
+        rpc_client client;
+        client.set_proxy(std::make_shared<network::rpc_service::CustomRpcProxy>(kProxyServiceName, kProxyServiceField,
+                                                                                kProxyServiceToken));
+        [[maybe_unused]] bool r = client.connect("127.0.0.1", "9000");
+        EXPECT_TRUE(r && client.has_connected());
+        auto stream = client.upgrade_to_stream("test_echo_stream");
+        EXPECT_TRUE(stream != nullptr);
+        std::size_t cnt  = 5;
+        std::string base = "msg ";
+        while (cnt != 0) {
+            {
+                auto ret = stream->Write(base + std::to_string(cnt));
+                if (!ret) {
+                    FDEBUG(ret);
+                    EXPECT_TRUE(ret);
+                }
+            }
+            --cnt;
+            std::string tmp;
+            {
+                auto ret = stream->Read(tmp, 0);
+                if (!ret) {
+                    FDEBUG(ret);
+                    EXPECT_TRUE(ret);
+                }
+            }
+            FINFO("mutithread echo msg:{}", tmp);
+        }
+        {
+            auto ret = stream->WriteDone();
+            if (!ret) {
+                FDEBUG(ret);
+                EXPECT_TRUE(ret);
+            }
+        }
+        {
+            auto ret = !stream->Finish(0);
+            if (!ret) {
+                FDEBUG(ret);
+                EXPECT_TRUE(ret);
+            }
+        }
+    };
+    while (nums > 0) {
+        tasks.emplace_back(s_test_pool.Enqueue(task_func));
+        nums--;
+    }
+    for (auto& f : tasks)
+        EXPECT_NO_THROW(f.resultFuture.get());
+}
+#if 0
 TEST(rpc_test, test_connect) {
     Fundamental::Timer check_timer;
     Fundamental::ScopeGuard check_guard(
         [&]() { EXPECT_LE(check_timer.GetDuration<Fundamental::Timer::TimeScale::Millisecond>(), 100); });
     rpc_client client;
-    [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
+    [[maybe_unused]] bool r = client.connect("127.0.0.1", "9000");
     EXPECT_TRUE(r && client.has_connected());
 }
 
@@ -31,7 +85,7 @@ TEST(rpc_test, test_add) {
     Fundamental::ScopeGuard check_guard(
         [&]() { EXPECT_LE(check_timer.GetDuration<Fundamental::Timer::TimeScale::Millisecond>(), 100); });
     try {
-        rpc_client client("127.0.0.1", 9000);
+        rpc_client client("127.0.0.1", "9000");
 
         bool r = client.connect();
         if (!r) {
@@ -61,7 +115,7 @@ TEST(rpc_test, test_translate) {
     Fundamental::ScopeGuard check_guard(
         [&]() { EXPECT_LE(check_timer.GetDuration<Fundamental::Timer::TimeScale::Millisecond>(), 100); });
     try {
-        rpc_client client("127.0.0.1", 9000);
+        rpc_client client("127.0.0.1", "9000");
         bool r = client.connect();
         if (!r) {
             EXPECT_TRUE(false && "connect timeout");
@@ -80,7 +134,7 @@ TEST(rpc_test, test_hello) {
     Fundamental::ScopeGuard check_guard(
         [&]() { EXPECT_LE(check_timer.GetDuration<Fundamental::Timer::TimeScale::Millisecond>(), 100); });
     try {
-        rpc_client client("127.0.0.1", 9000);
+        rpc_client client("127.0.0.1", "9000");
         bool r = client.connect();
         if (!r) {
             EXPECT_TRUE(false && "connect timeout");
@@ -97,7 +151,7 @@ TEST(rpc_test, test_get_person_name) {
     Fundamental::ScopeGuard check_guard(
         [&]() { EXPECT_LE(check_timer.GetDuration<Fundamental::Timer::TimeScale::Millisecond>(), 100); });
     try {
-        rpc_client client("127.0.0.1", 9000);
+        rpc_client client("127.0.0.1", "9000");
         bool r = client.connect();
         if (!r) {
             EXPECT_TRUE(false && "connect timeout");
@@ -115,7 +169,7 @@ TEST(rpc_test, test_get_person) {
     Fundamental::ScopeGuard check_guard(
         [&]() { EXPECT_LE(check_timer.GetDuration<Fundamental::Timer::TimeScale::Millisecond>(), 100); });
     try {
-        rpc_client client("127.0.0.1", 9000);
+        rpc_client client("127.0.0.1", "9000");
         bool r = client.connect();
         if (!r) {
             EXPECT_TRUE(false && "connect timeout");
@@ -132,7 +186,7 @@ TEST(rpc_test, test_async_client) {
     Fundamental::Timer check_timer;
     Fundamental::ScopeGuard check_guard(
         [&]() { EXPECT_LE(check_timer.GetDuration<Fundamental::Timer::TimeScale::Millisecond>(), 100); });
-    rpc_client client("127.0.0.1", 9000);
+    rpc_client client("127.0.0.1", "9000");
     bool r = client.connect();
     if (!r) {
         EXPECT_TRUE(false && "connect timeout");
@@ -153,7 +207,7 @@ TEST(rpc_test, test_upload) {
     Fundamental::Timer check_timer;
     Fundamental::ScopeGuard check_guard(
         [&]() { EXPECT_LE(check_timer.GetDuration<Fundamental::Timer::TimeScale::Millisecond>(), 100); });
-    rpc_client client("127.0.0.1", 9000);
+    rpc_client client("127.0.0.1", "9000");
     bool r = client.connect(1);
     if (!r) {
         EXPECT_TRUE(false && "connect timeout");
@@ -184,7 +238,7 @@ TEST(rpc_test, test_download) {
     Fundamental::Timer check_timer;
     Fundamental::ScopeGuard check_guard(
         [&]() { EXPECT_LE(check_timer.GetDuration<Fundamental::Timer::TimeScale::Millisecond>(), 100); });
-    rpc_client client("127.0.0.1", 9000);
+    rpc_client client("127.0.0.1", "9000");
     bool r = client.connect(1);
     if (!r) {
         EXPECT_TRUE(false && "connect timeout");
@@ -201,7 +255,7 @@ TEST(rpc_test, test_echo) {
     Fundamental::Timer check_timer;
     Fundamental::ScopeGuard check_guard(
         [&]() { EXPECT_LE(check_timer.GetDuration<Fundamental::Timer::TimeScale::Millisecond>(), 100); });
-    rpc_client client("127.0.0.1", 9000);
+    rpc_client client("127.0.0.1", "9000");
     bool r = client.connect();
     if (!r) {
         EXPECT_TRUE(false && "connect timeout");
@@ -231,7 +285,7 @@ TEST(rpc_test, test_call_with_timeout) {
     Fundamental::ScopeGuard check_guard(
         [&]() { EXPECT_LE(check_timer.GetDuration<Fundamental::Timer::TimeScale::Millisecond>(), 100); });
     rpc_client client;
-    client.async_connect("127.0.0.1", 9000);
+    client.async_connect("127.0.0.1", "9000");
 
     try {
         auto result = client.call<50, person>("get_person");
@@ -254,7 +308,7 @@ TEST(rpc_test, test_callback) {
     rpc_client client;
     client.enable_auto_reconnect();
     client.enable_timeout_check();
-    [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
+    [[maybe_unused]] bool r = client.connect("127.0.0.1", "9000");
     EXPECT_TRUE(r);
     std::atomic<std::size_t> count    = 200;
     static std::atomic_bool is_failed = false;
@@ -311,7 +365,7 @@ TEST(rpc_test, test_proxy) {
     Fundamental::ScopeGuard check_guard(
         [&]() { EXPECT_LE(check_timer.GetDuration<Fundamental::Timer::TimeScale::Millisecond>(), 100); });
 
-    rpc_client client("127.0.0.1", 9000);
+    rpc_client client("127.0.0.1", "9000");
     client.set_proxy(std::make_shared<network::rpc_service::CustomRpcProxy>(kProxyServiceName, kProxyServiceField,
                                                                             kProxyServiceToken));
     bool r = client.connect();
@@ -338,7 +392,7 @@ TEST(rpc_test, test_auto_reconnect) {
         [&]() { EXPECT_LE(check_timer.GetDuration<Fundamental::Timer::TimeScale::Millisecond>(), 50); });
 
     try {
-        rpc_client client("127.0.0.1", 9000);
+        rpc_client client("127.0.0.1", "9000");
         client.enable_auto_reconnect();
         client.set_reconnect_delay(10);
         bool r = client.connect();
@@ -370,7 +424,7 @@ TEST(rpc_test, test_sub1) {
         rpc_client client;
         client.enable_auto_reconnect();
         client.enable_timeout_check();
-        bool r = client.connect("127.0.0.1", 9000);
+        bool r = client.connect("127.0.0.1", "9000");
         if (!r) {
             success = false;
             break;
@@ -407,7 +461,7 @@ TEST(rpc_test, test_sub1) {
         rpc_client client2;
         client2.enable_auto_reconnect();
         client2.enable_timeout_check();
-        r = client2.connect("127.0.0.1", 9000);
+        r = client2.connect("127.0.0.1", "9000");
         if (!r) {
             success = false;
             break;
@@ -434,7 +488,7 @@ TEST(rpc_test, test_sub1) {
         rpc_client client3;
         client3.enable_auto_reconnect();
         client3.enable_timeout_check();
-        r = client3.connect("127.0.0.1", 9000);
+        r = client3.connect("127.0.0.1", "9000");
         if (!r) {
             success = false;
             break;
@@ -450,7 +504,7 @@ TEST(rpc_test, test_sub1) {
 
 TEST(rpc_test, basice_rpc_stream_test) {
     rpc_client client;
-    [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
+    [[maybe_unused]] bool r = client.connect("127.0.0.1", "9000");
     EXPECT_TRUE(r && client.has_connected());
     auto ptr = client.upgrade_to_stream("test_stream");
     EXPECT_TRUE(ptr != nullptr);
@@ -458,7 +512,7 @@ TEST(rpc_test, basice_rpc_stream_test) {
 
 TEST(rpc_test, basice_rpc_stream_read_write) {
     rpc_client client;
-    [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
+    [[maybe_unused]] bool r = client.connect("127.0.0.1", "9000");
     EXPECT_TRUE(r && client.has_connected());
     auto stream = client.upgrade_to_stream("test_stream");
     EXPECT_TRUE(stream != nullptr);
@@ -486,7 +540,7 @@ TEST(rpc_test, basice_rpc_stream_read_write) {
 
 TEST(rpc_test, basice_rpc_stream_read_only) {
     rpc_client client;
-    [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
+    [[maybe_unused]] bool r = client.connect("127.0.0.1", "9000");
     EXPECT_TRUE(r && client.has_connected());
     auto stream = client.upgrade_to_stream("test_read_stream");
     EXPECT_TRUE(stream != nullptr);
@@ -514,7 +568,7 @@ TEST(rpc_test, basice_rpc_stream_read_only) {
 
 TEST(rpc_test, basice_rpc_stream_write_only) {
     rpc_client client;
-    [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
+    [[maybe_unused]] bool r = client.connect("127.0.0.1", "9000");
     EXPECT_TRUE(r && client.has_connected());
     auto stream = client.upgrade_to_stream("test_write_stream");
     EXPECT_TRUE(stream != nullptr);
@@ -539,7 +593,7 @@ TEST(rpc_test, basice_rpc_stream_write_only) {
 
 TEST(rpc_test, test_broken_rpc_stream) {
     rpc_client client;
-    [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
+    [[maybe_unused]] bool r = client.connect("127.0.0.1", "9000");
     EXPECT_TRUE(r && client.has_connected());
     auto stream = client.upgrade_to_stream("test_broken_stream");
     EXPECT_TRUE(stream != nullptr);
@@ -557,7 +611,7 @@ TEST(rpc_test, test_broken_rpc_stream) {
 
 TEST(rpc_test, test_echo_stream) {
     rpc_client client;
-    [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
+    [[maybe_unused]] bool r = client.connect("127.0.0.1", "9000");
     EXPECT_TRUE(r && client.has_connected());
     auto stream = client.upgrade_to_stream("test_echo_stream");
     EXPECT_TRUE(stream != nullptr);
@@ -574,7 +628,7 @@ TEST(rpc_test, test_echo_stream) {
     EXPECT_TRUE(!stream->Finish(0));
 }
 TEST(rpc_test, test_obj_echo) {
-    rpc_client client("127.0.0.1", 9000);
+    rpc_client client("127.0.0.1", "9000");
     client.set_proxy(std::make_shared<network::rpc_service::CustomRpcProxy>(kProxyServiceName, kProxyServiceField,
                                                                             kProxyServiceToken));
     bool r = client.connect();
@@ -612,7 +666,7 @@ TEST(rpc_test, test_obj_echo) {
 }
 
 TEST(rpc_test, test_timeout_echo) {
-    rpc_client client("127.0.0.1", 9000);
+    rpc_client client("127.0.0.1", "9000");
     bool r = client.connect();
     client.enable_timeout_check(true, 1);
     if (!r) {
@@ -633,7 +687,7 @@ TEST(rpc_test, test_echo_stream_mutithread) {
     auto task_func = []() {
         rpc_client client;
 
-        [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
+        [[maybe_unused]] bool r = client.connect("127.0.0.1", "9000");
         EXPECT_TRUE(r && client.has_connected());
         auto stream = client.upgrade_to_stream("test_echo_stream");
         EXPECT_TRUE(stream != nullptr);
@@ -664,7 +718,7 @@ TEST(rpc_test, test_echo_stream_proxy_mutithread) {
         rpc_client client;
         client.set_proxy(std::make_shared<network::rpc_service::CustomRpcProxy>(kProxyServiceName, kProxyServiceField,
                                                                                 kProxyServiceToken));
-        [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
+        [[maybe_unused]] bool r = client.connect("127.0.0.1", "9000");
         EXPECT_TRUE(r && client.has_connected());
         auto stream = client.upgrade_to_stream("test_echo_stream");
         EXPECT_TRUE(stream != nullptr);
@@ -691,7 +745,7 @@ TEST(rpc_test, test_echo_stream_proxy_mutithread) {
 TEST(rpc_test, test_control_stream) {
     {
         rpc_client client;
-        [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
+        [[maybe_unused]] bool r = client.connect("127.0.0.1", "9000");
         EXPECT_TRUE(r && client.has_connected());
         auto stream = client.upgrade_to_stream("test_control_stream");
         EXPECT_TRUE(stream != nullptr);
@@ -715,7 +769,7 @@ TEST(rpc_test, test_control_stream) {
     }
     {
         rpc_client client;
-        [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
+        [[maybe_unused]] bool r = client.connect("127.0.0.1", "9000");
         EXPECT_TRUE(r && client.has_connected());
         auto stream = client.upgrade_to_stream("test_control_stream");
         EXPECT_TRUE(stream != nullptr);
@@ -739,7 +793,7 @@ TEST(rpc_test, test_control_stream) {
     }
     {//test read some
         rpc_client client;
-        [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
+        [[maybe_unused]] bool r = client.connect("127.0.0.1", "9000");
         EXPECT_TRUE(r && client.has_connected());
         auto stream = client.upgrade_to_stream("test_control_stream");
         EXPECT_TRUE(stream != nullptr);
@@ -763,7 +817,7 @@ TEST(rpc_test, test_control_stream) {
     {//test read some
         rpc_client client;
         client.config_tcp_no_delay();
-        [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
+        [[maybe_unused]] bool r = client.connect("127.0.0.1", "9000");
         EXPECT_TRUE(r && client.has_connected());
         auto stream = client.upgrade_to_stream("test_control_stream");
         stream->EnableAutoHeartBeat(true, 5);
@@ -788,7 +842,7 @@ TEST(rpc_test, test_control_stream) {
         {//test read some
         rpc_client client;
         client.config_tcp_no_delay();
-        [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
+        [[maybe_unused]] bool r = client.connect("::", "9000");
         EXPECT_TRUE(r && client.has_connected());
         auto stream = client.upgrade_to_stream("test_control_stream");
         EXPECT_TRUE(stream != nullptr);
@@ -820,7 +874,7 @@ TEST(rpc_test, test_ssl) {
         [&]() { EXPECT_LE(check_timer.GetDuration<Fundamental::Timer::TimeScale::Millisecond>(), 100); });
 
     try {
-        rpc_client client("127.0.0.1", 9000);
+        rpc_client client("127.0.0.1", "9000");
         client.enable_ssl("server.crt");
         bool r = client.connect();
         if (!r) {
@@ -838,7 +892,7 @@ TEST(rpc_test, test_ssl) {
 
     std::cout << "finish ssl" << std::endl;
     try {
-        rpc_client client("127.0.0.1", 9000);
+        rpc_client client("127.0.0.1", "9000");
         bool r = client.connect();
         if (!r) {
             EXPECT_TRUE(false && "connect timeout");
@@ -859,7 +913,7 @@ TEST(rpc_test, test_ssl_proxy) {
     Fundamental::ScopeGuard check_guard(
         [&]() { EXPECT_LE(check_timer.GetDuration<Fundamental::Timer::TimeScale::Millisecond>(), 100); });
     {
-        rpc_client client("127.0.0.1", 9000);
+        rpc_client client("127.0.0.1", "9000");
         client.enable_ssl("server.crt");
         client.set_proxy(std::make_shared<network::rpc_service::CustomRpcProxy>(kProxyServiceName, kProxyServiceField,
                                                                                 kProxyServiceToken));
@@ -882,7 +936,7 @@ TEST(rpc_test, test_ssl_proxy) {
         }
     }
     {
-        rpc_client client("127.0.0.1", 9000);
+        rpc_client client("127.0.0.1", "9000");
         client.enable_ssl("", network::rpc_service::rpc_client_ssl_level_optional);
         client.set_proxy(std::make_shared<network::rpc_service::CustomRpcProxy>(kProxyServiceName, kProxyServiceField,
                                                                                 kProxyServiceToken));
@@ -910,7 +964,7 @@ TEST(rpc_test, test_ssl_proxy_echo_stream) {
     client.enable_ssl("server.crt");
     client.set_proxy(std::make_shared<network::rpc_service::CustomRpcProxy>(kProxyServiceName, kProxyServiceField,
                                                                             kProxyServiceToken));
-    [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
+    [[maybe_unused]] bool r = client.connect("127.0.0.1", "9000");
     EXPECT_TRUE(r && client.has_connected());
     auto stream = client.upgrade_to_stream("test_echo_stream");
     EXPECT_TRUE(stream != nullptr);
@@ -931,7 +985,7 @@ TEST(rpc_test, test_ssl_concept) {
     {
         rpc_client client;
         client.enable_ssl("server.crt", network::rpc_service::rpc_client_ssl_level_optional);
-        [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
+        [[maybe_unused]] bool r = client.connect("127.0.0.1", "9000");
         EXPECT_TRUE(r && client.has_connected());
         auto stream = client.upgrade_to_stream("test_echo_stream");
         EXPECT_TRUE(stream != nullptr);
@@ -943,7 +997,7 @@ TEST(rpc_test, test_ssl_concept) {
     {
         rpc_client client;
         client.enable_ssl("server.crt_none", network::rpc_service::rpc_client_ssl_level_optional);
-        [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
+        [[maybe_unused]] bool r = client.connect("127.0.0.1", "9000");
         EXPECT_TRUE(r && client.has_connected());
         auto stream = client.upgrade_to_stream("test_echo_stream");
         EXPECT_TRUE(stream != nullptr);
@@ -954,7 +1008,7 @@ TEST(rpc_test, test_ssl_concept) {
     }
     {
         rpc_client client;
-        [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
+        [[maybe_unused]] bool r = client.connect("127.0.0.1", "9000");
         EXPECT_TRUE(r && client.has_connected());
         auto stream = client.upgrade_to_stream("test_echo_stream");
         EXPECT_TRUE(stream != nullptr);
@@ -976,7 +1030,7 @@ TEST(rpc_test, test_ssl_concept) {
 //         client.set_proxy(std::make_shared<network::rpc_service::CustomRpcProxy>(kProxyServiceName,
 //         kProxyServiceField,
 //                                                                                 kProxyServiceToken));
-//         [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
+//         [[maybe_unused]] bool r = client.connect("127.0.0.1", "9000");
 //         EXPECT_TRUE(r && client.has_connected());
 //         auto stream = client.upgrade_to_stream("test_echo_stream");
 //         EXPECT_TRUE(stream != nullptr);
@@ -1000,9 +1054,6 @@ TEST(rpc_test, test_ssl_concept) {
 //         EXPECT_NO_THROW(f.resultFuture.get());
 // }
 #endif
-
-
-
 
 int main(int argc, char** argv) {
     int mode = 0;
