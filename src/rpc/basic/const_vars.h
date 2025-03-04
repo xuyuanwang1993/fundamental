@@ -32,6 +32,7 @@ enum class request_type : uint8_t
 enum class rpc_stream_data_status : std::uint8_t
 {
     rpc_stream_none,       // init status
+    rpc_stream_heartbeat,  // size=0
     rpc_stream_data,       // size+data
     rpc_stream_write_done, // size=0
     rpc_stream_finish,

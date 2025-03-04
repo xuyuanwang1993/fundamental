@@ -41,7 +41,7 @@ static network::proxy::ProxyManager s_manager;
 
 void server_task(std::promise<void>& sync_p) {
 
-    auto s_server = std::make_shared<rpc_server>(9000, 3600);
+    auto s_server = std::make_shared<rpc_server>(9000);
     s_server->enable_ssl({ nullptr, "server.crt", "server.key", "dh2048.pem" });
     s_server->register_handler("echo", echo);
     s_server->register_handler("echos", echos);

@@ -33,6 +33,11 @@ RTTR_REGISTRATION {
         .property("f", &TestProxyRequest::f)
         .property("v", &TestProxyRequest::v)
         .property("strs", &TestProxyRequest::strs);
+    rttr::registration::class_<DelayControlStream>("DelayControlStream")
+        .constructor()(rttr::policy::ctor::as_object)
+        .property("1", &DelayControlStream::cmd)
+        .property("2", &DelayControlStream::msg)
+        .property("3", &DelayControlStream::process_delay);
 }
 
 struct dummy {
@@ -204,7 +209,7 @@ void test_echo_stream(rpc_conn conn) {
             FWARN("stream start");
             std::string msg;
             while (stream->Read(msg, 0)) {
-                if (!stream->Write(msg + " from server")) break;
+                if (!stream->Write(msg.substr(0,msg.size()>100?100:msg.size()) + " from server")) break;
             };
             stream->WriteDone();
             auto ec = stream->Finish(0);
@@ -212,6 +217,39 @@ void test_echo_stream(rpc_conn conn) {
                 FINFO("rpc failed {} {}", id, ec.message());
             } else {
                 FINFO("rpc done {}", id);
+            }
+        },
+        w);
+}
+
+void test_control_stream(rpc_conn conn) {
+    auto c = conn.lock();
+    auto w = c->InitRpcStream();
+
+    rpc_stream_pool.Enqueue(
+        [](decltype(w) stream) {
+            DelayControlStream request;
+
+            while (stream->Read(request, 0)) {
+                FDEBUG("test_control_stream request {} {} msg size:{}", request.cmd, request.process_delay,
+                       request.msg.size());
+                if (request.cmd == "set") {
+                    stream->EnableTimeoutCheck(request.process_delay);
+                } else if (request.cmd == "echo") {
+                    if (request.process_delay > 0)
+                        std::this_thread::sleep_for(std::chrono::milliseconds(request.process_delay));
+                    FDEBUG("finish test_control_stream request {} {}", request.cmd, request.process_delay);
+                    stream->Write(request.msg);
+                } else {
+                    break;
+                }
+            }
+            stream->WriteDone();
+            auto ec = stream->Finish(0);
+            if (ec) {
+                FINFO("test_control_stream rpc failed {}", ec.message());
+            } else {
+                FINFO("test_control_stream rpc done");
             }
         },
         w);
@@ -237,7 +275,7 @@ std::unique_ptr<std::thread> s_thread;
 static network::proxy::ProxyManager s_manager;
 void server_task(std::promise<void>& sync_p) {
 
-    auto s_server = std::make_shared<rpc_server>(9000, 2);
+    auto s_server = std::make_shared<rpc_server>(9000);
     auto& server  = *s_server;
     server.enable_ssl({ nullptr, "server.crt", "server.key", "dh2048.pem" });
     dummy d;
@@ -263,6 +301,7 @@ void server_task(std::promise<void>& sync_p) {
     server.register_handler("test_echo_stream", test_echo_stream);
     server.register_handler("object_echo<int>", object_echo<int>);
     server.register_handler("object_echo<TestProxyRequest>", object_echo<TestProxyRequest>);
+    server.register_handler("test_control_stream", test_control_stream);
     server.on_net_err.Connect([](std::shared_ptr<connection> conn, std::string reason) {
         std::cout << "remote client address: " << conn->remote_address() << " networking error, reason: " << reason
                   << "\n";

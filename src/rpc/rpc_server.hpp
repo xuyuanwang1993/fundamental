@@ -10,13 +10,15 @@
 #include <set>
 #include <thread>
 
-#include "fundamental/events/event_system.h"
 #include "basic/io_context_pool.hpp"
+#include "fundamental/events/event_system.h"
 
 using asio::ip::tcp;
 
-namespace network {
-namespace rpc_service {
+namespace network
+{
+namespace rpc_service
+{
 using rpc_conn = std::weak_ptr<connection>;
 
 struct protocal_helper {
@@ -50,8 +52,8 @@ public:
     Fundamental::Signal<void()> on_release;
 
 public:
-    rpc_server(unsigned short port, size_t timeout_seconds = 30) :
-    acceptor_(io_context_pool::Instance().get_io_context()), timeout_seconds_(timeout_seconds) {
+    rpc_server(unsigned short port, size_t timeout_msec = 30000) :
+    acceptor_(io_context_pool::Instance().get_io_context()), timeout_msec_(timeout_msec) {
         protocal_helper::init_acceptor(acceptor_, port);
     }
 
@@ -149,7 +151,7 @@ private:
                 if (ec) {
                     // maybe system error... ignored
                 } else {
-                    auto new_conn = std::make_shared<connection>(std::move(socket), timeout_seconds_, router_);
+                    auto new_conn = std::make_shared<connection>(std::move(socket), timeout_msec_, router_);
                     new_conn->on_new_subscriber_added.Connect([this](std::string key, std::weak_ptr<connection> conn) {
                         std::unique_lock<std::mutex> lock(sub_mtx_);
                         sub_map_.emplace(std::move(key), conn);
@@ -194,7 +196,7 @@ private:
                     new_conn->set_conn_id(id);
                     new_conn->config_proxy_manager(proxy_manager);
                     new_conn->start();
-                    FDEBUG("start connection {:p} -> {}", (void*)(new_conn.get()),id);
+                    FDEBUG("start connection {:p} -> {}", (void*)(new_conn.get()), id);
                 }
 
                 do_accept();
@@ -221,7 +223,7 @@ private:
 
     std::atomic_bool has_started_ = false;
     tcp::acceptor acceptor_;
-    std::size_t timeout_seconds_;
+    std::size_t timeout_msec_ = 0;
 
     std::atomic<std::int64_t> conn_id_ = 0;
 

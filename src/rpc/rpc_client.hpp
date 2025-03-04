@@ -11,6 +11,7 @@
 #include <functional>
 #include <future>
 #include <iostream>
+#include <list>
 #include <memory>
 #include <set>
 #include <string>
@@ -125,10 +126,39 @@ public:
     bool WriteDone();
     std::error_code Finish(std::size_t max_wait_ms = 5000);
     std::error_code GetLastError() const;
+    void EnableAutoHeartBeat(bool enable, std::size_t timeout_msec = 15000);
 
 private:
+    void send_heartbeat() {
+        auto& new_item = write_cache_.emplace_back();
+        new_item.size  = 0;
+        new_item.type  = static_cast<std::uint8_t>(rpc_stream_data_status::rpc_stream_heartbeat);
+        new_item.data.clear();
+        if (write_cache_.size() == 1) handle_write();
+    }
+    void reset_timer() {
+        if (timeout_msec_ == 0) return;
+        deadline_.expires_after(std::chrono::milliseconds(timeout_msec_));
+        deadline_.async_wait([this](const asio::error_code& ec) {
+            if (ec) return;
+            if (last_data_status_.load() >= rpc_stream_data_status::rpc_stream_finish) {
+                return;
+            }
+            if (b_wait_any_data) {
+                b_wait_any_data.exchange(false);
+                FWARN("disconnect rpc stream for timeout {} sec,we has not recv any data", timeout_msec_);
+                set_status(rpc_stream_data_status::rpc_stream_failed,
+                           error::make_error_code(error::rpc_errors::rpc_timeout));
+                return;
+            }
+            b_wait_any_data.exchange(true);
+            send_heartbeat();
+
+            reset_timer();
+        });
+    }
     void read_head();
-    void read_body();
+    void read_body(std::uint32_t offset = 0);
     void set_status(rpc_stream_data_status status, std::error_code ec);
     void handle_write();
 
@@ -142,6 +172,10 @@ private:
     std::condition_variable cv_;
     std::deque<std::vector<std::uint8_t>> response_cache_;
     std::deque<rpc_stream_packet> write_cache_;
+    std::list<asio::const_buffer> write_buffers_;
+    std::atomic_bool b_wait_any_data = false;
+    asio::steady_timer deadline_;
+    std::size_t timeout_msec_ = 0;
 };
 
 class rpc_client : private asio::noncopyable {
@@ -174,21 +208,21 @@ public:
         reconnect_cnt_ = reconnect_count;
     }
 
-    bool connect(size_t timeout = 3) {
+    bool connect(size_t timeout_msec = 3000) {
         if (has_connected_) return true;
 
         assert(port_ != 0);
         async_connect();
-        return wait_conn(timeout);
+        return wait_conn(timeout_msec);
     }
 
-    bool connect(const std::string& host, unsigned short port, size_t timeout = 3) {
+    bool connect(const std::string& host, unsigned short port, size_t timeout_msec = 3000) {
         if (port_ == 0) {
             host_ = host;
             port_ = port;
         }
 
-        return connect(timeout);
+        return connect(timeout_msec);
     }
 
     void async_connect(const std::string& host, unsigned short port) {
@@ -200,16 +234,16 @@ public:
         async_connect();
     }
 
-    bool wait_conn(size_t timeout) {
+    bool wait_conn(size_t timeout_msec) {
         if (has_connected_) {
             return true;
         }
 
         has_wait_ = true;
         std::unique_lock<std::mutex> lock(conn_mtx_);
-        [[maybe_unused]] bool result =
-            conn_cond_.wait_for(lock, std::chrono::seconds(timeout), [this] { return has_connected_.load(); });
-        has_wait_ = false;
+        [[maybe_unused]] bool result = conn_cond_.wait_for(lock, std::chrono::milliseconds(timeout_msec),
+                                                           [this] { return has_connected_.load(); });
+        has_wait_                    = false;
         return has_connected_;
     }
 
@@ -218,9 +252,9 @@ public:
         reconnect_cnt_    = std::numeric_limits<int>::max();
     }
 
-    void enable_timeout_check(bool enable = true, std::size_t timeout_sec = 30) {
+    void enable_timeout_check(bool enable = true, std::size_t timeout_msec = 30000) {
         if (enable) {
-            reset_deadline_timer(timeout_sec);
+            reset_deadline_timer(timeout_msec);
         } else {
             deadline_.cancel();
         }
@@ -538,18 +572,18 @@ private:
         });
     }
 
-    void reset_deadline_timer(size_t timeout) {
+    void reset_deadline_timer(size_t timeout_msec) {
         if (stop_client_) {
             return;
         }
 
-        deadline_.expires_after(std::chrono::seconds(timeout));
-        deadline_.async_wait([this, timeout](const asio::error_code& ec) {
+        deadline_.expires_after(std::chrono::milliseconds(timeout_msec));
+        deadline_.async_wait([this, timeout_msec](const asio::error_code& ec) {
             if (!ec) {
                 if (has_connected_) {
                     if (b_wait_any_data) {
                         b_wait_any_data.exchange(false);
-                        FWARN("disconnect for timeout {} sec,we has not recv any data", timeout);
+                        FWARN("disconnect for timeout {} msec,we has not recv any data", timeout_msec);
                         close();
                     } else {
                         b_wait_any_data.exchange(true);
@@ -561,7 +595,7 @@ private:
                 }
             }
 
-            reset_deadline_timer(timeout);
+            reset_deadline_timer(timeout_msec);
         });
     }
 
@@ -581,46 +615,68 @@ private:
     }
 
     void write() {
-        auto& msg   = outbox_[0];
-        write_size_ = (uint32_t)msg.content.size();
-        std::array<asio::const_buffer, 2> write_buffers;
-        rpc_header { RPC_MAGIC_NUM, msg.req_type, write_size_, msg.req_id, msg.func_id }.Serialize(write_head_,
-                                                                                                   kRpcHeadLen);
-        write_buffers[0] = asio::buffer(write_head_, kRpcHeadLen);
-        write_buffers[1] = asio::buffer((char*)msg.content.data(), write_size_);
+        FDEBUG("process write {}", outbox_.size());
+        if (outbox_.empty()) return;
+        if (write_buffers_.empty()) {
+            auto& msg   = outbox_[0];
+            write_size_ = (uint32_t)msg.content.size();
+            rpc_header { RPC_MAGIC_NUM, msg.req_type, write_size_, msg.req_id, msg.func_id }.Serialize(write_head_,
+                                                                                                       kRpcHeadLen);
+            write_buffers_.emplace_back(asio::buffer(write_head_, kRpcHeadLen));
+            if (write_size_ > 0) write_buffers_.emplace_back(asio::buffer((char*)msg.content.data(), write_size_));
+        }
+        async_write_buffers_some(
+            std::vector<asio::const_buffer>(write_buffers_.begin(), write_buffers_.end()),
+            [this](const asio::error_code& ec, size_t length) {
+                if (ec) {
+                    close();
+                    error_callback(ec);
 
-        async_write_buffers(std::move(write_buffers), [this](const asio::error_code& ec, const size_t length) {
-            if (ec) {
-                has_connected_ = false;
-                close();
-                error_callback(ec);
-
-                return;
-            }
-
-            std::unique_lock<std::mutex> lock(write_mtx_);
-            if (outbox_.empty()) {
-                return;
-            }
-#ifdef RPC_VERBOSE
-            auto& msg = outbox_[0];
-            FDEBUG("client write header:{} body:{}", Fundamental::Utils::BufferToHex(write_head_, kRpcHeadLen),
-                   Fundamental::Utils::BufferToHex(msg.content.data(), msg.content.size(), 140));
+                    return;
+                }
+                if (length > 0) b_wait_any_data.exchange(false);
+#ifndef RPC_VERBOSE
+                if (length > 0) FDEBUG("client write some size:{}", length);
 #endif
-            outbox_.pop_front();
+                std::unique_lock<std::mutex> lock(write_mtx_);
+                if (outbox_.empty()) {
+                    return;
+                }
 
-            if (!outbox_.empty()) {
-                // more messages to send
-                this->write();
-            }
-        });
+                while (length != 0) {
+                    auto current_size = write_buffers_.front().size();
+                    if (length >= current_size) {
+                        length -= current_size;
+                        write_buffers_.pop_front();
+                        continue;
+                    }
+                    write_buffers_.front() = asio::const_buffer((std::uint8_t*)write_buffers_.front().data() + length,
+                                                                current_size - length);
+                    break;
+                }
+                if (!write_buffers_.empty()) { // write rest data
+                    write();
+                    return;
+                }
+#ifdef RPC_VERBOSE
+                auto& msg = outbox_[0];
+                FDEBUG("client write header:{} body:{}", Fundamental::Utils::BufferToHex(write_head_, kRpcHeadLen),
+                       Fundamental::Utils::BufferToHex(msg.content.data(), msg.content.size(), 140));
+#endif
+                outbox_.pop_front();
+
+                if (!outbox_.empty()) {
+                    // more messages to send
+                    this->write();
+                }
+            });
     }
 
     void do_read() {
         async_buffer_read({ asio::buffer(head_, kRpcHeadLen) },
                           [this](const asio::error_code& ec, const size_t length) {
                               if (!socket_.is_open()) {
-                                  has_connected_ = false;
+                                  close();
                                   return;
                               }
 
@@ -668,6 +724,9 @@ private:
                 if (!ec) {
                     b_wait_any_data.exchange(false);
                     auto current_offset = read_offset + length;
+#ifndef RPC_VERBOSE
+                    FDEBUG("client  read some need:{}  current: {} new:{}", body_len, current_offset, length);
+#endif
                     if (current_offset < body_len) {
                         read_body(req_id, req_type, body_len, current_offset);
                         return;
@@ -694,7 +753,6 @@ private:
                     }
                 } else {
                     FWARN("read failed {}", ec.message());
-                    has_connected_ = false;
                     call_back(req_id, ec, {});
                     close();
                     error_callback(ec);
@@ -760,6 +818,7 @@ private:
             while (!outbox_.empty()) {
                 outbox_.pop_front();
             }
+            write_buffers_.clear();
         }
 
         {
@@ -874,7 +933,7 @@ private:
     }
 
     template <typename BufferType, typename Handler>
-    void async_write_buffers(BufferType buffers, Handler handler) {
+    void async_write_buffers(BufferType&& buffers, Handler handler) {
         if (is_ssl()) {
 #ifndef RPC_DISABLE_SSL
             asio::async_write(*ssl_stream_, std::move(buffers), std::move(handler));
@@ -883,7 +942,16 @@ private:
             asio::async_write(socket_, std::move(buffers), std::move(handler));
         }
     }
-
+    template <typename BufferType, typename Handler>
+    void async_write_buffers_some(BufferType&& buffers, Handler handler) {
+        if (is_ssl()) {
+#ifndef RPC_DISABLE_SSL
+            ssl_stream_->async_write_some(std::move(buffers), std::move(handler));
+#endif
+        } else {
+            socket_.async_write_some(std::move(buffers), std::move(handler));
+        }
+    }
     asio::io_context& ios_;
     asio::ip::tcp::socket socket_;
 
@@ -921,7 +989,8 @@ private:
     std::vector<char> body_;
 
     std::uint8_t write_head_[kRpcHeadLen] = {};
-
+    //
+    std::list<asio::const_buffer> write_buffers_;
     std::mutex sub_mtx_;
     std::unordered_map<std::string, std::function<void(string_view)>> sub_map_;
     //
@@ -935,12 +1004,13 @@ private:
     std::atomic_bool has_upgrade = false;
 };
 
-inline ClientStreamReadWriter::ClientStreamReadWriter(rpc_client& client) : client_(client) {
+inline ClientStreamReadWriter::ClientStreamReadWriter(rpc_client& client) :
+client_(client), deadline_(client_.socket_.get_executor()) {
     read_head();
 }
 inline ClientStreamReadWriter::~ClientStreamReadWriter() {
     if (last_data_status_ < rpc_stream_data_status::rpc_stream_finish) {
-        set_status(rpc_stream_data_status::rpc_stream_finish,
+        set_status(rpc_stream_data_status::rpc_stream_failed,
                    error::make_error_code(error::rpc_errors::rpc_internal_error));
     }
     client_.close();
@@ -1012,9 +1082,9 @@ inline std::error_code ClientStreamReadWriter::Finish(std::size_t max_wait_ms) {
     do {
         if (last_data_status_ >= rpc_stream_data_status::rpc_stream_finish) break;
         asio::post(client_.socket_.get_executor(), [this]() mutable {
-            auto& new_item = write_cache_.emplace_back();
-            new_item.size  = 0;
-            new_item.type  = static_cast<std::uint8_t>(rpc_stream_data_status::rpc_stream_finish);
+            auto& new_item       = write_cache_.emplace_back();
+            new_item.size        = 0;
+            new_item.type        = static_cast<std::uint8_t>(rpc_stream_data_status::rpc_stream_finish);
             new_item.data.clear();
             if (write_cache_.size() == 1) handle_write();
         });
@@ -1033,59 +1103,59 @@ inline std::error_code ClientStreamReadWriter::Finish(std::size_t max_wait_ms) {
 inline std::error_code ClientStreamReadWriter::GetLastError() const {
     return last_err_;
 }
-inline void ClientStreamReadWriter::read_head() {
-    client_.async_buffer_read(
-        { asio::buffer(&read_packet_buffer.size, sizeof(read_packet_buffer.size)) },
-        [this](asio::error_code ec, std::size_t length) {
-            if (last_data_status_ >= rpc_stream_data_status::rpc_stream_finish) return;
-            if (ec) {
-                set_status(rpc_stream_data_status::rpc_stream_failed, std::move(ec));
-            } else {
-#ifdef RPC_VERBOSE
-                FDEBUG("client stream read head : {}",
-                       Fundamental::Utils::BufferToHex(&read_packet_buffer.size, sizeof(read_packet_buffer.size)));
-#endif
-                read_packet_buffer.size = le32toh(read_packet_buffer.size);
-                try {
-                    read_packet_buffer.data.resize(read_packet_buffer.size);
-                    read_body();
-                } catch (...) {
-                    set_status(rpc_stream_data_status::rpc_stream_failed,
-                               error::make_error_code(error::rpc_errors::rpc_memory_error));
-                }
-            }
-        });
+inline void ClientStreamReadWriter::EnableAutoHeartBeat(bool enable, std::size_t timeout_msec) {
+    timeout_msec_ = timeout_msec;
+    if (!enable) {
+        timeout_msec_ = 0;
+        deadline_.cancel();
+    } else {
+        reset_timer();
+    }
 }
-inline void ClientStreamReadWriter::read_body() {
+inline void ClientStreamReadWriter::read_head() {
     std::vector<asio::mutable_buffer> buffers;
+    buffers.emplace_back(asio::buffer(&read_packet_buffer.size, sizeof(read_packet_buffer.size)));
     buffers.emplace_back(asio::buffer(&read_packet_buffer.type, 1));
-    if (read_packet_buffer.size > 0)
-        buffers.emplace_back(asio::buffer(read_packet_buffer.data.data(), read_packet_buffer.size));
+
     client_.async_buffer_read(std::move(buffers), [this](asio::error_code ec, std::size_t length) {
-        if (last_data_status_ >= rpc_stream_data_status::rpc_stream_write_done) return;
+        if (last_data_status_ >= rpc_stream_data_status::rpc_stream_finish) return;
         if (ec) {
             set_status(rpc_stream_data_status::rpc_stream_failed, std::move(ec));
         } else {
+            b_wait_any_data.exchange(false);
 #ifdef RPC_VERBOSE
-            FDEBUG("client stream read :{:x} {}", read_packet_buffer.type,
-                   Fundamental::Utils::BufferToHex(read_packet_buffer.data.data(), read_packet_buffer.size, 140));
+            FDEBUG("client stream read head : {}",
+                   Fundamental::Utils::BufferToHex(&read_packet_buffer.size, sizeof(read_packet_buffer.size)));
 #endif
             auto status = static_cast<rpc_stream_data_status>(read_packet_buffer.type);
-            if (status < last_data_status_ || status >= rpc_stream_data_status::rpc_stream_finish) {
+            if ((status != rpc_stream_data_status::rpc_stream_heartbeat && status < last_data_status_) ||
+                status >= rpc_stream_data_status::rpc_stream_finish) {
                 set_status(rpc_stream_data_status::rpc_stream_failed,
                            error::make_error_code(error::rpc_errors::rpc_bad_request));
                 return;
             }
             switch (status) {
             case rpc_stream_data_status::rpc_stream_data: {
-                read_head();
-                std::scoped_lock<std::mutex> locker(mutex);
-                last_data_status_ = rpc_stream_data_status::rpc_stream_data;
-                response_cache_.emplace_back(std::move(read_packet_buffer.data));
-                cv_.notify_one();
+                {
+                    std::scoped_lock<std::mutex> locker(mutex);
+                    last_data_status_ = rpc_stream_data_status::rpc_stream_data;
+                }
+                read_packet_buffer.size = le32toh(read_packet_buffer.size);
+                try {
+                    if (read_packet_buffer.size > read_packet_buffer.data.size())
+                        read_packet_buffer.data.resize(read_packet_buffer.size);
+                    read_body();
+                } catch (...) {
+                    set_status(rpc_stream_data_status::rpc_stream_failed,
+                               error::make_error_code(error::rpc_errors::rpc_memory_error));
+                }
+
             } break;
             case rpc_stream_data_status::rpc_stream_write_done: {
                 set_status(status, error::make_error_code(error::rpc_errors::rpc_success));
+                read_head();
+            } break;
+            case rpc_stream_data_status::rpc_stream_heartbeat: {
                 read_head();
             } break;
             default: {
@@ -1097,55 +1167,117 @@ inline void ClientStreamReadWriter::read_body() {
         }
     });
 }
+inline void ClientStreamReadWriter::read_body(std::uint32_t offset) {
+    std::vector<asio::mutable_buffer> buffers;
+    buffers.emplace_back(asio::buffer(read_packet_buffer.data.data() + offset, read_packet_buffer.size - offset));
+    client_.async_buffer_read_some(std::move(buffers), [this, offset](asio::error_code ec, std::size_t length) {
+        if (last_data_status_ >= rpc_stream_data_status::rpc_stream_write_done) return;
+        if (ec) {
+            set_status(rpc_stream_data_status::rpc_stream_failed, std::move(ec));
+        } else {
+            b_wait_any_data.exchange(false);
+            auto current_offset = offset + length;
+#ifndef RPC_VERBOSE
+            FDEBUG("client stream read some need:{}  current: {} new:{}", read_packet_buffer.size, current_offset,
+                   length);
+#endif
+            if (current_offset < read_packet_buffer.size) {
+                read_body(current_offset);
+                return;
+            }
+#ifdef RPC_VERBOSE
+            FDEBUG("client stream read :{:x} {}", read_packet_buffer.type,
+                   Fundamental::Utils::BufferToHex(read_packet_buffer.data.data(), read_packet_buffer.size, 140));
+#endif
+            read_head();
+            {
+                std::scoped_lock<std::mutex> locker(mutex);
+                response_cache_.emplace_back(std::move(read_packet_buffer.data));
+                cv_.notify_one();
+            }
+        }
+    });
+}
 inline void ClientStreamReadWriter::set_status(rpc_stream_data_status status, std::error_code ec) {
+    std::scoped_lock<std::mutex> locker(mutex);
     if (last_data_status_.load() >= rpc_stream_data_status::rpc_stream_finish) {
         cv_.notify_all();
         return;
     }
-    std::scoped_lock<std::mutex> locker(mutex);
+
     last_err_         = std::move(ec);
     last_data_status_ = status;
     cv_.notify_all();
     if (last_data_status_.load() >= rpc_stream_data_status::rpc_stream_finish) {
+        FDEBUG("rpc stream client finish success:{} {}",
+               last_data_status_.load() == rpc_stream_data_status::rpc_stream_finish, last_err_.message());
+        deadline_.cancel();
         client_.close();
     }
 }
 inline void ClientStreamReadWriter::handle_write() {
-    if (last_data_status_.load() >= rpc_stream_data_status::rpc_stream_finish) write_cache_.clear();
+    if (last_data_status_.load() >= rpc_stream_data_status::rpc_stream_finish) {
+        write_cache_.clear();
+        write_buffers_.clear();
+    }
     if (write_cache_.empty()) {
         return;
     }
 
-    std::vector<asio::const_buffer> write_buffers;
-    auto& item = write_cache_.front();
-    write_buffers.emplace_back(asio::const_buffer(&item.size, sizeof(item.size)));
-    write_buffers.emplace_back(asio::const_buffer(&item.type, sizeof(item.type)));
-    if (item.data.size() > 0) {
-        write_buffers.emplace_back(asio::const_buffer(item.data.data(), item.data.size()));
+    if (write_buffers_.empty()) {
+        auto& item = write_cache_.front();
+        write_buffers_.emplace_back(asio::const_buffer(&item.size, sizeof(item.size)));
+        write_buffers_.emplace_back(asio::const_buffer(&item.type, sizeof(item.type)));
+        if (item.data.size() > 0) {
+            write_buffers_.emplace_back(asio::const_buffer(item.data.data(), item.data.size()));
+        }
     }
 
-    client_.async_write_buffers(std::move(write_buffers), [this](asio::error_code ec, std::size_t length) {
-        if (last_data_status_ >= rpc_stream_data_status::rpc_stream_finish) return;
-        if (ec) {
-            set_status(rpc_stream_data_status::rpc_stream_failed, ec);
-            return;
-        }
-#ifdef RPC_VERBOSE
-        auto& item = write_cache_.front();
-        FDEBUG("client stream write {}{}{}", Fundamental::Utils::BufferToHex(&item.size, sizeof(item.size)),
-               Fundamental::Utils::BufferToHex(&item.type, sizeof(item.type)),
-               Fundamental::Utils::BufferToHex(item.data.data(), item.data.size(), 140));
+    client_.async_write_buffers_some(
+        std::vector<asio::const_buffer>(write_buffers_.begin(), write_buffers_.end()),
+        [this](asio::error_code ec, std::size_t length) {
+            if (last_data_status_ >= rpc_stream_data_status::rpc_stream_finish) return;
+            if (ec) {
+                set_status(rpc_stream_data_status::rpc_stream_failed, ec);
+                return;
+            }
+            // write success means connection is active
+            if (length > 0) b_wait_any_data.exchange(false);
+#ifndef RPC_VERBOSE
+            if (length > 0) FDEBUG("client stream write some size:{}", length);
 #endif
-        auto packet_type = write_cache_.front().type;
-        if (packet_type == static_cast<std::uint8_t>(rpc_stream_data_status::rpc_stream_finish)) {
-            write_cache_.clear();
-            set_status(rpc_stream_data_status::rpc_stream_finish,
-                       error::make_error_code(error::rpc_errors::rpc_success));
-        } else {
+            while (length != 0) {
+                auto current_size = write_buffers_.front().size();
+                if (length >= current_size) {
+                    length -= current_size;
+                    write_buffers_.pop_front();
+                    continue;
+                }
+                write_buffers_.front() =
+                    asio::const_buffer((std::uint8_t*)write_buffers_.front().data() + length, current_size - length);
+                break;
+            }
+            if (!write_buffers_.empty()) { // write rest data
+                handle_write();
+                return;
+            }
+#ifdef RPC_VERBOSE
+            auto& item = write_cache_.front();
+            FDEBUG("client stream write {}{}{}", Fundamental::Utils::BufferToHex(&item.size, sizeof(item.size)),
+                   Fundamental::Utils::BufferToHex(&item.type, sizeof(item.type)),
+                   Fundamental::Utils::BufferToHex(item.data.data(), item.data.size(), 140));
+#endif
+            auto packet_type = write_cache_.front().type;
             write_cache_.pop_front();
-            handle_write();
-        }
-    });
+            if (packet_type == static_cast<std::uint8_t>(rpc_stream_data_status::rpc_stream_finish)) {
+                write_cache_.clear();
+                write_buffers_.clear();
+                set_status(rpc_stream_data_status::rpc_stream_finish,
+                           error::make_error_code(error::rpc_errors::rpc_success));
+            } else {
+                handle_write();
+            }
+        });
 }
 } // namespace rpc_service
 } // namespace network

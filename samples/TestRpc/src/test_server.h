@@ -26,6 +26,12 @@ struct TestProxyRequest {
         return !(this->operator==(other));
     }
 };
+//return string
+struct DelayControlStream{
+    std::string cmd;//"set" "echo"
+    std::uint32_t process_delay;
+    std::string msg;
+};
 
 constexpr const char* kProxyServiceName  = "rpc_service";
 constexpr const char* kProxyServiceField = "rpc_field";
