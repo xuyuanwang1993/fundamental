@@ -687,6 +687,130 @@ TEST(rpc_test, test_echo_stream_proxy_mutithread) {
     for (auto& f : tasks)
         EXPECT_NO_THROW(f.resultFuture.get());
 }
+
+TEST(rpc_test, test_control_stream) {
+    {
+        rpc_client client;
+        [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
+        EXPECT_TRUE(r && client.has_connected());
+        auto stream = client.upgrade_to_stream("test_control_stream");
+        EXPECT_TRUE(stream != nullptr);
+        std::string base = "msg ";
+        DelayControlStream echo_request;
+        echo_request.cmd           = "echo";
+        echo_request.msg           = "echo msg";
+        echo_request.process_delay = 200;
+        DelayControlStream set_request;
+        set_request.cmd           = "set";
+        set_request.process_delay = 100; // 5s
+        set_request.msg           = "";
+        stream->Write(set_request);
+        // stream->EnableAutoHeartBeat(true,30);
+        EXPECT_TRUE(stream->Write(echo_request));
+        EXPECT_TRUE(stream->WriteDone());
+        std::string echo_msg;
+        EXPECT_FALSE(stream->Read(echo_msg, 0));
+        // error code !=0
+        EXPECT_TRUE(stream->Finish(0));
+    }
+    {
+        rpc_client client;
+        [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
+        EXPECT_TRUE(r && client.has_connected());
+        auto stream = client.upgrade_to_stream("test_control_stream");
+        EXPECT_TRUE(stream != nullptr);
+        std::string base = "msg ";
+        DelayControlStream echo_request;
+        echo_request.cmd           = "echo";
+        echo_request.msg           = "echo msg";
+        echo_request.process_delay = 200;
+        DelayControlStream set_request;
+        set_request.cmd           = "set";
+        set_request.process_delay = 100; // 5s
+        set_request.msg           = "";
+        stream->Write(set_request);
+        stream->EnableAutoHeartBeat(true, 30);
+        EXPECT_TRUE(stream->Write(echo_request));
+        EXPECT_TRUE(stream->WriteDone());
+        std::string echo_msg;
+        EXPECT_TRUE(stream->Read(echo_msg, 0));
+        // error code !=0
+        EXPECT_FALSE(stream->Finish(0));
+    }
+    {//test read some
+        rpc_client client;
+        [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
+        EXPECT_TRUE(r && client.has_connected());
+        auto stream = client.upgrade_to_stream("test_control_stream");
+        EXPECT_TRUE(stream != nullptr);
+        std::string base = "msg ";
+        DelayControlStream echo_request;
+        echo_request.cmd           = "echo";
+        echo_request.msg           = std::string(1024*1024*10,'a');
+        echo_request.process_delay = 4;
+        DelayControlStream set_request;
+        set_request.cmd           = "set";
+        set_request.process_delay = 40; 
+        set_request.msg           = "";
+        stream->Write(set_request);
+        EXPECT_TRUE(stream->Write(echo_request));
+        EXPECT_TRUE(stream->WriteDone());
+        std::string echo_msg;
+        EXPECT_TRUE(stream->Read(echo_msg, 0));
+        // error code !=0
+        EXPECT_FALSE(stream->Finish(0));
+    }
+    {//test read some
+        rpc_client client;
+        client.config_tcp_no_delay();
+        [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
+        EXPECT_TRUE(r && client.has_connected());
+        auto stream = client.upgrade_to_stream("test_control_stream");
+        stream->EnableAutoHeartBeat(true, 5);
+        EXPECT_TRUE(stream != nullptr);
+        std::string base = "msg ";
+        DelayControlStream echo_request;
+        echo_request.cmd           = "echo";
+        echo_request.msg           = std::string(1024*1024*10,'a');
+        echo_request.process_delay = 4;
+        DelayControlStream set_request;
+        set_request.cmd           = "set";
+        set_request.process_delay = 6; 
+        set_request.msg           = "";
+        stream->Write(set_request);
+        EXPECT_TRUE(stream->Write(echo_request));
+        EXPECT_TRUE(stream->WriteDone());
+        std::string echo_msg;
+        EXPECT_TRUE(stream->Read(echo_msg, 0));
+        // error code !=0
+        EXPECT_FALSE(stream->Finish(0));
+    }
+        {//test read some
+        rpc_client client;
+        client.config_tcp_no_delay();
+        [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
+        EXPECT_TRUE(r && client.has_connected());
+        auto stream = client.upgrade_to_stream("test_control_stream");
+        EXPECT_TRUE(stream != nullptr);
+        std::string base = "msg ";
+        DelayControlStream echo_request;
+        echo_request.cmd           = "echo";
+        echo_request.msg           = std::string(1024*1024*10,'a');
+        echo_request.process_delay = 4;
+        DelayControlStream set_request;
+        set_request.cmd           = "set";
+        set_request.process_delay = 6; 
+        set_request.msg           = "";
+        stream->Write(set_request);
+        stream->Write(echo_request);
+        stream->WriteDone();
+        std::string echo_msg;
+        EXPECT_FALSE(stream->Read(echo_msg, 0));
+        // error code !=0
+        EXPECT_TRUE(stream->Finish(0));
+    }
+}
+
 #endif
 
 #if !defined(RPC_DISABLE_SSL) && 0
@@ -877,106 +1001,7 @@ TEST(rpc_test, test_ssl_concept) {
 // }
 #endif
 
-// TEST(rpc_test, test_control_stream) {
-//     {
-//         rpc_client client;
-//         [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
-//         EXPECT_TRUE(r && client.has_connected());
-//         auto stream = client.upgrade_to_stream("test_control_stream");
-//         EXPECT_TRUE(stream != nullptr);
-//         std::string base = "msg ";
-//         DelayControlStream echo_request;
-//         echo_request.cmd           = "echo";
-//         echo_request.msg           = "echo msg";
-//         echo_request.process_delay = 200;
-//         DelayControlStream set_request;
-//         set_request.cmd           = "set";
-//         set_request.process_delay = 100; // 5s
-//         set_request.msg           = "";
-//         stream->Write(set_request);
-//         // stream->EnableAutoHeartBeat(true,30);
-//         EXPECT_TRUE(stream->Write(echo_request));
-//         EXPECT_TRUE(stream->WriteDone());
-//         std::string echo_msg;
-//         EXPECT_FALSE(stream->Read(echo_msg, 0));
-//         // error code !=0
-//         EXPECT_TRUE(stream->Finish(0));
-//     }
-    // {
-    //     rpc_client client;
-    //     [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
-    //     EXPECT_TRUE(r && client.has_connected());
-    //     auto stream = client.upgrade_to_stream("test_control_stream");
-    //     EXPECT_TRUE(stream != nullptr);
-    //     std::string base = "msg ";
-    //     DelayControlStream echo_request;
-    //     echo_request.cmd           = "echo";
-    //     echo_request.msg           = "echo msg";
-    //     echo_request.process_delay = 200;
-    //     DelayControlStream set_request;
-    //     set_request.cmd           = "set";
-    //     set_request.process_delay = 100; // 5s
-    //     set_request.msg           = "";
-    //     stream->Write(set_request);
-    //     stream->EnableAutoHeartBeat(true, 30);
-    //     EXPECT_TRUE(stream->Write(echo_request));
-    //     EXPECT_TRUE(stream->WriteDone());
-    //     std::string echo_msg;
-    //     EXPECT_TRUE(stream->Read(echo_msg, 0));
-    //     // error code !=0
-    //     EXPECT_FALSE(stream->Finish(0));
-    // }
-    // {//test read some
-    //     rpc_client client;
-    //     [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
-    //     EXPECT_TRUE(r && client.has_connected());
-    //     auto stream = client.upgrade_to_stream("test_control_stream");
-    //     EXPECT_TRUE(stream != nullptr);
-    //     std::string base = "msg ";
-    //     DelayControlStream echo_request;
-    //     echo_request.cmd           = "echo";
-    //     echo_request.msg           = std::string(1024*1024*10,'a');
-    //     echo_request.process_delay = 8;
-    //     DelayControlStream set_request;
-    //     set_request.cmd           = "set";
-    //     set_request.process_delay = 10; 
-    //     set_request.msg           = "";
-    //     stream->Write(set_request);
-    //     EXPECT_TRUE(stream->Write(echo_request));
-    //     EXPECT_TRUE(stream->WriteDone());
-    //     std::string echo_msg;
-    //     EXPECT_TRUE(stream->Read(echo_msg, 0));
-    //     // error code !=0
-    //     EXPECT_FALSE(stream->Finish(0));
-    // }
-//}
-// TEST(rpc_test, basice_rpc_stream_read_write) {
-//     rpc_client client;
-//     [[maybe_unused]] bool r = client.connect("127.0.0.1", 9000);
-//     EXPECT_TRUE(r && client.has_connected());
-//     auto stream = client.upgrade_to_stream("test_stream");
-//     EXPECT_TRUE(stream != nullptr);
-//     person p;
-//     p.id            = 0;
-//     p.age           = 10;
-//     p.name          = "jack ";
-//     std::size_t cnt = 0;
-//     while (cnt < 5) {
-//         p.id = cnt;
-//         p.age += cnt;
-//         p.name += std::to_string(cnt);
-//         EXPECT_TRUE(stream->Write(p));
-//         ++cnt;
-//     }
-//     EXPECT_TRUE(stream->WriteDone());
-//     std::size_t read_cnt = 0;
-//     while (stream->Read(p, 0)) {
-//         ++read_cnt;
-//         FINFO("id:{},age:{},name:{}", p.id, p.age, p.name);
-//     }
-//     EXPECT_TRUE(read_cnt == cnt);
-//     EXPECT_TRUE(!stream->Finish(0));
-// }
+
 
 
 int main(int argc, char** argv) {

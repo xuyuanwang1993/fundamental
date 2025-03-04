@@ -225,7 +225,7 @@ void test_echo_stream(rpc_conn conn) {
 void test_control_stream(rpc_conn conn) {
     auto c = conn.lock();
     auto w = c->InitRpcStream();
-
+    c->set_tcp_no_delay();
     rpc_stream_pool.Enqueue(
         [](decltype(w) stream) {
             DelayControlStream request;
@@ -317,7 +317,9 @@ void server_task(std::promise<void>& sync_p) {
     network::io_context_pool::Instance().start();
     Fundamental::Application::Instance().exitStarted.Connect([&]() { network::io_context_pool::Instance().stop(); });
     network::io_context_pool::Instance().notify_sys_signal.Connect(
-        [](std::error_code code, std::int32_t signo) { Fundamental::Application::Instance().Exit(); });
+        [](std::error_code code, std::int32_t signo) { 
+            
+            Fundamental::Application::Instance().Exit(); });
     {
         using namespace network::proxy;
         auto& manager = s_manager;

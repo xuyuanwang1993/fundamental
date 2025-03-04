@@ -199,7 +199,9 @@ public:
     ~rpc_client() {
         stop();
     }
-
+    void config_tcp_no_delay(bool flag = true) {
+        tcp_no_delay_flag = flag;
+    }
     void set_reconnect_delay(size_t milliseconds) {
         reconnect_delay_ms = milliseconds;
     }
@@ -509,6 +511,7 @@ private:
     void async_connect() {
         assert(port_ != 0);
         auto addr = asio::ip::make_address(host_);
+
         socket_.async_connect({ addr, port_ }, [this](const asio::error_code& ec) {
             if (has_connected_ || stop_client_) {
                 return;
@@ -552,6 +555,7 @@ private:
     }
     void rpc_protocal_ready() {
         has_connected_ = true;
+        socket_.set_option(asio::ip::tcp::no_delay(tcp_no_delay_flag));
         do_read();
         resend_subscribe();
         if (has_wait_) conn_cond_.notify_one();
@@ -615,7 +619,6 @@ private:
     }
 
     void write() {
-        FDEBUG("process write {}", outbox_.size());
         if (outbox_.empty()) return;
         if (write_buffers_.empty()) {
             auto& msg   = outbox_[0];
@@ -634,9 +637,9 @@ private:
 
                     return;
                 }
-                if (length > 0) b_wait_any_data.exchange(false);
-#ifndef RPC_VERBOSE
-                if (length > 0) FDEBUG("client write some size:{}", length);
+                b_wait_any_data.exchange(false);
+#ifdef RPC_VERBOSE
+                FDEBUG("client write some size:{}", length);
 #endif
                 std::unique_lock<std::mutex> lock(write_mtx_);
                 if (outbox_.empty()) {
@@ -724,7 +727,7 @@ private:
                 if (!ec) {
                     b_wait_any_data.exchange(false);
                     auto current_offset = read_offset + length;
-#ifndef RPC_VERBOSE
+#ifdef RPC_VERBOSE
                     FDEBUG("client  read some need:{}  current: {} new:{}", body_len, current_offset, length);
 #endif
                     if (current_offset < body_len) {
@@ -959,6 +962,7 @@ private:
     unsigned short port_ = 0;
     asio::steady_timer reconnect_delay_timer_;
     size_t reconnect_delay_ms       = 1000; // s
+    bool tcp_no_delay_flag          = false;
     int reconnect_cnt_              = -1;
     std::atomic_bool has_connected_ = { false };
     std::mutex conn_mtx_;
@@ -1082,9 +1086,9 @@ inline std::error_code ClientStreamReadWriter::Finish(std::size_t max_wait_ms) {
     do {
         if (last_data_status_ >= rpc_stream_data_status::rpc_stream_finish) break;
         asio::post(client_.socket_.get_executor(), [this]() mutable {
-            auto& new_item       = write_cache_.emplace_back();
-            new_item.size        = 0;
-            new_item.type        = static_cast<std::uint8_t>(rpc_stream_data_status::rpc_stream_finish);
+            auto& new_item = write_cache_.emplace_back();
+            new_item.size  = 0;
+            new_item.type  = static_cast<std::uint8_t>(rpc_stream_data_status::rpc_stream_finish);
             new_item.data.clear();
             if (write_cache_.size() == 1) handle_write();
         });
@@ -1177,7 +1181,7 @@ inline void ClientStreamReadWriter::read_body(std::uint32_t offset) {
         } else {
             b_wait_any_data.exchange(false);
             auto current_offset = offset + length;
-#ifndef RPC_VERBOSE
+#ifdef RPC_VERBOSE
             FDEBUG("client stream read some need:{}  current: {} new:{}", read_packet_buffer.size, current_offset,
                    length);
 #endif
@@ -1242,9 +1246,9 @@ inline void ClientStreamReadWriter::handle_write() {
                 return;
             }
             // write success means connection is active
-            if (length > 0) b_wait_any_data.exchange(false);
-#ifndef RPC_VERBOSE
-            if (length > 0) FDEBUG("client stream write some size:{}", length);
+            b_wait_any_data.exchange(false);
+#ifdef RPC_VERBOSE
+            FDEBUG("client stream write some size:{}", length);
 #endif
             while (length != 0) {
                 auto current_size = write_buffers_.front().size();
