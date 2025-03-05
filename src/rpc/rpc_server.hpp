@@ -55,9 +55,12 @@ public:
 public:
     template <typename... Args>
     static decltype(auto) make_shared(Args&&... args) {
-        return std::shared_ptr<rpc_server>(new rpc_server(std::forward<Args>(args)...));
+        return std::make_shared<rpc_server>(std::forward<Args>(args)...);
     }
-
+    rpc_server(unsigned short port, size_t timeout_msec = 30000) :
+    acceptor_(io_context_pool::Instance().get_io_context()), timeout_msec_(timeout_msec) {
+        protocal_helper::init_acceptor(acceptor_, port);
+    }
     ~rpc_server() {
         FDEBUG("release rpc_server start");
         on_release.Emit();
@@ -73,11 +76,18 @@ public:
     void stop() {
         bool expected_value = true;
         if (!has_started_.compare_exchange_strong(expected_value, false)) return;
-        try {
-            // close acceptor directly
-            acceptor_.close();
-        } catch (const std::exception& e) {
-        }
+        std::promise<void> promise;
+        asio::post(acceptor_.get_executor(), [this, &promise] {
+            try {
+                std::error_code ec;
+                // close acceptor directly
+                acceptor_.cancel(ec);
+                acceptor_.close(ec);
+            } catch (const std::exception& e) {
+            }
+            promise.set_value();
+        });
+        promise.get_future().wait();
     }
     template <bool is_pub = false, typename Function>
     void register_handler(std::string const& name, const Function& f) {
@@ -141,10 +151,7 @@ public:
     }
 
 private:
-    rpc_server(unsigned short port, size_t timeout_msec = 30000) :
-    acceptor_(io_context_pool::Instance().get_io_context()), timeout_msec_(timeout_msec) {
-        protocal_helper::init_acceptor(acceptor_, port);
-    }
+    
     void do_accept() {
 
         acceptor_.async_accept(
@@ -152,7 +159,7 @@ private:
             [this, ptr = weak_from_this()](asio::error_code ec, asio::ip::tcp::socket socket) {
                 auto instance = ptr.lock();
                 if (!instance) {
-                    FDEBUG("instance {:p} has alread release", (void*)this);
+                    FASSERT(false, "instance {:p} has alread release {}", (void*)this,ec.message());
                     return;
                 }
                 if (!acceptor_.is_open()) {

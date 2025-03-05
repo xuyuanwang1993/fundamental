@@ -460,7 +460,7 @@ TEST(rpc_test, test_sub1) {
         }
         std::atomic<std::size_t> target_count = 0;
         client
-            .subscribe("key",
+            ->subscribe("key",
                        [&](string_view data) {
                            msgpack_codec codec;
                            try {
@@ -474,7 +474,7 @@ TEST(rpc_test, test_sub1) {
                        })
             .get();
         client
-            .subscribe("key_p",
+            ->subscribe("key_p",
                        [&](string_view data) {
                            msgpack_codec codec;
                            try {
@@ -487,17 +487,17 @@ TEST(rpc_test, test_sub1) {
                            }
                        })
             .get();
-        rpc_client client2;
-        client2.enable_auto_reconnect();
-        client2.enable_timeout_check();
-        r = client2.connect("127.0.0.1", "9000");
+        auto client2=rpc_client::make_shared();
+        client2->enable_auto_reconnect();
+        client2->enable_timeout_check();
+        r = client2->connect("127.0.0.1", "9000");
         if (!r) {
             success = false;
             break;
         }
 
         client2
-            .subscribe("key",
+            ->subscribe("key",
                        [&](string_view data) {
                            msgpack_codec codec;
                            try {
@@ -505,7 +505,7 @@ TEST(rpc_test, test_sub1) {
                                std::cout << "key2:" << msg << "\n";
                                target_count++;
                                if (target_count.load() > 4) {
-                                   client2.unsubscribe("key");
+                                   client2->unsubscribe("key");
                                }
                            } catch (const std::exception& e) {
                                success = false;
@@ -514,17 +514,17 @@ TEST(rpc_test, test_sub1) {
                        })
             .get();
 
-        rpc_client client3;
-        client3.enable_auto_reconnect();
-        client3.enable_timeout_check();
-        r = client3.connect("127.0.0.1", "9000");
+        auto client3=rpc_client::make_shared();
+        client3->enable_auto_reconnect();
+        client3->enable_timeout_check();
+        r = client3->connect("127.0.0.1", "9000");
         if (!r) {
             success = false;
             break;
         }
 
         person p { 10, "jack_client", 21 };
-        client3.publish("key", "publish msg from client").get();
+        client3->publish("key", "publish msg from client").get();
         while (success && target_count.load() < 10)
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
     } while (0);
@@ -1048,6 +1048,31 @@ TEST(rpc_test, test_ssl_concept) {
     }
 }
 #endif
+// TEST(rpc_test, test_ssl_proxy_echo_stream) {
+//     auto client=rpc_client::make_shared();
+//     //client->enable_ssl("server.crt");
+//     client->set_proxy(network::rpc_service::CustomRpcProxy::make_shared(kProxyServiceName, kProxyServiceField,
+//                                                                             kProxyServiceToken));
+//     [[maybe_unused]] bool r = client->connect("127.0.0.1", "9000");
+//     EXPECT_TRUE(r && client->has_connected());
+//     auto stream = client->upgrade_to_stream("test_echo_stream");
+//     EXPECT_TRUE(stream != nullptr);
+//     std::size_t cnt  = 5;
+//     std::string base = "msg ";
+//     while (cnt != 0) {
+//         EXPECT_TRUE(stream->Write(base + std::to_string(cnt)));
+//         --cnt;
+//         std::string tmp;
+//         EXPECT_TRUE(stream->Read(tmp));
+//         FINFO("ssl/proxy echo msg:{}", tmp);
+//     }
+//     FERR("");
+//     EXPECT_TRUE(stream->WriteDone());
+//     FERR("");
+//     EXPECT_TRUE(!stream->Finish(0));
+//     FERR("");
+//     FDEBUG("cnt:{}",client.use_count());
+// }
 #if 1
 
 // TEST(rpc_test, test_ssl_proxy_echo_stream_mutithread) {

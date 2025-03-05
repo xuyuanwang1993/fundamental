@@ -52,13 +52,13 @@ public:
     ~proxy_handler();
     template <typename... Args>
     static decltype(auto) make_shared(Args&&... args) {
-        return std::shared_ptr<proxy_handler>(new proxy_handler(std::forward<Args>(args)...));
+        return std::make_shared<proxy_handler>(std::forward<Args>(args)...);
     }
-
-protected:
     explicit proxy_handler(const std::string& proxy_host,
                            const std::string& proxy_service,
                            asio::ip::tcp::socket&& socket);
+protected:
+    
     void Process();
     void ProcessTrafficProxy();
     void HandleDisconnect(asio::error_code ec,

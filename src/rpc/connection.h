@@ -40,7 +40,7 @@ class ServerStreamReadWriter : public std::enable_shared_from_this<ServerStreamR
 public:
     template <typename... Args>
     static decltype(auto) make_shared(Args&&... args) {
-        return std::shared_ptr<ServerStreamReadWriter>(new ServerStreamReadWriter(std::forward<Args>(args)...));
+        return std::make_shared<ServerStreamReadWriter>(std::forward<Args>(args)...);
     }
     ~ServerStreamReadWriter();
     template <typename T>
@@ -51,9 +51,12 @@ public:
     std::error_code Finish(std::size_t max_wait_ms = 5000);
     std::error_code GetLastError() const;
     void EnableTimeoutCheck(std::size_t timeout_msec = 15000);
+    ServerStreamReadWriter(std::shared_ptr<connection> conn);
 
 private:
-    ServerStreamReadWriter(std::shared_ptr<connection> conn);
+    void start() {
+        read_head();
+    }
     void reponse_heartbeat();
     void read_head();
     void read_body(std::uint32_t offset = 0);
@@ -67,7 +70,7 @@ private:
         timeout_check_timer_.async_wait([this, ptr = weak_from_this()](const asio::error_code& ec) {
             auto instance = ptr.lock();
             if (!instance) {
-                FDEBUG("instance {:p} has alread release", (void*)this);
+                FASSERT(false, "instance {:p} has alread release {}", (void*)this,ec.message());
                 return;
             }
             if (ec) {
@@ -123,9 +126,12 @@ public:
 public:
     template <typename... Args>
     static decltype(auto) make_shared(Args&&... args) {
-        return std::shared_ptr<connection>(new connection(std::forward<Args>(args)...));
+        return std::make_shared<connection>(std::forward<Args>(args)...);
     }
-
+    connection(tcp::socket socket, std::size_t timeout_msec, router& router) :
+    socket_(std::move(socket)), body_(INIT_BUF_SIZE), timeout_check_timer_(socket_.get_executor()),
+    timeout_msec_(timeout_msec), has_closed_(false), router_(router) {
+    }
     ~connection() {
         close(true);
         FDEBUG("release connection {:p} -> {}", (void*)this, conn_id_);
@@ -203,7 +209,8 @@ public:
     std::shared_ptr<ServerStreamReadWriter> InitRpcStream() {
         FASSERT(rpc_stream_rw_ != nullptr && "it's not a stream rpc call");
         std::shared_ptr<ServerStreamReadWriter> ret = rpc_stream_rw_;
-        rpc_stream_rw_                              = nullptr;
+        ret->start();
+        rpc_stream_rw_ = nullptr;
         return ret;
     }
 
@@ -218,10 +225,6 @@ public:
     }
 
 private:
-    connection(tcp::socket socket, std::size_t timeout_msec, router& router) :
-    socket_(std::move(socket)), body_(INIT_BUF_SIZE), timeout_check_timer_(socket_.get_executor()),
-    timeout_msec_(timeout_msec), has_closed_(false), router_(router) {
-    }
     void publish(const std::string& key, const std::string& data) {
         response(0, request_type::rpc_publish, key, data);
     }
@@ -361,7 +364,7 @@ private:
                     // switch to proxy connection,don't need timer check any more
                     cancel_timer();
                     b_waiting_process_any_data.exchange(false);
-#ifndef RPC_VERBOSE
+#ifdef RPC_VERBOSE
                     FDEBUG("server proxy request read {}",
                            Fundamental::Utils::BufferToHex(proxy_buffer->data(), proxy_buffer->size(), 140));
 #endif
@@ -407,7 +410,7 @@ private:
                 return;
             }
             b_waiting_process_any_data.exchange(false);
-#ifndef RPC_VERBOSE
+#ifdef RPC_VERBOSE
             FDEBUG("server {:p} read head {}", (void*)this, Fundamental::Utils::BufferToHex(head_, kRpcHeadLen));
 #endif
             switch (head_[0]) {
@@ -423,7 +426,7 @@ private:
 
     void read_body(uint32_t func_id, std::size_t size, std::size_t start_offset = 0) {
         auto self(this->shared_from_this());
-#ifndef RPC_VERBOSE
+#ifdef RPC_VERBOSE
         FDEBUG("server {:p} try read size: {}", (void*)this, size - start_offset);
 #endif
         async_buffer_read_some(
@@ -440,7 +443,7 @@ private:
                 }
                 b_waiting_process_any_data.exchange(false);
                 auto current_read_offset = start_offset + length;
-#ifndef RPC_VERBOSE
+#ifdef RPC_VERBOSE
                 FDEBUG("server {:p} read some need:{}  current: {} new:{}", (void*)this, size, current_read_offset,
                        length);
 #endif
@@ -448,7 +451,7 @@ private:
                     read_body(func_id, size, current_read_offset);
                     return;
                 }
-#ifndef RPC_VERBOSE
+#ifdef RPC_VERBOSE
                 FDEBUG("server {:p} read {} body {}", (void*)this, size,
                        Fundamental::Utils::BufferToHex(body_.data(), size, 140));
 #endif
@@ -559,7 +562,7 @@ private:
                                          return;
                                      }
                                      b_waiting_process_any_data.exchange(false);
-#ifndef RPC_VERBOSE
+#ifdef RPC_VERBOSE
                                      FDEBUG("server {:p} write some size:{}", (void*)this, length);
 #endif
                                      while (length != 0) {
@@ -679,7 +682,8 @@ private:
         if (ssl_stream_) {
             asio::error_code ec;
             ssl_stream_->shutdown(ec);
-            ssl_stream_ = nullptr;
+            ssl_stream_->lowest_layer().cancel(ec);
+            ssl_stream_->lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both, ec);
         }
 #endif
         cancel_timer();
@@ -723,16 +727,20 @@ private:
 inline ServerStreamReadWriter::ServerStreamReadWriter(std::shared_ptr<connection> conn) :
 conn_(conn), timeout_check_timer_(conn_->socket_.get_executor()) {
     FDEBUG("build stream writer {:p} with connection:{:p}", (void*)this, (void*)conn_.get());
-    read_head();
 }
 inline ServerStreamReadWriter::~ServerStreamReadWriter() {
     FDEBUG("release stream writer {:p} with connection:{:p}", (void*)this, (void*)conn_.get());
-    cancel_timer();
-    if (last_data_status_ < rpc_stream_data_status::rpc_stream_finish) {
-        set_status(rpc_stream_data_status::rpc_stream_finish,
-                   error::make_error_code(error::rpc_errors::rpc_internal_error));
-    }
-    conn_->close();
+    std::promise<void> promise;
+    asio::post(conn_->socket_.get_executor(), [this, &promise] {
+        cancel_timer();
+        if (last_data_status_ < rpc_stream_data_status::rpc_stream_finish) {
+            set_status(rpc_stream_data_status::rpc_stream_finish,
+                       error::make_error_code(error::rpc_errors::rpc_internal_error));
+        }
+        conn_->close(true);
+        promise.set_value();
+    });
+    promise.get_future().wait();
 }
 template <typename T>
 inline bool ServerStreamReadWriter::Read(T& request, std::size_t max_wait_ms) {
@@ -828,18 +836,19 @@ inline void ServerStreamReadWriter::read_head() {
     std::vector<asio::mutable_buffer> buffers;
     buffers.emplace_back(&read_packet_buffer->size, sizeof(read_packet_buffer->size));
     buffers.emplace_back(asio::buffer(&read_packet_buffer->type, 1));
+
     conn_->async_buffer_read(std::move(buffers), [this, buffer_ref = read_packet_buffer,
                                                   ptr = weak_from_this()](asio::error_code ec, std::size_t length) {
         auto instance = ptr.lock();
         if (!instance) {
-            FDEBUG("instance {:p} has alread release", (void*)this);
+            FASSERT(false, "instance {:p} has alread release {}", (void*)this,ec.message());
             return;
         }
         if (last_data_status_ >= rpc_stream_data_status::rpc_stream_finish) return;
         if (ec) {
             set_status(rpc_stream_data_status::rpc_stream_failed, std::move(ec));
         } else {
-#ifndef RPC_VERBOSE
+#ifdef RPC_VERBOSE
             FDEBUG("server {:p} stream read head size data:{} type:{}", (void*)this,
                    Fundamental::Utils::BufferToHex(&read_packet_buffer->size, sizeof(read_packet_buffer->size)),
                    static_cast<std::uint32_t>(read_packet_buffer->type));
@@ -910,7 +919,7 @@ inline void ServerStreamReadWriter::read_body(std::uint32_t offset) {
                              ptr = weak_from_this()](asio::error_code ec, std::size_t length) {
             auto instance = ptr.lock();
             if (!instance) {
-                FDEBUG("instance {:p} has alread release", (void*)this);
+                FASSERT(false, "instance {:p} has alread release {}", (void*)this,ec.message());
                 return;
             }
             if (last_data_status_ >= rpc_stream_data_status::rpc_stream_finish) return;
@@ -919,7 +928,7 @@ inline void ServerStreamReadWriter::read_body(std::uint32_t offset) {
             } else {
                 b_waiting_process_any_data.exchange(false);
                 auto current_read_offset = offset + length;
-#ifndef RPC_VERBOSE
+#ifdef RPC_VERBOSE
                 FDEBUG("server {:p} stream read some need:{}  current: {} new:{}", (void*)this,
                        read_packet_buffer->size, current_read_offset, length);
 #endif
@@ -928,7 +937,7 @@ inline void ServerStreamReadWriter::read_body(std::uint32_t offset) {
                     read_body(current_read_offset);
                     return;
                 }
-#ifndef RPC_VERBOSE
+#ifdef RPC_VERBOSE
                 FDEBUG("server {:p} stream read {}", (void*)this,
                        Fundamental::Utils::BufferToHex(read_packet_buffer->data.data(), read_packet_buffer->size, 140));
 #endif
@@ -978,7 +987,7 @@ inline void ServerStreamReadWriter::handle_write() {
         [this, ref = write_cache_.front(), ptr = weak_from_this()](asio::error_code ec, std::size_t length) {
             auto instance = ptr.lock();
             if (!instance) {
-                FDEBUG("instance {:p} has alread release", (void*)this);
+                FASSERT(false, "instance {:p} has alread release {}", (void*)this,ec.message());
                 return;
             }
             if (last_data_status_ >= rpc_stream_data_status::rpc_stream_finish) return;
@@ -988,7 +997,7 @@ inline void ServerStreamReadWriter::handle_write() {
             }
             b_waiting_process_any_data.exchange(false);
 
-#ifndef RPC_VERBOSE
+#ifdef RPC_VERBOSE
             FDEBUG("server {:p} stream write some size:{}", (void*)this, length);
 #endif
             while (length != 0) {

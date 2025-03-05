@@ -9,7 +9,7 @@ namespace network
 namespace rpc_service
 {
 class rpc_client;
-class RpcClientProxyInterface : virtual public std::enable_shared_from_this<RpcClientProxyInterface> {
+class RpcClientProxyInterface :  public std::enable_shared_from_this<RpcClientProxyInterface> {
     friend class rpc_client;
 
 public:
@@ -74,7 +74,7 @@ private:
                           [this, ref = sendBufCache, ptr = weak_from_this()](const asio::error_code& ec, std::size_t) {
                               auto instance = ptr.lock();
                               if (!instance) {
-                                  FDEBUG("instance {:p} has alread release", (void*)this);
+                                  FASSERT(false,"instance {:p} has alread release", (void*)this);
                                   return;
                               }
 
@@ -94,7 +94,7 @@ private:
                          [this, ref = recvBufCache, ptr = weak_from_this()](const asio::error_code& ec, std::size_t) {
                              auto instance = ptr.lock();
                              if (!instance) {
-                                 FDEBUG("instance {:p} has alread release", (void*)this);
+                                 FASSERT(false,"instance {:p} has alread release", (void*)this);
                                  return;
                              }
                              if (ec) {

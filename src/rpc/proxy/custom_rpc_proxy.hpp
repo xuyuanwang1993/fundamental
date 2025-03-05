@@ -8,17 +8,17 @@ namespace network
 {
 namespace rpc_service
 {
-class CustomRpcProxy : public RpcClientProxyInterface, virtual public std::enable_shared_from_this<CustomRpcProxy> {
+class CustomRpcProxy : public RpcClientProxyInterface {
 public:
     template <typename... Args>
     static decltype(auto) make_shared(Args&&... args) {
-        return std::shared_ptr<CustomRpcProxy>(new CustomRpcProxy(std::forward<Args>(args)...));
+        return std::make_shared<CustomRpcProxy>(std::forward<Args>(args)...);
     }
-
-protected:
     CustomRpcProxy(const std::string& serviceName, const std::string& field, const std::string& token) :
     serviceName_(serviceName), field_(field), token_(token) {
     }
+
+protected:
     std::int32_t FinishSend() override {
         recvBufCache->resize(network::proxy::ProxyRequest::kVerifyStrLen);
         return RpcClientProxyInterface::HandShakeStatusMask::HandShakeNeedMoreData;
