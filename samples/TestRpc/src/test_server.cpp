@@ -209,7 +209,7 @@ void test_echo_stream(rpc_conn conn) {
             FWARN("stream start");
             std::string msg;
             while (stream->Read(msg, 0)) {
-                if (!stream->Write(msg.substr(0,msg.size()>100?100:msg.size()) + " from server")) break;
+                if (!stream->Write(msg.substr(0, msg.size() > 100 ? 100 : msg.size()) + " from server")) break;
             };
             stream->WriteDone();
             auto ec = stream->Finish(0);
@@ -275,7 +275,7 @@ std::unique_ptr<std::thread> s_thread;
 static network::proxy::ProxyManager s_manager;
 void server_task(std::promise<void>& sync_p) {
 
-    auto s_server = std::make_shared<rpc_server>(9000);
+    auto s_server = rpc_server::make_shared(9000);
     auto& server  = *s_server;
     server.enable_ssl({ nullptr, "server.crt", "server.key", "dh2048.pem" });
     dummy d;
@@ -317,9 +317,7 @@ void server_task(std::promise<void>& sync_p) {
     network::io_context_pool::Instance().start();
     Fundamental::Application::Instance().exitStarted.Connect([&]() { network::io_context_pool::Instance().stop(); });
     network::io_context_pool::Instance().notify_sys_signal.Connect(
-        [](std::error_code code, std::int32_t signo) { 
-            
-            Fundamental::Application::Instance().Exit(); });
+        [](std::error_code code, std::int32_t signo) { Fundamental::Application::Instance().Exit(); });
     {
         using namespace network::proxy;
         auto& manager = s_manager;

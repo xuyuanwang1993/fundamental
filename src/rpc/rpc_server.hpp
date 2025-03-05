@@ -10,6 +10,7 @@
 #include <set>
 #include <thread>
 
+#include "basic/const_vars.h"
 #include "basic/io_context_pool.hpp"
 #include "fundamental/events/event_system.h"
 
@@ -43,7 +44,7 @@ struct protocal_helper {
     }
 };
 
-class rpc_server : private asio::noncopyable {
+class rpc_server : private asio::noncopyable, public std::enable_shared_from_this<rpc_server> {
     friend class connection;
 
 public:
@@ -52,9 +53,9 @@ public:
     Fundamental::Signal<void()> on_release;
 
 public:
-    rpc_server(unsigned short port, size_t timeout_msec = 30000) :
-    acceptor_(io_context_pool::Instance().get_io_context()), timeout_msec_(timeout_msec) {
-        protocal_helper::init_acceptor(acceptor_, port);
+    template <typename... Args>
+    static decltype(auto) make_shared(Args&&... args) {
+        return std::shared_ptr<rpc_server>(new rpc_server(std::forward<Args>(args)...));
     }
 
     ~rpc_server() {
@@ -140,10 +141,20 @@ public:
     }
 
 private:
+    rpc_server(unsigned short port, size_t timeout_msec = 30000) :
+    acceptor_(io_context_pool::Instance().get_io_context()), timeout_msec_(timeout_msec) {
+        protocal_helper::init_acceptor(acceptor_, port);
+    }
     void do_accept() {
 
         acceptor_.async_accept(
-            io_context_pool::Instance().get_io_context(), [this](asio::error_code ec, asio::ip::tcp::socket socket) {
+            io_context_pool::Instance().get_io_context(),
+            [this, ptr = weak_from_this()](asio::error_code ec, asio::ip::tcp::socket socket) {
+                auto instance = ptr.lock();
+                if (!instance) {
+                    FDEBUG("instance {:p} has alread release", (void*)this);
+                    return;
+                }
                 if (!acceptor_.is_open()) {
                     return;
                 }
@@ -151,7 +162,7 @@ private:
                 if (ec) {
                     // maybe system error... ignored
                 } else {
-                    auto new_conn = std::make_shared<connection>(std::move(socket), timeout_msec_, router_);
+                    auto new_conn = connection::make_shared(std::move(socket), timeout_msec_, router_);
                     new_conn->on_new_subscriber_added.Connect([this](std::string key, std::weak_ptr<connection> conn) {
                         std::unique_lock<std::mutex> lock(sub_mtx_);
                         sub_map_.emplace(std::move(key), conn);

@@ -20,62 +20,62 @@
 
 template <std::size_t blockSize>
 static void TestNormal(benchmark::State& state) {
-    network::rpc_service::rpc_client client("127.0.0.1", "9000");
-    client.connect();
+    auto client=network::rpc_service::rpc_client::make_shared("127.0.0.1", "9000");
+    client->connect();
     std::string msg(blockSize, 'a');
     if (blockSize < 1024 * 1024 * 32) {
-        auto msg_recv = client.call<20000, std::string>("echo", msg);
+        auto msg_recv = client->call<20000, std::string>("echo", msg);
         FASSERT(msg_recv == msg);
     }
     for (auto _ : state) {
-        benchmark::DoNotOptimize(client.call<20000, std::string>("echo", msg));
+        benchmark::DoNotOptimize(client->call<20000, std::string>("echo", msg));
     }
 }
 
 template <std::size_t blockSize>
 static void TestProxy(benchmark::State& state) {
-    network::rpc_service::rpc_client client("127.0.0.1", "9000");
-    client.set_proxy(std::make_shared<network::rpc_service::CustomRpcProxy>(kProxyServiceName, kProxyServiceField,
+    auto client=network::rpc_service::rpc_client::make_shared("127.0.0.1", "9000");
+    client->set_proxy(network::rpc_service::CustomRpcProxy::make_shared(kProxyServiceName, kProxyServiceField,
                                                                             kProxyServiceToken));
-    client.connect();
+    client->connect();
     std::string msg(blockSize, 'a');
     if (blockSize < 1024 * 1024 * 32) {
-        auto msg_recv = client.call<20000, std::string>("echo", msg);
+        auto msg_recv = client->call<20000, std::string>("echo", msg);
         FASSERT(msg_recv == msg);
     }
 
     for (auto _ : state) {
-        benchmark::DoNotOptimize(client.call<20000, std::string>("echo", msg));
+        benchmark::DoNotOptimize(client->call<20000, std::string>("echo", msg));
     }
 }
 #ifndef RPC_DISABLE_SSL
 template <std::size_t blockSize>
 static void TestSslProxy(benchmark::State& state) {
-    network::rpc_service::rpc_client client("127.0.0.1", "9000");
-    client.enable_ssl("server.crt");
-    client.set_proxy(std::make_shared<network::rpc_service::CustomRpcProxy>(kProxyServiceName, kProxyServiceField,
+    auto client=network::rpc_service::rpc_client::make_shared("127.0.0.1", "9000");
+    client->enable_ssl("server.crt");
+    client->set_proxy(network::rpc_service::CustomRpcProxy::make_shared(kProxyServiceName, kProxyServiceField,
                                                                             kProxyServiceToken));
-    client.connect();
+    client->connect();
     std::string msg(blockSize, 'a');
     if (blockSize < 1024 * 1024 * 32) {
-        auto msg_recv = client.call<20000, std::string>("echo", msg);
+        auto msg_recv = client->call<20000, std::string>("echo", msg);
         FASSERT(msg_recv == msg);
     }
 
     for (auto _ : state) {
-        benchmark::DoNotOptimize(client.call<30000, std::string>("echo", msg));
+        benchmark::DoNotOptimize(client->call<30000, std::string>("echo", msg));
     }
 }
 template <std::size_t blockSize>
 static void TestSslProxyStream(benchmark::State& state) {
-    network::rpc_service::rpc_client client("127.0.0.1", "9000");
-    client.enable_ssl("server.crt");
-    client.set_proxy(std::make_shared<network::rpc_service::CustomRpcProxy>(kProxyServiceName, kProxyServiceField,
+    auto client=network::rpc_service::rpc_client::make_shared("127.0.0.1", "9000");
+    client->enable_ssl("server.crt");
+    client->set_proxy(network::rpc_service::CustomRpcProxy::make_shared(kProxyServiceName, kProxyServiceField,
                                                                             kProxyServiceToken));
-    client.connect();
+    client->connect();
     std::string msg(blockSize, 'a');
     std::string recv(blockSize, 'b');
-    auto stream = client.upgrade_to_stream("echos");
+    auto stream = client->upgrade_to_stream("echos");
     if (blockSize < 1024 * 1024 * 32) {
         stream->Write(msg);
         stream->Read(recv, 0);

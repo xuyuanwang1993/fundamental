@@ -6,10 +6,13 @@
 #include <stdexcept>
 #include <thread>
 
-namespace network {
+namespace network
+{
 
 io_context_pool::io_context_pool() :
-io_contexts_ { io_context_ptr(new asio::io_context) }, next_io_context_(0), signals_(*io_contexts_[0]) {
+notify_sys_signal_storage(new Fundamental::Signal<void(std::error_code /*ec*/, int /*signo*/)>()),
+notify_sys_signal(*notify_sys_signal_storage), io_contexts_ { io_context_ptr(new asio::io_context) },
+next_io_context_(0), signals_(*io_contexts_[0]) {
     work_.push_back(asio::make_work_guard(*io_contexts_[0]));
     // WARRNING: this context pool works as a singleton,so we
     //  should release all resource reference before our application is exited
@@ -51,9 +54,9 @@ void io_context_pool::start() {
 #if defined(SIGQUIT)
     signals_.add(SIGQUIT);
 #endif // defined(SIGQUIT)
-    signals_.async_wait([this](std::error_code ec, int signo) {
+    signals_.async_wait([this, s = notify_sys_signal_storage](std::error_code ec, int signo) {
         FDEBUG("recv signo:{} msg:{}", signo, ec.message());
-        notify_sys_signal(std::move(ec), signo);
+        s->Emit(std::move(ec), signo);
     });
 }
 

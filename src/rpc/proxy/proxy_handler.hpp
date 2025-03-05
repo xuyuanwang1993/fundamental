@@ -6,6 +6,8 @@
 #include <memory>
 
 #include "fundamental/basic/allocator.hpp"
+#include "fundamental/basic/async_utils.hpp"
+
 namespace network
 {
 namespace proxy
@@ -48,10 +50,9 @@ class proxy_handler : public std::enable_shared_from_this<proxy_handler> {
 public:
     void SetUp();
     ~proxy_handler();
-    static std::shared_ptr<proxy_handler> MakeShared(const std::string& proxy_host,
-                                                     const std::string& proxy_service,
-                                                     asio::ip::tcp::socket&& socket) {
-        return std::shared_ptr<proxy_handler>(new proxy_handler(proxy_host, proxy_service, std::move(socket)));
+    template <typename... Args>
+    static decltype(auto) make_shared(Args&&... args) {
+        return std::shared_ptr<proxy_handler>(new proxy_handler(std::forward<Args>(args)...));
     }
 
 protected:

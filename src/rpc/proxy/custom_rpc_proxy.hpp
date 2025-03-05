@@ -4,22 +4,27 @@
 #include "proxy_codec.hpp"
 #include "rpc/basic/rpc_client_proxy.hpp"
 
-namespace network {
-namespace rpc_service {
-class CustomRpcProxy : public RpcClientProxyInterface {
-
+namespace network
+{
+namespace rpc_service
+{
+class CustomRpcProxy : public RpcClientProxyInterface, virtual public std::enable_shared_from_this<CustomRpcProxy> {
 public:
-    CustomRpcProxy(const std::string& serviceName, const std::string& field, const std::string& token) :
-    serviceName_(serviceName), field_(field), token_(token) {
+    template <typename... Args>
+    static decltype(auto) make_shared(Args&&... args) {
+        return std::shared_ptr<CustomRpcProxy>(new CustomRpcProxy(std::forward<Args>(args)...));
     }
 
 protected:
+    CustomRpcProxy(const std::string& serviceName, const std::string& field, const std::string& token) :
+    serviceName_(serviceName), field_(field), token_(token) {
+    }
     std::int32_t FinishSend() override {
-        recvBufCache.resize(network::proxy::ProxyRequest::kVerifyStrLen);
+        recvBufCache->resize(network::proxy::ProxyRequest::kVerifyStrLen);
         return RpcClientProxyInterface::HandShakeStatusMask::HandShakeNeedMoreData;
     }
     std::int32_t FinishRecv() override {
-        if (std::memcmp(recvBufCache.data(), network::proxy::ProxyRequest::kVerifyStr,
+        if (std::memcmp(recvBufCache->data(), network::proxy::ProxyRequest::kVerifyStr,
                         network::proxy::ProxyRequest::kVerifyStrLen) == 0)
             return RpcClientProxyInterface::HandShakeStatusMask::HandShakeSucess;
         else {
@@ -28,8 +33,8 @@ protected:
     }
     void Init() {
         network::proxy::ProxyRequest request(serviceName_, token_, field_);
-        sendBufCache = request.Encode();
-        curentStatus = RpcClientProxyInterface::HandShakeStatusMask::HandShakeDataPending;
+        *sendBufCache = request.Encode();
+        curentStatus  = RpcClientProxyInterface::HandShakeStatusMask::HandShakeDataPending;
     }
 
 private:

@@ -12,9 +12,11 @@
 namespace network {
 /// A pool of io_context objects.
 class io_context_pool : public Fundamental::Singleton<io_context_pool> {
+private:
+    std::shared_ptr<Fundamental::Signal<void(std::error_code /*ec*/, int /*signo*/)>> notify_sys_signal_storage;
 public:
     inline static std::size_t s_excutorNums = 0;
-    Fundamental::Signal<void(std::error_code /*ec*/, int /*signo*/)> notify_sys_signal;
+    Fundamental::Signal<void(std::error_code /*ec*/, int /*signo*/)>& notify_sys_signal;
 public:
     /// Construct the io_context pool.
     io_context_pool();
@@ -33,6 +35,7 @@ private:
     io_context_pool& operator=(const io_context_pool&) = delete;
     typedef std::shared_ptr<asio::io_context> io_context_ptr;
     typedef asio::executor_work_guard<asio::io_context::executor_type> io_context_work;
+    
 
     /// The pool of io_contexts.
     std::vector<io_context_ptr> io_contexts_;
