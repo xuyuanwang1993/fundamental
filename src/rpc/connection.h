@@ -348,7 +348,7 @@ private:
                     // switch to proxy connection,don't need timer check any more
                     cancel_timer();
                     b_waiting_process_any_data.exchange(false);
-#ifndef RPC_VERBOSE
+#ifdef RPC_VERBOSE
                     FDEBUG("server proxy request read {}",
                            Fundamental::Utils::BufferToHex(proxy_buffer->data(), proxy_buffer->size(), 140));
 #endif
@@ -379,6 +379,7 @@ private:
         close();
     }
     void read_head(std::size_t offset = 0) {
+        FASSERT(offset<kRpcHeadLen);
         auto self(this->shared_from_this());
         async_buffer_read({ asio::buffer(head_ + offset, kRpcHeadLen - offset) }, [this, self](asio::error_code ec,
                                                                                                std::size_t length) {
@@ -393,7 +394,7 @@ private:
                 return;
             }
             b_waiting_process_any_data.exchange(false);
-#ifndef RPC_VERBOSE
+#ifdef RPC_VERBOSE
             FDEBUG("server {:p} read head {}", (void*)this, Fundamental::Utils::BufferToHex(head_, kRpcHeadLen));
 #endif
             switch (head_[0]) {
@@ -409,7 +410,7 @@ private:
 
     void read_body(uint32_t func_id, std::size_t size, std::size_t start_offset = 0) {
         auto self(this->shared_from_this());
-#ifndef RPC_VERBOSE
+#ifdef RPC_VERBOSE
         FDEBUG("server {:p} try read size: {}", (void*)this, size - start_offset);
 #endif
         async_buffer_read_some(
@@ -426,7 +427,7 @@ private:
                 }
                 b_waiting_process_any_data.exchange(false);
                 auto current_read_offset = start_offset + length;
-#ifndef RPC_VERBOSE
+#ifdef RPC_VERBOSE
                 FDEBUG("server {:p} read some need:{}  current: {} new:{}", (void*)this, size, current_read_offset,
                        length);
 #endif
@@ -434,7 +435,7 @@ private:
                     read_body(func_id, size, current_read_offset);
                     return;
                 }
-#ifndef RPC_VERBOSE
+#ifdef RPC_VERBOSE
                 FDEBUG("server {:p} read {} body {}", (void*)this, size,
                        Fundamental::Utils::BufferToHex(body_.data(), size, 140));
 #endif
@@ -545,7 +546,7 @@ private:
                                          return;
                                      }
                                      b_waiting_process_any_data.exchange(false);
-#ifndef RPC_VERBOSE
+#ifdef RPC_VERBOSE
                                      FDEBUG("server {:p} write some size:{}", (void*)this, length);
 #endif
                                      while (length != 0) {
@@ -814,7 +815,7 @@ inline void ServerStreamReadWriter::read_head() {
         if (ec) {
             set_status(rpc_stream_data_status::rpc_stream_failed, std::move(ec));
         } else {
-#ifndef RPC_VERBOSE
+#ifdef RPC_VERBOSE
             FDEBUG("server {:p} stream read head size data:{} type:{}", (void*)this,
                    Fundamental::Utils::BufferToHex(&read_packet_buffer.size, sizeof(read_packet_buffer.size)),
                    static_cast<std::uint32_t>(read_packet_buffer.type));
@@ -887,7 +888,7 @@ inline void ServerStreamReadWriter::read_body(std::uint32_t offset) {
         } else {
             b_waiting_process_any_data.exchange(false);
             auto current_read_offset = offset + length;
-#ifndef RPC_VERBOSE
+#ifdef RPC_VERBOSE
             FDEBUG("server {:p} stream read some need:{}  current: {} new:{}", (void*)this, read_packet_buffer.size,
                    current_read_offset, length);
 #endif
@@ -896,7 +897,7 @@ inline void ServerStreamReadWriter::read_body(std::uint32_t offset) {
                 read_body(current_read_offset);
                 return;
             }
-#ifndef RPC_VERBOSE
+#ifdef RPC_VERBOSE
             FDEBUG("server {:p} stream read {}", (void*)this,
                    Fundamental::Utils::BufferToHex(read_packet_buffer.data.data(), read_packet_buffer.size, 140));
 #endif
@@ -951,7 +952,7 @@ inline void ServerStreamReadWriter::handle_write() {
             }
             b_waiting_process_any_data.exchange(false);
 
-#ifndef RPC_VERBOSE
+#ifdef RPC_VERBOSE
             FDEBUG("server {:p} stream write some size:{}",(void*)this, length);
 #endif
             while (length != 0) {

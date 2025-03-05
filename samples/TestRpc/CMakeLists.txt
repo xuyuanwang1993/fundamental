@@ -46,7 +46,7 @@ target_link_libraries(${app_target_name}
     PRIVATE
     gtest
 )
-
+config_enable_sanitize_address_check(${app_target_name})
 install(FILES ${FUNDAMENTAL_ASSETS_PATH}/dh2048.pem
     ${FUNDAMENTAL_ASSETS_PATH}/server.crt
     ${FUNDAMENTAL_ASSETS_PATH}/server.key

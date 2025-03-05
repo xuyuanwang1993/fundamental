@@ -41,24 +41,24 @@ enum class rpc_stream_data_status : std::uint8_t
 };
 
 struct message_type {
-    std::uint64_t req_id;
-    request_type req_type;
+    std::uint64_t req_id  = 0;
+    request_type req_type = request_type::rpc_req;
     std::string content;
 };
 
 struct rpc_stream_packet {
-    std::uint32_t size;
-    std::uint8_t type;
+    std::uint32_t size = 0;
+    std::uint8_t type  = 0;
     std::vector<std::uint8_t> data;
 };
 
-static const uint8_t RPC_MAGIC_NUM = 39;
+constexpr std::uint8_t RPC_MAGIC_NUM = 39;
 struct rpc_header {
-    uint8_t magic;
-    request_type req_type;
-    uint32_t body_len;
-    uint64_t req_id;
-    uint32_t func_id;
+    uint8_t magic = RPC_MAGIC_NUM;
+    request_type req_type=request_type::rpc_req;
+    uint32_t body_len = 0;
+    uint64_t req_id   = 0;
+    uint32_t func_id  = 0;
     void Serialize(void* dst, std::size_t len) {
         FASSERT(len >= HeadLen());
         Fundamental::BufferWriter writer;

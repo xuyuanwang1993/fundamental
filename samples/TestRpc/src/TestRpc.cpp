@@ -16,51 +16,80 @@
 using namespace network;
 using namespace network::rpc_service;
 static Fundamental::ThreadPool& s_test_pool = Fundamental::ThreadPool::Instance<101>();
-TEST(rpc_test, test_echo_stream_proxy_mutithread) {
+// TEST(rpc_test, test_echo_stream_proxy_mutithread) {
+//     std::vector<Fundamental::ThreadPoolTaskToken<void>> tasks;
+//     auto nums      = 100;
+//     auto task_func = []() {
+//         rpc_client client;
+//         client.set_proxy(std::make_shared<network::rpc_service::CustomRpcProxy>(kProxyServiceName,
+//         kProxyServiceField,
+//                                                                                 kProxyServiceToken));
+//         [[maybe_unused]] bool r = client.connect("127.0.0.1", "9000");
+//         EXPECT_TRUE(r && client.has_connected());
+//         auto stream = client.upgrade_to_stream("test_echo_stream");
+//         EXPECT_TRUE(stream != nullptr);
+//         std::size_t cnt  = 5;
+//         std::string base = "msg ";
+//         while (cnt != 0) {
+//             {
+//                 auto ret = stream->Write(base + std::to_string(cnt));
+//                 if (!ret) {
+//                     FDEBUG(ret);
+//                     EXPECT_TRUE(ret);
+//                 }
+//             }
+//             --cnt;
+//             std::string tmp;
+//             {
+//                 auto ret = stream->Read(tmp, 0);
+//                 if (!ret) {
+//                     FDEBUG(ret);
+//                     EXPECT_TRUE(ret);
+//                 }
+//             }
+//             FINFO("mutithread echo msg:{}", tmp);
+//         }
+//         {
+//             auto ret = stream->WriteDone();
+//             if (!ret) {
+//                 FDEBUG(ret);
+//                 EXPECT_TRUE(ret);
+//             }
+//         }
+//         {
+//             auto ret = !stream->Finish(0);
+//             if (!ret) {
+//                 FDEBUG(ret);
+//                 EXPECT_TRUE(ret);
+//             }
+//         }
+//     };
+//     while (nums > 0) {
+//         tasks.emplace_back(s_test_pool.Enqueue(task_func));
+//         nums--;
+//     }
+//     for (auto& f : tasks)
+//         EXPECT_NO_THROW(f.resultFuture.get());
+// }
+
+TEST(rpc_test, test_echo_proxy_mutithread) {
     std::vector<Fundamental::ThreadPoolTaskToken<void>> tasks;
-    auto nums      = 40;
+    auto nums      = 100;
     auto task_func = []() {
         rpc_client client;
-        client.set_proxy(std::make_shared<network::rpc_service::CustomRpcProxy>(kProxyServiceName, kProxyServiceField,
-                                                                                kProxyServiceToken));
+        // client.set_proxy(std::make_shared<network::rpc_service::CustomRpcProxy>(kProxyServiceName,
+        // kProxyServiceField,
+        //                                                                         kProxyServiceToken));
         [[maybe_unused]] bool r = client.connect("127.0.0.1", "9000");
         EXPECT_TRUE(r && client.has_connected());
-        auto stream = client.upgrade_to_stream("test_echo_stream");
-        EXPECT_TRUE(stream != nullptr);
         std::size_t cnt  = 5;
         std::string base = "msg ";
+        if (!r) return;
         while (cnt != 0) {
-            {
-                auto ret = stream->Write(base + std::to_string(cnt));
-                if (!ret) {
-                    FDEBUG(ret);
-                    EXPECT_TRUE(ret);
-                }
-            }
+            auto str = base + std::to_string(cnt);
+            auto ret = client.call<std::string>("echo", str);
+            EXPECT_EQ(str, ret);
             --cnt;
-            std::string tmp;
-            {
-                auto ret = stream->Read(tmp, 0);
-                if (!ret) {
-                    FDEBUG(ret);
-                    EXPECT_TRUE(ret);
-                }
-            }
-            FINFO("mutithread echo msg:{}", tmp);
-        }
-        {
-            auto ret = stream->WriteDone();
-            if (!ret) {
-                FDEBUG(ret);
-                EXPECT_TRUE(ret);
-            }
-        }
-        {
-            auto ret = !stream->Finish(0);
-            if (!ret) {
-                FDEBUG(ret);
-                EXPECT_TRUE(ret);
-            }
         }
     };
     while (nums > 0) {

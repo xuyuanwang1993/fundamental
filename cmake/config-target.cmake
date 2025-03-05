@@ -1,7 +1,7 @@
 if(__FUNDAMENTAL_CONFIG_TARGET__)
     return()
 endif()
-set(__FUNDAMENTAL_CONFIG_TARGET__ TRUE )
+set(__FUNDAMENTAL_CONFIG_TARGET__ TRUE)
 
 include(clang-tidy-helper)
 option(F_BUILD_STATIC "build static fundamental lib" ON)
@@ -99,14 +99,21 @@ target_enable_clang_tidy(BuildSettings)
 
 
 function(config_enable_sanitize_address_check target_name)
-    target_compile_options(${target_name} INTERFACE
-        "$<$<CONFIG:Debug>:-fsanitize=address"
+    target_compile_options(${target_name} PRIVATE
+        "$<$<CONFIG:Debug>:-fstack-protector>"
     )
-
-    target_link_options(${target_name} INTERFACE
+    target_compile_options(${target_name} PRIVATE
         "$<$<CONFIG:Debug>:-fsanitize=address>"
     )
-
+    
+    target_link_options(${target_name} PRIVATE
+        "$<$<CONFIG:Debug>:-fsanitize=address>"
+    )
+    #you shoulde install libasan5 in ubuntu
+    target_link_libraries(
+        ${target_name} PRIVATE
+        "$<$<CONFIG:Debug>:asan>"
+    )
 endfunction()
 
 

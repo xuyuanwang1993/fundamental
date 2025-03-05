@@ -17,6 +17,7 @@ list(APPEND lib_source ${services_source})
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${lib_source})
 
 add_library(${lib_name} STATIC ${lib_source})
+config_enable_sanitize_address_check(${lib_name})
 
 target_include_directories(${lib_name} PUBLIC
     ${src_root_dir}
