@@ -13,6 +13,7 @@
 #include <optional>
 #include <sstream>
 #include <string_view>
+#include <algorithm>
 
 namespace Fundamental {
 
@@ -202,9 +203,10 @@ inline constexpr std::array<char, N> __get_short_file_name__(const char (&file_n
     }
     std::size_t flag_bytes = with_discard_flag ? i : 0;
     if (flag_bytes > 3) flag_bytes = 3;
+    std::size_t copy_size = std::min(N - i - 1, N - flag_bytes - 1); // -1 for null terminator
     __builtin_memset(short_name.data(), '.', flag_bytes);
-    __builtin_memcpy(short_name.data() + flag_bytes, file_name + i + 1, N - i);
-    short_name[flag_bytes + N - i] = '\0';
+    __builtin_memcpy(short_name.data() + flag_bytes, file_name + i + 1, copy_size);
+    short_name[flag_bytes + copy_size] = '\0';
     return short_name;
 }
 #define SHORT_FILE_NAME_LEVEL        3
