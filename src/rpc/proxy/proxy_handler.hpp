@@ -1,4 +1,5 @@
 #pragma once
+#include "rpc/basic/const_vars.h"
 
 #include <array>
 #include <asio.hpp>
@@ -6,11 +7,18 @@
 #include <memory>
 
 #include "fundamental/basic/allocator.hpp"
+#include "fundamental/basic/async_utils.hpp"
+
 namespace network
 {
+namespace rpc_service
+{
+class connection;
+}
 namespace proxy
 {
 class proxy_handler : public std::enable_shared_from_this<proxy_handler> {
+    friend class rpc_service::connection;
     inline static constexpr std::size_t kCacheBufferSize = 32 * 1024; // 32k
     inline static constexpr std::size_t kMinPerReadSize  = 1200;
     using DataCacheType                                  = std::array<std::uint8_t, kCacheBufferSize>;
@@ -48,16 +56,24 @@ class proxy_handler : public std::enable_shared_from_this<proxy_handler> {
 public:
     void SetUp();
     ~proxy_handler();
-    static std::shared_ptr<proxy_handler> MakeShared(const std::string& proxy_host,
-                                                     const std::string& proxy_service,
-                                                     asio::ip::tcp::socket&& socket) {
-        return std::shared_ptr<proxy_handler>(new proxy_handler(proxy_host, proxy_service, std::move(socket)));
+    template <typename... Args>
+    static decltype(auto) make_shared(Args&&... args) {
+        return std::make_shared<proxy_handler>(std::forward<Args>(args)...);
     }
-
-protected:
     explicit proxy_handler(const std::string& proxy_host,
                            const std::string& proxy_service,
                            asio::ip::tcp::socket&& socket);
+    void release_obj() {
+        reference_.release();
+        asio::post(socket_.get_executor(), [this, ref = shared_from_this()] {
+            try {
+                HandleDisconnect({}, "release_obj");
+            } catch (const std::exception& e) {
+            }
+        });
+    }
+
+protected:
     void Process();
     void ProcessTrafficProxy();
     void HandleDisconnect(asio::error_code ec,
@@ -74,6 +90,7 @@ protected:
     void StartServerRead();
 
 protected:
+    rpc_service::rpc_data_reference reference_;
     const std::string proxy_host;
     const std::string proxy_service;
     /// Socket for the connection.

@@ -16,7 +16,17 @@
 using namespace network;
 using namespace rpc_service;
 static auto& rpc_stream_pool = Fundamental::ThreadPool::Instance<100>();
-std::string echo(rpc_conn conn, const std::string& src) {
+std::string echo(rpc_conn conn, std::string src) {
+    if (src.size() > 4096) {
+        auto sp = conn.lock();
+        sp->set_delay(true);
+        auto req_id = sp->request_id(); // note: you need keep the request id at that
+        rpc_stream_pool.Enqueue([src = std::move(src), conn, req_id]() ->void {
+            auto sp = conn.lock();
+            if (sp) sp->response(req_id, network::rpc_service::request_type::rpc_res, std::move(src));
+        });
+        return "";
+    }
     return src;
 }
 
@@ -41,15 +51,11 @@ static network::proxy::ProxyManager s_manager;
 
 void server_task(std::promise<void>& sync_p) {
 
-    auto s_server = std::make_shared<rpc_server>(9000, 3600);
+    auto s_server = rpc_server::make_shared(9000);
     s_server->enable_ssl({ nullptr, "server.crt", "server.key", "dh2048.pem" });
     s_server->register_handler("echo", echo);
     s_server->register_handler("echos", echos);
-    network::io_context_pool::s_excutorNums = 10;
-    network::io_context_pool::Instance().start();
-    Fundamental::Application::Instance().exitStarted.Connect([&]() { network::io_context_pool::Instance().stop(); });
-    network::io_context_pool::Instance().notify_sys_signal.Connect(
-        [](std::error_code code, std::int32_t signo) { Fundamental::Application::Instance().Exit(); });
+    network::init_io_context_pool(10);
     {
         using namespace network::proxy;
         auto& manager = s_manager;

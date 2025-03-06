@@ -7,7 +7,8 @@
 #include "fundamental/thread_pool/thread_pool.h"
 #include <atomic>
 #include <type_traits>
-namespace Fundamental {
+namespace Fundamental
+{
 
 struct ApplicationInterface {
     constexpr ApplicationInterface() = default;
@@ -53,12 +54,16 @@ public:
         loopFinished.Emit();
     }
     void Exit() {
-        bool expectedValue = true;
-        if (!bRunning.compare_exchange_strong(expectedValue, false)) return;
-        exitStarted.Emit();
-        if (imp) imp->Exit();
-        WakeUp();
-        exitFinished.Emit();
+        if (bRunning) {
+            PostProcessEvent([this]() {
+                bool expectedValue = true;
+                if (!bRunning.compare_exchange_strong(expectedValue, false)) return;
+                exitStarted.Emit();
+                if (imp) imp->Exit();
+                exitFinished.Emit();
+            });
+            WakeUp();
+        }
     }
 
 protected:

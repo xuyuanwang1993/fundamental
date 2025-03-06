@@ -7,6 +7,7 @@
 #include "fundamental/basic/buffer.hpp"
 #include "fundamental/basic/log.h"
 #include "fundamental/basic/utils.hpp"
+#include "fundamental/events/event_system.h"
 
 namespace network
 {
@@ -32,6 +33,7 @@ enum class request_type : uint8_t
 enum class rpc_stream_data_status : std::uint8_t
 {
     rpc_stream_none,       // init status
+    rpc_stream_heartbeat,  // size=0
     rpc_stream_data,       // size+data
     rpc_stream_write_done, // size=0
     rpc_stream_finish,
@@ -40,24 +42,24 @@ enum class rpc_stream_data_status : std::uint8_t
 };
 
 struct message_type {
-    std::uint64_t req_id;
-    request_type req_type;
+    std::uint64_t req_id  = 0;
+    request_type req_type = request_type::rpc_req;
     std::string content;
 };
 
 struct rpc_stream_packet {
-    std::uint32_t size;
-    std::uint8_t type;
+    std::uint32_t size = 0;
+    std::uint8_t type  = 0;
     std::vector<std::uint8_t> data;
 };
 
-static const uint8_t RPC_MAGIC_NUM = 39;
+constexpr std::uint8_t RPC_MAGIC_NUM = 39;
 struct rpc_header {
-    uint8_t magic;
-    request_type req_type;
-    uint32_t body_len;
-    uint64_t req_id;
-    uint32_t func_id;
+    uint8_t magic         = RPC_MAGIC_NUM;
+    request_type req_type = request_type::rpc_req;
+    uint32_t body_len     = 0;
+    uint64_t req_id       = 0;
+    uint32_t func_id      = 0;
     void Serialize(void* dst, std::size_t len) {
         FASSERT(len >= HeadLen());
         Fundamental::BufferWriter writer;
@@ -83,6 +85,25 @@ struct rpc_header {
         return sizeof(std::uint8_t) + sizeof(request_type) + sizeof(std::uint32_t) + sizeof(std::uint64_t) +
                sizeof(std::uint32_t);
     }
+};
+struct rpc_data_reference {
+    Fundamental::Signal<void()> notify_release;
+    bool is_valid() const {
+        return !__has_released;
+    }
+    operator bool() const {
+        return is_valid();
+    }
+    bool operator!() const {
+        return !is_valid();
+    }
+    void release() {
+        auto expected_value = false;
+        if (__has_released.compare_exchange_strong(expected_value, true)) {
+            notify_release.Emit();
+        }
+    }
+    std::atomic_bool __has_released = false;
 };
 
 static constexpr std::size_t MAX_BUF_LEN     = 1024LLU * 1024 * 1024 * 4;
@@ -112,14 +133,14 @@ public:
     }
     std::string message(int value) const override {
         switch (static_cast<rpc_errors>(value)) {
-        case rpc_errors::rpc_success: return "success";
-        case rpc_errors::rpc_failed: return "failed";
-        case rpc_errors::rpc_timeout: return "timeout";
-        case rpc_errors::rpc_broken_pipe: return "broken pipe";
-        case rpc_errors::rpc_pack_failed: return "pack failed";
-        case rpc_errors::rpc_unpack_failed: return "unpack failed";
-        case rpc_errors::rpc_bad_request: return "bad request";
-        case rpc_errors::rpc_internal_error: return "internal error";
+        case rpc_errors::rpc_success: return "rpc success";
+        case rpc_errors::rpc_failed: return "rpc failed";
+        case rpc_errors::rpc_timeout: return "rpc timeout";
+        case rpc_errors::rpc_broken_pipe: return "rpc broken pipe";
+        case rpc_errors::rpc_pack_failed: return "rpc pack failed";
+        case rpc_errors::rpc_unpack_failed: return "rpc unpack failed";
+        case rpc_errors::rpc_bad_request: return "rpc bad request";
+        case rpc_errors::rpc_internal_error: return "rpc internal error";
         case rpc_errors::rpc_memory_error: return "rpc memory error";
         default: return "network.rpc error";
         }

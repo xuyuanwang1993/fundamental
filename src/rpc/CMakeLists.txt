@@ -2,6 +2,9 @@
 get_filename_component(lib_name ${CMAKE_CURRENT_LIST_DIR} NAME)
 
 file(GLOB lib_source
+    *.h
+    *.cpp
+    *.hpp
     basic/*.h
     basic/*.cpp
     basic/*.hpp
@@ -17,6 +20,7 @@ list(APPEND lib_source ${services_source})
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${lib_source})
 
 add_library(${lib_name} STATIC ${lib_source})
+config_enable_sanitize_address_check(${lib_name})
 
 target_include_directories(${lib_name} PUBLIC
     ${src_root_dir}

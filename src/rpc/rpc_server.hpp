@@ -10,13 +10,15 @@
 #include <set>
 #include <thread>
 
+#include "basic/rpc_init.hpp"
 #include "fundamental/events/event_system.h"
-#include "basic/io_context_pool.hpp"
 
 using asio::ip::tcp;
 
-namespace network {
-namespace rpc_service {
+namespace network
+{
+namespace rpc_service
+{
 using rpc_conn = std::weak_ptr<connection>;
 
 struct protocal_helper {
@@ -41,25 +43,24 @@ struct protocal_helper {
     }
 };
 
-class rpc_server : private asio::noncopyable {
+class rpc_server : private asio::noncopyable, public std::enable_shared_from_this<rpc_server> {
     friend class connection;
 
 public:
     Fundamental::Signal<void(asio::error_code, string_view)> on_err;
     Fundamental::Signal<void(std::shared_ptr<connection>, std::string)> on_net_err;
-    Fundamental::Signal<void()> on_release;
 
 public:
-    rpc_server(unsigned short port, size_t timeout_seconds = 15) :
-    acceptor_(io_context_pool::Instance().get_io_context()), timeout_seconds_(timeout_seconds) {
+    template <typename... Args>
+    static decltype(auto) make_shared(Args&&... args) {
+        return std::make_shared<rpc_server>(std::forward<Args>(args)...);
+    }
+    rpc_server(unsigned short port, size_t timeout_msec = 30000) :
+    acceptor_(io_context_pool::Instance().get_io_context()), timeout_msec_(timeout_msec) {
         protocal_helper::init_acceptor(acceptor_, port);
     }
-
     ~rpc_server() {
-        FDEBUG("release rpc_server start");
-        on_release.Emit();
-        stop();
-        FDEBUG("release rpc_server over");
+        FDEBUG("release rpc_server");
     }
 
     void start() {
@@ -67,14 +68,9 @@ public:
         if (!has_started_.compare_exchange_strong(expected_value, true)) return;
         do_accept();
     }
+
     void stop() {
-        bool expected_value = true;
-        if (!has_started_.compare_exchange_strong(expected_value, false)) return;
-        try {
-            // close acceptor directly
-            acceptor_.close();
-        } catch (const std::exception& e) {
-        }
+        release_obj();
     }
     template <bool is_pub = false, typename Function>
     void register_handler(std::string const& name, const Function& f) {
@@ -97,8 +93,17 @@ public:
         forward_msg(std::move(key), std::move(s_data));
     }
 
-    void post_stop() {
-        stop();
+    void release_obj() {
+        reference_.release();
+        bool expected_value = true;
+        if (!has_started_.compare_exchange_strong(expected_value, false)) return;
+        asio::post(acceptor_.get_executor(), [this, ref = shared_from_this()] {
+            try {
+                std::error_code ec;
+                acceptor_.close(ec);
+            } catch (const std::exception& e) {
+            }
+        });
     }
     // this function will throw when param is invalid
     void enable_ssl(rpc_server_ssl_config ssl_config) {
@@ -141,7 +146,11 @@ private:
     void do_accept() {
 
         acceptor_.async_accept(
-            io_context_pool::Instance().get_io_context(), [this](asio::error_code ec, asio::ip::tcp::socket socket) {
+            io_context_pool::Instance().get_io_context(),
+            [this, ptr = shared_from_this()](asio::error_code ec, asio::ip::tcp::socket socket) {
+                if (!reference_.is_valid()) {
+                    return;
+                }
                 if (!acceptor_.is_open()) {
                     return;
                 }
@@ -149,7 +158,8 @@ private:
                 if (ec) {
                     // maybe system error... ignored
                 } else {
-                    auto new_conn = std::make_shared<connection>(std::move(socket), timeout_seconds_, router_);
+                    auto new_conn =
+                        connection::make_shared(std::move(socket), timeout_msec_, router_, weak_from_this());
                     new_conn->on_new_subscriber_added.Connect([this](std::string key, std::weak_ptr<connection> conn) {
                         std::unique_lock<std::mutex> lock(sub_mtx_);
                         sub_map_.emplace(std::move(key), conn);
@@ -157,16 +167,25 @@ private:
                     if (on_net_err) {
                         new_conn->on_net_err_.Connect(on_net_err);
                     }
-                    auto release_handle = on_release.Connect([con = new_conn->weak_from_this()]() {
+                    auto release_handle = reference_.notify_release.Connect([con = new_conn->weak_from_this()]() {
                         auto ptr = con.lock();
-                        if (ptr) ptr->close();
+                        if (ptr) ptr->release_obj();
                     });
-                    new_conn->on_connection_closed.Connect(
-                        [release_handle, this]() { on_release.DisConnect(release_handle); });
-                    new_conn->on_publish_msg.Connect(
-                        [this](std::string key, std::string data) { forward_msg(std::move(key), std::move(data)); });
+                    // unbind
+                    new_conn->reference_.notify_release.Connect([release_handle, s = weak_from_this(), this]() {
+                        auto ptr = s.lock();
+                        if (ptr) reference_.notify_release.DisConnect(release_handle);
+                    });
+                    new_conn->on_publish_msg.Connect([this, s = weak_from_this()](std::string key, std::string data) {
+                        auto ptr = s.lock();
+                        if (!ptr) return;
+                        forward_msg(std::move(key), std::move(data));
+                    });
                     new_conn->on_subscribers_removed.Connect(
-                        [this](const std::unordered_set<std::string>& keys, std::weak_ptr<connection> conn) {
+                        [this, s = weak_from_this()](const std::unordered_set<std::string>& keys,
+                                                     std::weak_ptr<connection> conn) {
+                            auto ptr = s.lock();
+                            if (!ptr) return;
                             std::unique_lock<std::mutex> lock(sub_mtx_);
                             for (auto& key : keys) {
                                 auto range = sub_map_.equal_range(key);
@@ -194,7 +213,7 @@ private:
                     new_conn->set_conn_id(id);
                     new_conn->config_proxy_manager(proxy_manager);
                     new_conn->start();
-                    FDEBUG("start connection {:p} -> {}", (void*)(new_conn.get()),id);
+                    FDEBUG("start connection {:p} -> {}", (void*)(new_conn.get()), id);
                 }
 
                 do_accept();
@@ -218,10 +237,10 @@ private:
                        "The subscriber of the key: " + key + " does not exist.");
         }
     }
-
+    rpc_data_reference reference_;
     std::atomic_bool has_started_ = false;
     tcp::acceptor acceptor_;
-    std::size_t timeout_seconds_;
+    std::size_t timeout_msec_ = 0;
 
     std::atomic<std::int64_t> conn_id_ = 0;
 

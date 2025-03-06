@@ -4,11 +4,16 @@
 #include "proxy_codec.hpp"
 #include "rpc/basic/rpc_client_proxy.hpp"
 
-namespace network {
-namespace rpc_service {
+namespace network
+{
+namespace rpc_service
+{
 class CustomRpcProxy : public RpcClientProxyInterface {
-
 public:
+    template <typename... Args>
+    static decltype(auto) make_shared(Args&&... args) {
+        return std::make_shared<CustomRpcProxy>(std::forward<Args>(args)...);
+    }
     CustomRpcProxy(const std::string& serviceName, const std::string& field, const std::string& token) :
     serviceName_(serviceName), field_(field), token_(token) {
     }
@@ -29,7 +34,7 @@ protected:
     void Init() {
         network::proxy::ProxyRequest request(serviceName_, token_, field_);
         sendBufCache = request.Encode();
-        curentStatus = RpcClientProxyInterface::HandShakeStatusMask::HandShakeDataPending;
+        curentStatus  = RpcClientProxyInterface::HandShakeStatusMask::HandShakeDataPending;
     }
 
 private:
