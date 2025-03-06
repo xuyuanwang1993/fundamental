@@ -39,7 +39,9 @@ void io_context_pool::start() {
         threadpool.Enqueue([this, i] {
             Fundamental::Utils::SetThreadName(Fundamental::StringFormat("io_loop_{}", i));
             try {
+                FDEBUG("asio io loop conetxt {} started", i);
                 io_contexts_[i]->run();
+                FDEBUG("asio io loop conetxt {} finished", i);
             } catch (const std::exception& e) {
                 FERR("asio context err:{}", e.what());
             }
@@ -61,13 +63,11 @@ void io_context_pool::start() {
 }
 
 void io_context_pool::stop() {
-    FDEBUG("stop io context pool");
-    // Explicitly stop all io_contexts.
+    FDEBUG("try stop io context pool");
+    // wait all other task finished
     work_.clear();
-    for (std::size_t i = 0; i < io_contexts_.size(); ++i)
-        io_contexts_[i]->stop();
-    io_contexts_.clear();
-    FDEBUG("stop io context over");
+    std::error_code ec;
+    signals_.cancel(ec);
 }
 
 asio::io_context& io_context_pool::get_io_context() {
