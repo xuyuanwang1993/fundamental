@@ -49,7 +49,6 @@ class rpc_server : private asio::noncopyable, public std::enable_shared_from_thi
 public:
     Fundamental::Signal<void(asio::error_code, string_view)> on_err;
     Fundamental::Signal<void(std::shared_ptr<connection>, std::string)> on_net_err;
-    Fundamental::Signal<void()> on_release;
 
 public:
     template <typename... Args>
@@ -98,17 +97,13 @@ public:
         reference_.release();
         bool expected_value = true;
         if (!has_started_.compare_exchange_strong(expected_value, false)) return;
-        on_release.Emit();
-        std::promise<void> promise;
-        asio::post(acceptor_.get_executor(), [this, &promise] {
+        asio::post(acceptor_.get_executor(), [this, ref = shared_from_this()] {
             try {
                 std::error_code ec;
                 acceptor_.close(ec);
             } catch (const std::exception& e) {
             }
-            promise.set_value();
         });
-        promise.get_future().wait();
     }
     // this function will throw when param is invalid
     void enable_ssl(rpc_server_ssl_config ssl_config) {
@@ -164,7 +159,8 @@ private:
                 if (ec) {
                     // maybe system error... ignored
                 } else {
-                    auto new_conn = connection::make_shared(std::move(socket), timeout_msec_, router_);
+                    auto new_conn =
+                        connection::make_shared(std::move(socket), timeout_msec_, router_, weak_from_this());
                     new_conn->on_new_subscriber_added.Connect([this](std::string key, std::weak_ptr<connection> conn) {
                         std::unique_lock<std::mutex> lock(sub_mtx_);
                         sub_map_.emplace(std::move(key), conn);
@@ -172,16 +168,25 @@ private:
                     if (on_net_err) {
                         new_conn->on_net_err_.Connect(on_net_err);
                     }
-                    auto release_handle = on_release.Connect([con = new_conn->weak_from_this()]() {
+                    auto release_handle = reference_.notify_release.Connect([con = new_conn->weak_from_this()]() {
                         auto ptr = con.lock();
-                        if (ptr) ptr->close();
+                        if (ptr) ptr->release_obj();
                     });
-                    new_conn->on_connection_closed.Connect(
-                        [release_handle, this]() { on_release.DisConnect(release_handle); });
-                    new_conn->on_publish_msg.Connect(
-                        [this](std::string key, std::string data) { forward_msg(std::move(key), std::move(data)); });
+                    // unbind
+                    new_conn->reference_.notify_release.Connect([release_handle, s = weak_from_this(), this]() {
+                        auto ptr = s.lock();
+                        if (ptr) reference_.notify_release.DisConnect(release_handle);
+                    });
+                    new_conn->on_publish_msg.Connect([this, s = weak_from_this()](std::string key, std::string data) {
+                        auto ptr = s.lock();
+                        if (!ptr) return;
+                        forward_msg(std::move(key), std::move(data));
+                    });
                     new_conn->on_subscribers_removed.Connect(
-                        [this](const std::unordered_set<std::string>& keys, std::weak_ptr<connection> conn) {
+                        [this, s = weak_from_this()](const std::unordered_set<std::string>& keys,
+                                                     std::weak_ptr<connection> conn) {
+                            auto ptr = s.lock();
+                            if (!ptr) return;
                             std::unique_lock<std::mutex> lock(sub_mtx_);
                             for (auto& key : keys) {
                                 auto range = sub_map_.equal_range(key);

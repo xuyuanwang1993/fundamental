@@ -11,7 +11,10 @@ namespace network
 inline void init_io_context_pool(std::size_t work_threads = std::thread::hardware_concurrency()) {
     network::io_context_pool::s_excutorNums = work_threads;
     network::io_context_pool::Instance().start();
-    Fundamental::Application::Instance().exitStarted.Connect([&]() { network::io_context_pool::Instance().stop(); });
+    Fundamental::Application::Instance().exitStarted.Connect([&]() {
+        FDEBUG("try stop io_context_pool");
+        network::io_context_pool::Instance().stop();
+    });
     network::io_context_pool::Instance().notify_sys_signal.Connect(
         [](std::error_code code, std::int32_t signo) { Fundamental::Application::Instance().Exit(); });
 }
@@ -20,10 +23,11 @@ template <typename T>
 struct auto_rpc_storage_instance : Fundamental::NonCopyable {
     using HandleType = typename decltype(Fundamental::Application::Instance().exitStarted)::HandleType;
     auto_rpc_storage_instance(std::shared_ptr<T> ptr) : ref_ptr(std::move(ptr)) {
-        handle_ = Fundamental::Application::Instance().exitStarted.Connect([&]() { ref_ptr->release_obj(); });
+        handle_ = Fundamental::Application::Instance().exitStarted.Connect([&]() { release(); });
     }
     ~auto_rpc_storage_instance() {
-        ref_ptr->release_obj();
+        release();
+        
         Fundamental::Application::Instance().exitStarted.DisConnect(handle_);
     }
     auto_rpc_storage_instance(auto_rpc_storage_instance&& other) noexcept :
@@ -42,7 +46,10 @@ struct auto_rpc_storage_instance : Fundamental::NonCopyable {
     decltype(auto) operator->() {
         return ref_ptr.get();
     }
-
+    void release()
+    {
+        ref_ptr->release_obj();
+    }
 private:
     HandleType handle_;
     std::shared_ptr<T> ref_ptr;

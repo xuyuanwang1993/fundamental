@@ -1,4 +1,5 @@
 #pragma once
+#include "rpc/basic/const_vars.h"
 
 #include <array>
 #include <asio.hpp>
@@ -10,9 +11,14 @@
 
 namespace network
 {
+namespace rpc_service
+{
+class connection;
+}
 namespace proxy
 {
 class proxy_handler : public std::enable_shared_from_this<proxy_handler> {
+    friend class rpc_service::connection;
     inline static constexpr std::size_t kCacheBufferSize = 32 * 1024; // 32k
     inline static constexpr std::size_t kMinPerReadSize  = 1200;
     using DataCacheType                                  = std::array<std::uint8_t, kCacheBufferSize>;
@@ -57,8 +63,17 @@ public:
     explicit proxy_handler(const std::string& proxy_host,
                            const std::string& proxy_service,
                            asio::ip::tcp::socket&& socket);
+    void release_obj() {
+        reference_.release();
+        asio::post(socket_.get_executor(), [this, ref = shared_from_this()] {
+            try {
+                HandleDisconnect({}, "release_obj");
+            } catch (const std::exception& e) {
+            }
+        });
+    }
+
 protected:
-    
     void Process();
     void ProcessTrafficProxy();
     void HandleDisconnect(asio::error_code ec,
@@ -75,6 +90,7 @@ protected:
     void StartServerRead();
 
 protected:
+    rpc_service::rpc_data_reference reference_;
     const std::string proxy_host;
     const std::string proxy_service;
     /// Socket for the connection.

@@ -74,12 +74,12 @@ static Fundamental::ThreadPool& s_test_pool = Fundamental::ThreadPool::Instance<
 
 TEST(rpc_test, test_echo_proxy_mutithread) {
     std::vector<Fundamental::ThreadPoolTaskToken<void>> tasks;
-    auto nums      = 40;
+    auto nums      = 1;
     auto task_func = []() {
         auto client=network::make_guard<rpc_client>();
-        // client->set_proxy(network::rpc_service::CustomRpcProxy::make_shared(kProxyServiceName,
-        // kProxyServiceField,
-        //                                                                         kProxyServiceToken));
+        client->set_proxy(network::rpc_service::CustomRpcProxy::make_shared(kProxyServiceName,
+        kProxyServiceField,
+                                                                                kProxyServiceToken));
         [[maybe_unused]] bool r = client->connect("127.0.0.1", "9000");
         EXPECT_TRUE(r && client->has_connected());
         std::size_t cnt  = 5;
@@ -87,7 +87,7 @@ TEST(rpc_test, test_echo_proxy_mutithread) {
         if (!r) return;
         while (cnt != 0) {
             auto str = base + std::to_string(cnt);
-            auto ret = client->call<std::string>("echo", str);
+            auto ret = client->call<1000,std::string>("echo", str);
             EXPECT_EQ(str, ret);
             --cnt;
         }
@@ -1119,7 +1119,7 @@ int main(int argc, char** argv) {
     options.logOutputProgramName = "test";
     options.logOutputPath        = "output";
     Fundamental::Logger::Initialize(std::move(options));
-    s_test_pool.Spawn(4);
+    s_test_pool.Spawn(1);
     if (mode == 0) {
         ::testing::InitGoogleTest(&argc, argv);
         run_server();

@@ -2,6 +2,9 @@
 get_filename_component(lib_name ${CMAKE_CURRENT_LIST_DIR} NAME)
 
 file(GLOB lib_source
+    *.h
+    *.cpp
+    *.hpp
     basic/*.h
     basic/*.cpp
     basic/*.hpp

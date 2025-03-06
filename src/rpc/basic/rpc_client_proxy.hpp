@@ -69,6 +69,7 @@ private:
         if (success_cb_) success_cb_();
     }
     void write_data() {
+        FERR("");
         auto buffer = asio::const_buffer(recvBufCache.data(), recvBufCache.size());
         asio::async_write(*ref_socket_, std::move(buffer),
                           [this, ptr = shared_from_this()](const asio::error_code& ec, std::size_t) {
@@ -81,13 +82,13 @@ private:
                                   err          = ec;
                                   curentStatus = HandShakeFailed;
                               } else {
-
                                   curentStatus = FinishSend();
                               }
                               perform();
                           });
     }
     void read_data() {
+        FERR("");
         auto buffer = asio::mutable_buffer(recvBufCache.data(), recvBufCache.size());
         asio::async_read(*ref_socket_, std::move(buffer),
                          [this, ptr = shared_from_this()](const asio::error_code& ec, std::size_t) {
@@ -107,13 +108,10 @@ private:
 
     void release_obj() {
         reference_.release();
-        std::promise<void> promise;
-        asio::post(ref_socket_->get_executor(), [this, &promise] {
+        asio::post(ref_socket_->get_executor(), [this, ref = shared_from_this()] {
             std::error_code ec;
             ref_socket_->close(ec);
-            promise.set_value();
         });
-        promise.get_future().wait();
     }
 
 protected:

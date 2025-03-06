@@ -7,6 +7,7 @@
 #include "fundamental/basic/buffer.hpp"
 #include "fundamental/basic/log.h"
 #include "fundamental/basic/utils.hpp"
+#include "fundamental/events/event_system.h"
 
 namespace network
 {
@@ -86,7 +87,7 @@ struct rpc_header {
     }
 };
 struct rpc_data_reference {
-
+    Fundamental::Signal<void()> notify_release;
     bool is_valid() const {
         return !__has_released;
     }
@@ -97,7 +98,10 @@ struct rpc_data_reference {
         return !is_valid();
     }
     void release() {
-        __has_released.exchange(true);
+        auto expected_value = false;
+        if (__has_released.compare_exchange_strong(expected_value, true)) {
+            notify_release.Emit();
+        }
     }
     std::atomic_bool __has_released = false;
 };

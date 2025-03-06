@@ -95,7 +95,7 @@ std::string get_name(rpc_conn conn, const person& p) {
 
 void auto_disconnect(rpc_conn conn, std::int32_t v) {
     FINFOS << "auto_disconnect " << v;
-    conn.lock()->abort();
+    conn.lock()->release_obj();
 }
 
 // if you want to response later, you can use async model, you can control when
@@ -314,7 +314,7 @@ void server_task(std::promise<void>& sync_p) {
         s_server->publish("key_p", p);
     });
     time_queue->StartDelayTask(h);
-    network::init_io_context_pool(10);
+    network::init_io_context_pool(1);
     {
         using namespace network::proxy;
         auto& manager = s_manager;
@@ -348,11 +348,11 @@ void server_task(std::promise<void>& sync_p) {
     sync_p.set_value();
     Fundamental::Application::Instance().exitStarted.Connect(
         [ h, time_queue]() mutable {
-            FDEBUG("emit stop server");
             time_queue->StopDelayTask(h);
         },
         false);
     Fundamental::Application::Instance().Loop();
+    FDEBUG("finish loop");
 }
 
 void run_server() {
