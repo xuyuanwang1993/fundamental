@@ -553,6 +553,17 @@ TEST(rpc_test, test_broken_rpc_stream) {
     }
     EXPECT_TRUE(stream->Finish(0));
 }
+
+TEST(rpc_test, test_call_rpc_stream_with_no_stream_action) {
+    auto client             = network::make_guard<rpc_client>();
+    [[maybe_unused]] bool r = client->connect("127.0.0.1", "9000");
+    EXPECT_TRUE(r && client->has_connected());
+    auto func=[&](){
+        client->call<5000,void>("test_echo_stream");
+    };
+    EXPECT_THROW(func(),std::logic_error);
+}
+
     #if 1
 TEST(rpc_test, test_echo_stream) {
     auto client             = network::make_guard<rpc_client>();

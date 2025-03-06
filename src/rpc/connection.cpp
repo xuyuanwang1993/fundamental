@@ -6,7 +6,10 @@ namespace network
 namespace rpc_service
 {
 std::shared_ptr<ServerStreamReadWriter> connection::InitRpcStream() {
-    FASSERT(rpc_stream_rw_ != nullptr && "it's not a stream rpc call");
+    if (!rpc_stream_rw_) {
+        FWARN("it's not a stream rpc call,abort it");
+        throw std::logic_error("invalid rpc call with a stream interface");
+    }
     std::shared_ptr<ServerStreamReadWriter> ret = rpc_stream_rw_;
     // release server stream write when connection was released
     auto release_handle = reference_.notify_release.Connect([con = ret->weak_from_this()]() {
