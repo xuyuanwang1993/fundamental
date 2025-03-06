@@ -56,7 +56,7 @@ void connection::process_proxy_request() {
                 // switch to proxy connection,don't need timer check any more
                 cancel_timer();
                 b_waiting_process_any_data.exchange(false);
-#ifndef RPC_VERBOSE
+#ifdef RPC_VERBOSE
                 FDEBUG("server proxy request read {}",
                        Fundamental::Utils::BufferToHex(proxy_buffer->data(), proxy_buffer->size(), 140));
 #endif

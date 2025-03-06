@@ -195,7 +195,8 @@ void test_broken_stream(rpc_conn conn) {
 
     rpc_stream_pool.Enqueue(
         [](decltype(w) stream) {
-            // just do nothing
+            // just release
+            stream->release_obj();
         },
         w);
 }
@@ -204,15 +205,16 @@ void test_echo_stream(rpc_conn conn) {
     auto c  = conn.lock();
     auto w  = c->InitRpcStream();
     auto id = c->conn_id();
+    FWARN("try start test_echo_stream");
     rpc_stream_pool.Enqueue(
         [id](decltype(w) stream) {
-            FWARN("stream start");
+            FWARN("test_echo_stream start");
             std::string msg;
-            while (stream->Read(msg, 0)) {
+            while (stream->Read(msg, 5000)) {
                 if (!stream->Write(msg.substr(0, msg.size() > 100 ? 100 : msg.size()) + " from server")) break;
             };
             stream->WriteDone();
-            auto ec = stream->Finish(0);
+            auto ec = stream->Finish(5000);
             if (ec) {
                 FINFO("rpc failed {} {}", id, ec.message());
             } else {
@@ -276,7 +278,7 @@ static network::proxy::ProxyManager s_manager;
 void server_task(std::promise<void>& sync_p) {
 
     auto s_server = network::make_guard<rpc_server>(9000);
-    auto p=s_server.get();
+    auto p        = s_server.get();
     auto& server  = *s_server.get();
     server.enable_ssl({ nullptr, "server.crt", "server.key", "dh2048.pem" });
     dummy d;
@@ -308,13 +310,13 @@ void server_task(std::promise<void>& sync_p) {
                   << "\n";
     });
     auto time_queue = Fundamental::Application::Instance().DelayQueue();
-    auto h          = time_queue->AddDelayTask(10, [s_server=s_server.get()] {
+    auto h          = time_queue->AddDelayTask(10, [s_server = s_server.get()] {
         person p { 10, "jack_server", 21 };
         s_server.get()->publish("key", "publish msg from server");
         s_server->publish("key_p", p);
     });
     time_queue->StartDelayTask(h);
-    network::init_io_context_pool(1);
+    network::init_io_context_pool(10);
     {
         using namespace network::proxy;
         auto& manager = s_manager;
@@ -347,10 +349,7 @@ void server_task(std::promise<void>& sync_p) {
     rpc_stream_pool.Spawn(5);
     sync_p.set_value();
     Fundamental::Application::Instance().exitStarted.Connect(
-        [ h, time_queue]() mutable {
-            time_queue->StopDelayTask(h);
-        },
-        false);
+        [h, time_queue]() mutable { time_queue->StopDelayTask(h); }, false);
     Fundamental::Application::Instance().Loop();
     FDEBUG("finish loop");
 }

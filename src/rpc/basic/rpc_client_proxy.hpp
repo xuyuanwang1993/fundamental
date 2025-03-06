@@ -69,12 +69,10 @@ private:
         if (success_cb_) success_cb_();
     }
     void write_data() {
-        FERR("");
-        auto buffer = asio::const_buffer(recvBufCache.data(), recvBufCache.size());
+        auto buffer = asio::const_buffer(sendBufCache.data(), sendBufCache.size());
         asio::async_write(*ref_socket_, std::move(buffer),
                           [this, ptr = shared_from_this()](const asio::error_code& ec, std::size_t) {
                               if (!reference_.is_valid()) {
-                                  FDEBUG("instance {:p} has alread release", (void*)this);
                                   return;
                               }
 
@@ -88,12 +86,10 @@ private:
                           });
     }
     void read_data() {
-        FERR("");
         auto buffer = asio::mutable_buffer(recvBufCache.data(), recvBufCache.size());
         asio::async_read(*ref_socket_, std::move(buffer),
                          [this, ptr = shared_from_this()](const asio::error_code& ec, std::size_t) {
                              if (!reference_.is_valid()) {
-                                 FDEBUG("instance {:p} has alread release", (void*)this);
                                  return;
                              }
                              if (ec) {

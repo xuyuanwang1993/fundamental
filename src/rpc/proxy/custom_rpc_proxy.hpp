@@ -20,12 +20,10 @@ public:
 
 protected:
     std::int32_t FinishSend() override {
-        FERR("");
         recvBufCache.resize(network::proxy::ProxyRequest::kVerifyStrLen);
         return RpcClientProxyInterface::HandShakeStatusMask::HandShakeNeedMoreData;
     }
     std::int32_t FinishRecv() override {
-        FERR("");
         if (std::memcmp(recvBufCache.data(), network::proxy::ProxyRequest::kVerifyStr,
                         network::proxy::ProxyRequest::kVerifyStrLen) == 0)
             return RpcClientProxyInterface::HandShakeStatusMask::HandShakeSucess;

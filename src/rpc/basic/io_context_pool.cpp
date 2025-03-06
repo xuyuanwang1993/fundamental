@@ -57,6 +57,7 @@ void io_context_pool::start() {
     signals_.add(SIGQUIT);
 #endif // defined(SIGQUIT)
     signals_.async_wait([this, s = notify_sys_signal_storage](std::error_code ec, int signo) {
+        if (ec) return;
         FDEBUG("recv signo:{} msg:{}", signo, ec.message());
         s->Emit(std::move(ec), signo);
     });

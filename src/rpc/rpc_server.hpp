@@ -149,7 +149,6 @@ private:
             io_context_pool::Instance().get_io_context(),
             [this, ptr = shared_from_this()](asio::error_code ec, asio::ip::tcp::socket socket) {
                 if (!reference_.is_valid()) {
-                    FDEBUG("instance {:p} has alread release", (void*)this);
                     return;
                 }
                 if (!acceptor_.is_open()) {
