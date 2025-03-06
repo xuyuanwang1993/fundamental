@@ -52,6 +52,7 @@ public:
     std::error_code GetLastError() const;
     void EnableTimeoutCheck(std::size_t timeout_msec = 15000);
     ServerStreamReadWriter(std::shared_ptr<connection> conn);
+    void release_obj();
 
 private:
     void start() {
@@ -67,10 +68,9 @@ private:
             return;
         }
         timeout_check_timer_.expires_after(std::chrono::milliseconds(timeout_msec_));
-        timeout_check_timer_.async_wait([this, ptr = weak_from_this()](const asio::error_code& ec) {
-            auto instance = ptr.lock();
-            if (!instance) {
-                FASSERT(false, "instance {:p} has alread release {}", (void*)this,ec.message());
+        timeout_check_timer_.async_wait([this, ptr = shared_from_this()](const asio::error_code& ec) {
+            if (!reference_.is_valid()) {
+                FDEBUG("instance {:p} has alread release", (void*)this);
                 return;
             }
             if (ec) {
@@ -97,15 +97,16 @@ private:
     }
 
 private:
+    rpc_data_reference reference_;
     std::mutex mutex;
     std::error_code last_err_;
-    std::shared_ptr<rpc_stream_packet> read_packet_buffer = std::make_shared<rpc_stream_packet>();
+    rpc_stream_packet read_packet_buffer;
     std::atomic<rpc_stream_data_status> last_data_status_ = rpc_stream_data_status::rpc_stream_none;
 
     std::shared_ptr<connection> conn_;
     std::condition_variable cv_;
     std::deque<std::vector<std::uint8_t>> request_cache_;
-    std::deque<std::shared_ptr<rpc_stream_packet>> write_cache_;
+    std::deque<rpc_stream_packet> write_cache_;
     asio::steady_timer timeout_check_timer_;
     std::atomic_bool b_waiting_process_any_data = false;
     std::size_t timeout_msec_                   = 0;
@@ -728,8 +729,8 @@ inline ServerStreamReadWriter::ServerStreamReadWriter(std::shared_ptr<connection
 conn_(conn), timeout_check_timer_(conn_->socket_.get_executor()) {
     FDEBUG("build stream writer {:p} with connection:{:p}", (void*)this, (void*)conn_.get());
 }
-inline ServerStreamReadWriter::~ServerStreamReadWriter() {
-    FDEBUG("release stream writer {:p} with connection:{:p}", (void*)this, (void*)conn_.get());
+inline void ServerStreamReadWriter::release_obj() {
+    reference_.release();
     std::promise<void> promise;
     asio::post(conn_->socket_.get_executor(), [this, &promise] {
         cancel_timer();
@@ -741,6 +742,9 @@ inline ServerStreamReadWriter::~ServerStreamReadWriter() {
         promise.set_value();
     });
     promise.get_future().wait();
+}
+inline ServerStreamReadWriter::~ServerStreamReadWriter() {
+    FDEBUG("release stream writer {:p} with connection:{:p}", (void*)this, (void*)conn_.get());
 }
 template <typename T>
 inline bool ServerStreamReadWriter::Read(T& request, std::size_t max_wait_ms) {
@@ -784,10 +788,9 @@ inline bool ServerStreamReadWriter::Write(U&& response) {
     }
     asio::post(conn_->socket_.get_executor(), [this, data = std::move(data)]() mutable {
         auto& new_item = write_cache_.emplace_back();
-        new_item       = std::make_shared<rpc_stream_packet>();
-        new_item->size = htole32(static_cast<std::uint32_t>(data.size()));
-        new_item->type = static_cast<std::uint8_t>(rpc_stream_data_status::rpc_stream_data);
-        new_item->data = std::move(data);
+        new_item.size  = htole32(static_cast<std::uint32_t>(data.size()));
+        new_item.type  = static_cast<std::uint8_t>(rpc_stream_data_status::rpc_stream_data);
+        new_item.data  = std::move(data);
         if (write_cache_.size() == 1) handle_write();
     });
     return true;
@@ -797,10 +800,9 @@ inline bool ServerStreamReadWriter::WriteDone() {
     if (last_data_status_ >= rpc_stream_data_status::rpc_stream_finish) return false;
     asio::post(conn_->socket_.get_executor(), [this]() mutable {
         auto& new_item = write_cache_.emplace_back();
-        new_item       = std::make_shared<rpc_stream_packet>();
-        new_item->size = 0;
-        new_item->type = static_cast<std::uint8_t>(rpc_stream_data_status::rpc_stream_write_done);
-        new_item->data.clear();
+        new_item.size  = 0;
+        new_item.type  = static_cast<std::uint8_t>(rpc_stream_data_status::rpc_stream_write_done);
+        new_item.data.clear();
         if (write_cache_.size() == 1) handle_write();
     });
     return true;
@@ -826,22 +828,20 @@ inline void ServerStreamReadWriter::EnableTimeoutCheck(std::size_t timeout_msec)
 }
 inline void ServerStreamReadWriter::reponse_heartbeat() {
     auto& new_item = write_cache_.emplace_back();
-    new_item       = std::make_shared<rpc_stream_packet>();
-    new_item->size = 0;
-    new_item->type = static_cast<std::uint8_t>(rpc_stream_data_status::rpc_stream_heartbeat);
-    new_item->data.clear();
+    new_item.size  = 0;
+    new_item.type  = static_cast<std::uint8_t>(rpc_stream_data_status::rpc_stream_heartbeat);
+    new_item.data.clear();
     if (write_cache_.size() == 1) handle_write();
 }
 inline void ServerStreamReadWriter::read_head() {
     std::vector<asio::mutable_buffer> buffers;
-    buffers.emplace_back(&read_packet_buffer->size, sizeof(read_packet_buffer->size));
-    buffers.emplace_back(asio::buffer(&read_packet_buffer->type, 1));
+    buffers.emplace_back(&read_packet_buffer.size, sizeof(read_packet_buffer.size));
+    buffers.emplace_back(asio::buffer(&read_packet_buffer.type, 1));
 
-    conn_->async_buffer_read(std::move(buffers), [this, buffer_ref = read_packet_buffer,
-                                                  ptr = weak_from_this()](asio::error_code ec, std::size_t length) {
-        auto instance = ptr.lock();
-        if (!instance) {
-            FASSERT(false, "instance {:p} has alread release {}", (void*)this,ec.message());
+    conn_->async_buffer_read(std::move(buffers), [this, ptr = shared_from_this()](asio::error_code ec,
+                                                                                  std::size_t length) {
+        if (!reference_.is_valid()) {
+            FDEBUG("instance {:p} has alread release", (void*)this);
             return;
         }
         if (last_data_status_ >= rpc_stream_data_status::rpc_stream_finish) return;
@@ -850,13 +850,13 @@ inline void ServerStreamReadWriter::read_head() {
         } else {
 #ifdef RPC_VERBOSE
             FDEBUG("server {:p} stream read head size data:{} type:{}", (void*)this,
-                   Fundamental::Utils::BufferToHex(&read_packet_buffer->size, sizeof(read_packet_buffer->size)),
-                   static_cast<std::uint32_t>(read_packet_buffer->type));
+                   Fundamental::Utils::BufferToHex(&read_packet_buffer.size, sizeof(read_packet_buffer.size)),
+                   static_cast<std::uint32_t>(read_packet_buffer.type));
 #endif
             b_waiting_process_any_data.exchange(false);
 
             try {
-                auto status = static_cast<rpc_stream_data_status>(read_packet_buffer->type);
+                auto status = static_cast<rpc_stream_data_status>(read_packet_buffer.type);
                 if ((status != rpc_stream_data_status::rpc_stream_heartbeat && status < last_data_status_) ||
                     status >= rpc_stream_data_status::rpc_stream_status_max) {
                     FDEBUG("server {:p} rpc_bad_request status:{} last_data_status:{}", (void*)this,
@@ -871,9 +871,9 @@ inline void ServerStreamReadWriter::read_head() {
                         std::scoped_lock<std::mutex> locker(mutex);
                         last_data_status_ = status;
                     }
-                    read_packet_buffer->size = le32toh(read_packet_buffer->size);
-                    if (read_packet_buffer->size > read_packet_buffer->data.size())
-                        read_packet_buffer->data.resize(read_packet_buffer->size);
+                    read_packet_buffer.size = le32toh(read_packet_buffer.size);
+                    if (read_packet_buffer.size > read_packet_buffer.data.size())
+                        read_packet_buffer.data.resize(read_packet_buffer.size);
                     read_body();
 
                 } break;
@@ -913,13 +913,11 @@ inline void ServerStreamReadWriter::read_head() {
 }
 inline void ServerStreamReadWriter::read_body(std::uint32_t offset) {
     std::vector<asio::mutable_buffer> buffers;
-    buffers.emplace_back(asio::buffer(read_packet_buffer->data.data() + offset, read_packet_buffer->size - offset));
+    buffers.emplace_back(asio::buffer(read_packet_buffer.data.data() + offset, read_packet_buffer.size - offset));
     conn_->async_buffer_read_some(
-        std::move(buffers), [this, buffer_ref = read_packet_buffer, offset,
-                             ptr = weak_from_this()](asio::error_code ec, std::size_t length) {
-            auto instance = ptr.lock();
-            if (!instance) {
-                FASSERT(false, "instance {:p} has alread release {}", (void*)this,ec.message());
+        std::move(buffers), [this, offset, ptr = shared_from_this()](asio::error_code ec, std::size_t length) {
+            if (!reference_.is_valid()) {
+                FDEBUG("instance {:p} has alread release", (void*)this);
                 return;
             }
             if (last_data_status_ >= rpc_stream_data_status::rpc_stream_finish) return;
@@ -929,21 +927,21 @@ inline void ServerStreamReadWriter::read_body(std::uint32_t offset) {
                 b_waiting_process_any_data.exchange(false);
                 auto current_read_offset = offset + length;
 #ifdef RPC_VERBOSE
-                FDEBUG("server {:p} stream read some need:{}  current: {} new:{}", (void*)this,
-                       read_packet_buffer->size, current_read_offset, length);
+                FDEBUG("server {:p} stream read some need:{}  current: {} new:{}", (void*)this, read_packet_buffer.size,
+                       current_read_offset, length);
 #endif
-                if (current_read_offset < read_packet_buffer->size) {
+                if (current_read_offset < read_packet_buffer.size) {
 
                     read_body(current_read_offset);
                     return;
                 }
 #ifdef RPC_VERBOSE
                 FDEBUG("server {:p} stream read {}", (void*)this,
-                       Fundamental::Utils::BufferToHex(read_packet_buffer->data.data(), read_packet_buffer->size, 140));
+                       Fundamental::Utils::BufferToHex(read_packet_buffer.data.data(), read_packet_buffer.size, 140));
 #endif
                 read_head();
                 std::scoped_lock<std::mutex> locker(mutex);
-                request_cache_.emplace_back(std::move(read_packet_buffer->data));
+                request_cache_.emplace_back(std::move(read_packet_buffer.data));
                 cv_.notify_one();
             }
         });
@@ -975,19 +973,18 @@ inline void ServerStreamReadWriter::handle_write() {
     }
     if (write_buffers_.empty()) {
         auto& item = write_cache_.front();
-        write_buffers_.emplace_back(asio::const_buffer(&item->size, sizeof(item->size)));
-        write_buffers_.emplace_back(asio::const_buffer(&item->type, sizeof(item->type)));
-        if (item->data.size() > 0) {
-            write_buffers_.emplace_back(asio::const_buffer(item->data.data(), item->data.size()));
+        write_buffers_.emplace_back(asio::const_buffer(&item.size, sizeof(item.size)));
+        write_buffers_.emplace_back(asio::const_buffer(&item.type, sizeof(item.type)));
+        if (item.data.size() > 0) {
+            write_buffers_.emplace_back(asio::const_buffer(item.data.data(), item.data.size()));
         }
     }
 
     conn_->async_write_buffers_some(
         std::vector<asio::const_buffer>(write_buffers_.begin(), write_buffers_.end()),
-        [this, ref = write_cache_.front(), ptr = weak_from_this()](asio::error_code ec, std::size_t length) {
-            auto instance = ptr.lock();
-            if (!instance) {
-                FASSERT(false, "instance {:p} has alread release {}", (void*)this,ec.message());
+        [this, ptr = shared_from_this()](asio::error_code ec, std::size_t length) {
+            if (!reference_.is_valid()) {
+                FDEBUG("instance {:p} has alread release", (void*)this);
                 return;
             }
             if (last_data_status_ >= rpc_stream_data_status::rpc_stream_finish) return;

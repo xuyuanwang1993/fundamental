@@ -54,11 +54,11 @@ struct rpc_stream_packet {
 
 constexpr std::uint8_t RPC_MAGIC_NUM = 39;
 struct rpc_header {
-    uint8_t magic = RPC_MAGIC_NUM;
-    request_type req_type=request_type::rpc_req;
-    uint32_t body_len = 0;
-    uint64_t req_id   = 0;
-    uint32_t func_id  = 0;
+    uint8_t magic         = RPC_MAGIC_NUM;
+    request_type req_type = request_type::rpc_req;
+    uint32_t body_len     = 0;
+    uint64_t req_id       = 0;
+    uint32_t func_id      = 0;
     void Serialize(void* dst, std::size_t len) {
         FASSERT(len >= HeadLen());
         Fundamental::BufferWriter writer;
@@ -84,6 +84,22 @@ struct rpc_header {
         return sizeof(std::uint8_t) + sizeof(request_type) + sizeof(std::uint32_t) + sizeof(std::uint64_t) +
                sizeof(std::uint32_t);
     }
+};
+struct rpc_data_reference {
+
+    bool is_valid() const {
+        return !__has_released;
+    }
+    operator bool() const {
+        return is_valid();
+    }
+    bool operator!() const {
+        return !is_valid();
+    }
+    void release() {
+        __has_released.exchange(true);
+    }
+    std::atomic_bool __has_released = false;
 };
 
 static constexpr std::size_t MAX_BUF_LEN     = 1024LLU * 1024 * 1024 * 4;

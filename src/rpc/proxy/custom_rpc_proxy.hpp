@@ -20,11 +20,11 @@ public:
 
 protected:
     std::int32_t FinishSend() override {
-        recvBufCache->resize(network::proxy::ProxyRequest::kVerifyStrLen);
+        recvBufCache.resize(network::proxy::ProxyRequest::kVerifyStrLen);
         return RpcClientProxyInterface::HandShakeStatusMask::HandShakeNeedMoreData;
     }
     std::int32_t FinishRecv() override {
-        if (std::memcmp(recvBufCache->data(), network::proxy::ProxyRequest::kVerifyStr,
+        if (std::memcmp(recvBufCache.data(), network::proxy::ProxyRequest::kVerifyStr,
                         network::proxy::ProxyRequest::kVerifyStrLen) == 0)
             return RpcClientProxyInterface::HandShakeStatusMask::HandShakeSucess;
         else {
@@ -33,7 +33,7 @@ protected:
     }
     void Init() {
         network::proxy::ProxyRequest request(serviceName_, token_, field_);
-        *sendBufCache = request.Encode();
+        sendBufCache = request.Encode();
         curentStatus  = RpcClientProxyInterface::HandShakeStatusMask::HandShakeDataPending;
     }
 

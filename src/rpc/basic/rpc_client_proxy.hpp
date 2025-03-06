@@ -9,7 +9,7 @@ namespace network
 namespace rpc_service
 {
 class rpc_client;
-class RpcClientProxyInterface :  public std::enable_shared_from_this<RpcClientProxyInterface> {
+class RpcClientProxyInterface : public std::enable_shared_from_this<RpcClientProxyInterface> {
     friend class rpc_client;
 
 public:
@@ -69,12 +69,11 @@ private:
         if (success_cb_) success_cb_();
     }
     void write_data() {
-        auto buffer = asio::const_buffer(sendBufCache->data(), sendBufCache->size());
+        auto buffer = asio::const_buffer(recvBufCache.data(), recvBufCache.size());
         asio::async_write(*ref_socket_, std::move(buffer),
-                          [this, ref = sendBufCache, ptr = weak_from_this()](const asio::error_code& ec, std::size_t) {
-                              auto instance = ptr.lock();
-                              if (!instance) {
-                                  FASSERT(false,"instance {:p} has alread release", (void*)this);
+                          [this, ptr = shared_from_this()](const asio::error_code& ec, std::size_t) {
+                              if (!reference_.is_valid()) {
+                                  FDEBUG("instance {:p} has alread release", (void*)this);
                                   return;
                               }
 
@@ -89,12 +88,11 @@ private:
                           });
     }
     void read_data() {
-        auto buffer = asio::mutable_buffer(recvBufCache->data(), recvBufCache->size());
+        auto buffer = asio::mutable_buffer(recvBufCache.data(), recvBufCache.size());
         asio::async_read(*ref_socket_, std::move(buffer),
-                         [this, ref = recvBufCache, ptr = weak_from_this()](const asio::error_code& ec, std::size_t) {
-                             auto instance = ptr.lock();
-                             if (!instance) {
-                                 FASSERT(false,"instance {:p} has alread release", (void*)this);
+                         [this, ptr = shared_from_this()](const asio::error_code& ec, std::size_t) {
+                             if (!reference_.is_valid()) {
+                                 FDEBUG("instance {:p} has alread release", (void*)this);
                                  return;
                              }
                              if (ec) {
@@ -107,13 +105,25 @@ private:
                          });
     }
 
+    void release_obj() {
+        reference_.release();
+        std::promise<void> promise;
+        asio::post(ref_socket_->get_executor(), [this, &promise] {
+            std::error_code ec;
+            ref_socket_->close(ec);
+            promise.set_value();
+        });
+        promise.get_future().wait();
+    }
+
 protected:
+    rpc_data_reference reference_;
     std::int32_t curentStatus = HandShakeDataPending;
     // handshake
     /// if curentStatus&HandShakeDataPending!=0,you should filled this buffer
-    std::shared_ptr<std::vector<std::uint8_t>> sendBufCache = std::make_shared<std::vector<std::uint8_t>>();
+    std::vector<std::uint8_t> sendBufCache;
     /// if curentStatus&HandShakeNeedMoreData!=0,you should give recvBuf a initialization with a none zero size
-    std::shared_ptr<std::vector<std::uint8_t>> recvBufCache = std::make_shared<std::vector<std::uint8_t>>();
+    std::vector<std::uint8_t> recvBufCache;
 
 private:
     asio::error_code err;

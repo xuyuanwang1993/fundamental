@@ -275,8 +275,9 @@ std::unique_ptr<std::thread> s_thread;
 static network::proxy::ProxyManager s_manager;
 void server_task(std::promise<void>& sync_p) {
 
-    auto s_server = rpc_server::make_shared(9000);
-    auto& server  = *s_server;
+    auto s_server = network::make_guard<rpc_server>(9000);
+    auto p=s_server.get();
+    auto& server  = *s_server.get();
     server.enable_ssl({ nullptr, "server.crt", "server.key", "dh2048.pem" });
     dummy d;
     server.register_handler("add", &dummy::add, &d);
@@ -307,17 +308,13 @@ void server_task(std::promise<void>& sync_p) {
                   << "\n";
     });
     auto time_queue = Fundamental::Application::Instance().DelayQueue();
-    auto h          = time_queue->AddDelayTask(10, [s_server] {
+    auto h          = time_queue->AddDelayTask(10, [s_server=s_server.get()] {
         person p { 10, "jack_server", 21 };
-        s_server->publish("key", "publish msg from server");
+        s_server.get()->publish("key", "publish msg from server");
         s_server->publish("key_p", p);
     });
     time_queue->StartDelayTask(h);
-    network::io_context_pool::s_excutorNums = 10;
-    network::io_context_pool::Instance().start();
-    Fundamental::Application::Instance().exitStarted.Connect([&]() { network::io_context_pool::Instance().stop(); });
-    network::io_context_pool::Instance().notify_sys_signal.Connect(
-        [](std::error_code code, std::int32_t signo) { Fundamental::Application::Instance().Exit(); });
+    network::init_io_context_pool(10);
     {
         using namespace network::proxy;
         auto& manager = s_manager;
@@ -350,11 +347,9 @@ void server_task(std::promise<void>& sync_p) {
     rpc_stream_pool.Spawn(5);
     sync_p.set_value();
     Fundamental::Application::Instance().exitStarted.Connect(
-        [s_server = std::move(s_server), h, time_queue]() mutable {
+        [ h, time_queue]() mutable {
             FDEBUG("emit stop server");
             time_queue->StopDelayTask(h);
-            if (s_server) s_server->stop();
-            s_server = nullptr;
         },
         false);
     Fundamental::Application::Instance().Loop();

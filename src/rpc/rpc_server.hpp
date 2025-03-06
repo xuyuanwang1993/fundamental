@@ -10,8 +10,7 @@
 #include <set>
 #include <thread>
 
-#include "basic/const_vars.h"
-#include "basic/io_context_pool.hpp"
+#include "basic/rpc_init.hpp"
 #include "fundamental/events/event_system.h"
 
 using asio::ip::tcp;
@@ -62,10 +61,7 @@ public:
         protocal_helper::init_acceptor(acceptor_, port);
     }
     ~rpc_server() {
-        FDEBUG("release rpc_server start");
-        on_release.Emit();
-        stop();
-        FDEBUG("release rpc_server over");
+        FDEBUG("release rpc_server");
     }
 
     void start() {
@@ -73,21 +69,9 @@ public:
         if (!has_started_.compare_exchange_strong(expected_value, true)) return;
         do_accept();
     }
+
     void stop() {
-        bool expected_value = true;
-        if (!has_started_.compare_exchange_strong(expected_value, false)) return;
-        std::promise<void> promise;
-        asio::post(acceptor_.get_executor(), [this, &promise] {
-            try {
-                std::error_code ec;
-                // close acceptor directly
-                acceptor_.cancel(ec);
-                acceptor_.close(ec);
-            } catch (const std::exception& e) {
-            }
-            promise.set_value();
-        });
-        promise.get_future().wait();
+        release_obj();
     }
     template <bool is_pub = false, typename Function>
     void register_handler(std::string const& name, const Function& f) {
@@ -110,8 +94,21 @@ public:
         forward_msg(std::move(key), std::move(s_data));
     }
 
-    void post_stop() {
-        stop();
+    void release_obj() {
+        reference_.release();
+        bool expected_value = true;
+        if (!has_started_.compare_exchange_strong(expected_value, false)) return;
+        on_release.Emit();
+        std::promise<void> promise;
+        asio::post(acceptor_.get_executor(), [this, &promise] {
+            try {
+                std::error_code ec;
+                acceptor_.close(ec);
+            } catch (const std::exception& e) {
+            }
+            promise.set_value();
+        });
+        promise.get_future().wait();
     }
     // this function will throw when param is invalid
     void enable_ssl(rpc_server_ssl_config ssl_config) {
@@ -151,15 +148,13 @@ public:
     }
 
 private:
-    
     void do_accept() {
 
         acceptor_.async_accept(
             io_context_pool::Instance().get_io_context(),
-            [this, ptr = weak_from_this()](asio::error_code ec, asio::ip::tcp::socket socket) {
-                auto instance = ptr.lock();
-                if (!instance) {
-                    FASSERT(false, "instance {:p} has alread release {}", (void*)this,ec.message());
+            [this, ptr = shared_from_this()](asio::error_code ec, asio::ip::tcp::socket socket) {
+                if (!reference_.is_valid()) {
+                    FDEBUG("instance {:p} has alread release", (void*)this);
                     return;
                 }
                 if (!acceptor_.is_open()) {
@@ -238,7 +233,7 @@ private:
                        "The subscriber of the key: " + key + " does not exist.");
         }
     }
-
+    rpc_data_reference reference_;
     std::atomic_bool has_started_ = false;
     tcp::acceptor acceptor_;
     std::size_t timeout_msec_ = 0;
