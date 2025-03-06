@@ -17,10 +17,10 @@
 #include "test_server.h"
 
 #include "benchmark/benchmark.h"
-
+using network::rpc_service::rpc_client;
 template <std::size_t blockSize>
 static void TestNormal(benchmark::State& state) {
-    auto client=network::rpc_service::rpc_client::make_shared("127.0.0.1", "9000");
+    auto client=network::make_guard<rpc_client>("127.0.0.1", "9000");
     client->connect();
     std::string msg(blockSize, 'a');
     if (blockSize < 1024 * 1024 * 32) {
@@ -34,7 +34,7 @@ static void TestNormal(benchmark::State& state) {
 
 template <std::size_t blockSize>
 static void TestProxy(benchmark::State& state) {
-    auto client=network::rpc_service::rpc_client::make_shared("127.0.0.1", "9000");
+    auto client=network::make_guard<rpc_client>("127.0.0.1", "9000");
     client->set_proxy(network::rpc_service::CustomRpcProxy::make_shared(kProxyServiceName, kProxyServiceField,
                                                                             kProxyServiceToken));
     client->connect();
@@ -51,7 +51,7 @@ static void TestProxy(benchmark::State& state) {
 #ifndef RPC_DISABLE_SSL
 template <std::size_t blockSize>
 static void TestSslProxy(benchmark::State& state) {
-    auto client=network::rpc_service::rpc_client::make_shared("127.0.0.1", "9000");
+    auto client=network::make_guard<rpc_client>("127.0.0.1", "9000");
     client->enable_ssl("server.crt");
     client->set_proxy(network::rpc_service::CustomRpcProxy::make_shared(kProxyServiceName, kProxyServiceField,
                                                                             kProxyServiceToken));
@@ -68,13 +68,13 @@ static void TestSslProxy(benchmark::State& state) {
 }
 template <std::size_t blockSize>
 static void TestSslProxyStream(benchmark::State& state) {
-    auto client=network::rpc_service::rpc_client::make_shared("127.0.0.1", "9000");
+    auto client=network::make_guard<rpc_client>("127.0.0.1", "9000");
     client->enable_ssl("server.crt");
     client->set_proxy(network::rpc_service::CustomRpcProxy::make_shared(kProxyServiceName, kProxyServiceField,
                                                                             kProxyServiceToken));
     client->connect();
     std::string msg(blockSize, 'a');
-    std::string recv(blockSize, 'b');
+    std::string recv;
     auto stream = client->upgrade_to_stream("echos");
     if (blockSize < 1024 * 1024 * 32) {
         stream->Write(msg);
