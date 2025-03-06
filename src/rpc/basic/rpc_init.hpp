@@ -12,7 +12,6 @@ inline void init_io_context_pool(std::size_t work_threads = std::thread::hardwar
     network::io_context_pool::s_excutorNums = work_threads;
     network::io_context_pool::Instance().start();
     Fundamental::Application::Instance().exitStarted.Connect([&]() {
-        FDEBUG("try stop io_context_pool");
         network::io_context_pool::Instance().stop();
     });
     network::io_context_pool::Instance().notify_sys_signal.Connect(

@@ -39,9 +39,7 @@ void io_context_pool::start() {
         threadpool.Enqueue([this, i] {
             Fundamental::Utils::SetThreadName(Fundamental::StringFormat("io_loop_{}", i));
             try {
-                FDEBUG("asio io loop conetxt {} started", i);
                 io_contexts_[i]->run();
-                FDEBUG("asio io loop conetxt {} finished", i);
             } catch (const std::exception& e) {
                 FERR("asio context err:{}", e.what());
             }

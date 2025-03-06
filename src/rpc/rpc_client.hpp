@@ -232,7 +232,6 @@ public:
 
     bool connect(size_t timeout_msec = 3000) {
         if (has_connected_) return true;
-
         FASSERT(!service_name_.empty());
         do_async_connect();
         return wait_conn(timeout_msec);
@@ -285,23 +284,6 @@ public:
     void config_addr(const std::string& host, const std::string& service) {
         host_         = host;
         service_name_ = service;
-    }
-
-    void close(bool forced_close = false) {
-
-        if (!has_connected_ && !forced_close) return;
-        has_connected_ = false;
-        asio::error_code ec;
-#ifndef RPC_DISABLE_SSL
-        if (ssl_stream_) {
-            ssl_stream_->shutdown(ec);
-            ssl_stream_->lowest_layer().cancel(ec);
-            ssl_stream_->lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both, ec);
-        }
-#endif
-        socket_.shutdown(asio::ip::tcp::socket::shutdown_both, ec);
-        socket_.close(ec);
-        clear_cache();
     }
 
     void set_error_callback(std::function<void(asio::error_code)> f) {
@@ -498,6 +480,23 @@ public:
     }
 
 private:
+    void close(bool forced_close = false) {
+
+        if (!has_connected_ && !forced_close) return;
+        has_connected_ = false;
+        asio::error_code ec;
+#ifndef RPC_DISABLE_SSL
+        if (ssl_stream_) {
+            ssl_stream_->shutdown(ec);
+            ssl_stream_->lowest_layer().cancel(ec);
+            ssl_stream_->lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both, ec);
+        }
+#endif
+        socket_.shutdown(asio::ip::tcp::socket::shutdown_both, ec);
+        socket_.close(ec);
+        clear_cache();
+    }
+
     std::shared_ptr<rpc_request_context> EmplaceNewCall(std::size_t timeout_msec = 15000) {
         auto p = std::make_shared<rpc_request_context>(ios_);
         if (timeout_msec == 0) timeout_msec = 15000;
@@ -679,15 +678,19 @@ private:
     void write(std::uint64_t req_id, request_type type, rpc_service::rpc_buffer_type&& message, uint32_t func_id) {
         size_t size = message.size();
         FASSERT(size < MAX_BUF_LEN);
-        client_message_type msg { req_id, type, std::move(message), func_id };
-
-        std::unique_lock<std::mutex> lock(write_mtx_);
-        outbox_.emplace_back(std::move(msg));
-        if (outbox_.size() > 1) {
-            // outstanding async_write
-            return;
-        }
-        do_write();
+        asio::post(socket_.get_executor(),
+                   [this, req_id, type, func_id, message = std::move(message), ptr = shared_from_this()]() mutable {
+                       if (!reference_.is_valid()) {
+                           return;
+                       }
+                       client_message_type msg { req_id, type, std::move(message), func_id };
+                       outbox_.emplace_back(std::move(msg));
+                       if (outbox_.size() > 1) {
+                           // outstanding async_write
+                           return;
+                       }
+                       do_write();
+                   });
     }
 
     void do_write() {
@@ -716,7 +719,6 @@ private:
 #ifdef RPC_VERBOSE
                 FDEBUG("client {:p} write some size:{}", (void*)this, length);
 #endif
-                std::unique_lock<std::mutex> lock(write_mtx_);
                 if (outbox_.empty()) {
                     return;
                 }
@@ -908,7 +910,6 @@ private:
 
     void clear_cache() {
         {
-            std::unique_lock<std::mutex> lock(write_mtx_);
             while (!outbox_.empty()) {
                 outbox_.pop_front();
             }
@@ -1083,7 +1084,6 @@ private:
         uint32_t func_id;
     };
     std::deque<client_message_type> outbox_;
-    std::mutex write_mtx_;
     uint64_t next_call_id_ = 0;
     std::function<void(asio::error_code)> err_cb_;
     bool enable_reconnect_ = false;
