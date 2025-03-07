@@ -21,8 +21,10 @@
 
     #pragma comment(lib, "dbghelp.lib")
 #endif
-namespace Fundamental {
-namespace details {
+namespace Fundamental
+{
+namespace details
+{
 struct CalcFileNameHelper;
 // stop default logger thread
 struct LogGuard {
@@ -49,8 +51,12 @@ void PrepareLogdir(const std::string& logPath) {
 class NativeLogSink SPDLOG_FINAL : public spdlog::sinks::base_sink<spdlog::details::null_mutex> {
 public:
     // create daily file sink which rotates on given time
-    NativeLogSink(Logger* logger, filename_t base_filename, int rotation_hour, int rotation_minute,
-                  std::size_t logFileLimitSize, std::int64_t logFileMaxExistedSec) :
+    NativeLogSink(Logger* logger,
+                  filename_t base_filename,
+                  int rotation_hour,
+                  int rotation_minute,
+                  std::size_t logFileLimitSize,
+                  std::int64_t logFileMaxExistedSec) :
     loggerRef(logger), m_baseFilename(std::move(base_filename)), m_logFileLimitSize(logFileLimitSize),
     m_logFileMaxExistedSec(logFileMaxExistedSec), m_rotationH(rotation_hour), m_rotationM(rotation_minute) {
         if (rotation_hour < 0 || rotation_hour > 23 || rotation_minute < 0 || rotation_minute > 59) {
@@ -388,9 +394,15 @@ void Logger::TestLogInstance() {
 
 LoggerStream::LoggerStream(Logger* logger, LogLevel level) : loggerRef(logger), level_(level) {
 }
-LoggerStream::LoggerStream(Logger* logger, LogLevel level, const char* fileName, const char* funcName,
+LoggerStream::LoggerStream(Logger* logger,
+                           LogLevel level,
+                           const char* fileName,
+                           const char* funcName,
                            std::int32_t line) : loggerRef(logger), level_(level) {
     ss_ << Fundamental::StringFormat("[{}:{}({})] ", fileName, funcName, line);
+}
+LoggerStream::LoggerStream(Logger* logger, LogLevel level, std::int32_t line) : loggerRef(logger), level_(level) {
+    ss_ << Fundamental::StringFormat("[{}] ", line);
 }
 LoggerStream::~LoggerStream() {
 #ifndef DISABLE_FLOG

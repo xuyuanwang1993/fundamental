@@ -148,6 +148,7 @@ public:
     explicit LoggerStream(Logger* logger, LogLevel level);
     explicit LoggerStream(Logger* logger, LogLevel level, const char* fileName, const char* funcName,
                           std::int32_t line);
+    explicit LoggerStream(Logger* logger, LogLevel level, std::int32_t line);
     ~LoggerStream();
     std::stringstream& stream() {
         return ss_;
@@ -268,6 +269,7 @@ inline constexpr std::array<char, N> __get_short_file_name__(const char (&file_n
 #endif
 
 #define FINFOS Fundamental::LoggerStream(Fundamental::Logger::s_defaultLogger, Fundamental::LogLevel::info).stream()
+#define FINFOSL Fundamental::LoggerStream(Fundamental::Logger::s_defaultLogger, Fundamental::LogLevel::info,__LINE__).stream()
 #define FERRS                                                                                                          \
     Fundamental::LoggerStream(Fundamental::Logger::s_defaultLogger, Fundamental::LogLevel::err, LOG_FILE_NAME,         \
                               __func__, __LINE__)                                                                      \
