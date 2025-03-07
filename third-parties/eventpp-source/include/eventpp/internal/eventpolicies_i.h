@@ -62,6 +62,25 @@ struct HasFunctionCanContinueInvoking
 
 	enum { value = !! decltype(test<T>(0))() };
 };
+
+template <typename T>
+class has_is_broken {
+private:
+    template <typename U>
+    static auto test(int) -> decltype(std::declval<U>().is_broken(), std::true_type());
+
+    template <typename>
+    static std::false_type test(...);
+
+public:
+    static constexpr bool value = decltype(test<T>(0))::value;
+};
+template <>
+class has_is_broken<void> {
+public:
+    static constexpr bool value = false;
+};
+
 struct DefaultCanContinueInvoking
 {
 	template <typename ...Args>
@@ -69,6 +88,7 @@ struct DefaultCanContinueInvoking
 		return true;
 	}
 };
+
 template <typename T, bool> struct SelectCanContinueInvoking { using Type = T; };
 template <typename T> struct SelectCanContinueInvoking<T, false> { using Type = DefaultCanContinueInvoking; };
 
