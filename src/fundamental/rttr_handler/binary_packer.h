@@ -10,6 +10,7 @@
 #include <rttr/type>
 namespace Fundamental::io
 {
+using BinaryPackSizeType=std::uint64_t;
 // throw when pack failed
 template <typename T>
 inline void binary_pack(std::vector<std::uint8_t>& out, const T& in);
