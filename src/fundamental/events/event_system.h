@@ -88,6 +88,19 @@ inline decltype(auto) EventSystem::DispatcherEvent(Args&&... args) {
     return m_syncer.enqueue(std::make_shared<EventDataType>(std::forward<Args>(args)...));
 }
 
+class SignalBrokenType {
+public:
+    SignalBrokenType() = default;
+    bool is_broken() const {
+        return is_broken_;
+    }
+    SignalBrokenType(bool has_broken) : is_broken_(has_broken) {
+    }
+
+private:
+    const bool is_broken_ = false;
+};
+
 template <typename Prototype, typename PoliciesType>
 class SignalBase;
 
@@ -157,7 +170,7 @@ inline void SignalBase<ReturnType(Args...), PoliciesType>::Emit(Args... args) {
 
 template <typename PoliciesType, typename ReturnType, typename... Args>
 inline void SignalBase<ReturnType(Args...), PoliciesType>::operator()(Args... args) {
-    _connections(std::forward<Args>(args)...);
+    _connections.broken_call(std::forward<Args>(args)...);
 }
 
 template <typename Prototype_, typename Policies_ = eventpp::DefaultPolicies>
