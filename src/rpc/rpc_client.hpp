@@ -118,6 +118,7 @@ class ClientStreamReadWriter : public std::enable_shared_from_this<ClientStreamR
     friend class rpc_client;
 
 public:
+    Fundamental::Signal<void()> notify_stream_abort;
     template <typename... Args>
     static decltype(auto) make_shared(Args&&... args) {
         return std::make_shared<ClientStreamReadWriter>(std::forward<Args>(args)...);
@@ -1241,6 +1242,7 @@ inline void ClientStreamReadWriter::read_head() {
             if (last_data_status_ >= rpc_stream_data_status::rpc_stream_finish) return;
             if (ec) {
                 set_status(rpc_stream_data_status::rpc_stream_failed, std::move(ec));
+                notify_stream_abort.Emit();
             } else {
                 b_wait_any_data.exchange(false);
 #ifdef RPC_VERBOSE
@@ -1298,6 +1300,7 @@ inline void ClientStreamReadWriter::read_body(std::uint32_t offset) {
             if (last_data_status_ >= rpc_stream_data_status::rpc_stream_write_done) return;
             if (ec) {
                 set_status(rpc_stream_data_status::rpc_stream_failed, std::move(ec));
+                notify_stream_abort();
             } else {
                 b_wait_any_data.exchange(false);
                 auto current_offset = offset + length;
@@ -1364,6 +1367,7 @@ inline void ClientStreamReadWriter::handle_write() {
             if (last_data_status_ >= rpc_stream_data_status::rpc_stream_finish) return;
             if (ec) {
                 set_status(rpc_stream_data_status::rpc_stream_failed, ec);
+                notify_stream_abort();
                 return;
             }
             if (write_cache_.empty()) return;

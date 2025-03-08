@@ -7,6 +7,8 @@
 #include "rpc/proxy/custom_rpc_proxy.hpp"
 
 #include "fundamental/application/application.hpp"
+#include "fundamental/basic/random_generator.hpp"
+
 #include "rpc/rpc_client.hpp"
 #include <chrono>
 #include <fstream>
@@ -17,7 +19,7 @@ using namespace network;
 using namespace network::rpc_service;
 static Fundamental::ThreadPool& s_test_pool = Fundamental::ThreadPool::Instance<101>();
 
-#if 1
+#if 0
     #if 1
 TEST(rpc_test, test_connect) {
     Fundamental::Timer check_timer;
@@ -1007,7 +1009,38 @@ TEST(rpc_test, test_ssl_proxy_echo_stream_mutithread) {
 }
     #endif
 #endif
-
+TEST(rpc_test, test_aborted_stream) {
+    auto g        = Fundamental::DefaultNumberGenerator<std::size_t>(1, 10);
+    auto test_cnt = g();
+    while (test_cnt > 0) {
+        test_cnt--;
+        auto client             = network::make_guard<rpc_client>();
+        [[maybe_unused]] bool r = client->connect("127.0.0.1", "9000");
+        EXPECT_TRUE(r && client->has_connected());
+        auto stream = client->upgrade_to_stream("test_abort_stream");
+        if (!stream) break;
+        stream->EnableAutoHeartBeat(true, 1000);
+        bool aborted = false;
+        std::mutex lock;
+        std::condition_variable cv;
+        stream->notify_stream_abort.Connect([&]() {
+            FWARN("remote stream aborted");
+            std::scoped_lock<std::mutex> locker(lock);
+            aborted = true;
+            cv.notify_one();
+        });
+        EXPECT_TRUE(stream->WriteDone());
+        std::size_t max_try_cnt = 5;
+        { // block wait connection disconneted
+            std::unique_lock<std::mutex> locker(lock);
+            while (!aborted && max_try_cnt > 0) {
+                --max_try_cnt;
+                cv.wait_for(locker, std::chrono::milliseconds(10));
+            }
+        }
+        // we won't call finish,disconenction
+    }
+}
 int main(int argc, char** argv) {
     int mode = 0;
     if (argc > 1) mode = std::stoi(argv[1]);

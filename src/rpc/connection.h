@@ -38,6 +38,7 @@ class ServerStreamReadWriter : public std::enable_shared_from_this<ServerStreamR
     friend class connection;
 
 public:
+    Fundamental::Signal<void()> notify_stream_abort;
     template <typename... Args>
     static decltype(auto) make_shared(Args&&... args) {
         return std::make_shared<ServerStreamReadWriter>(std::forward<Args>(args)...);
@@ -155,7 +156,7 @@ public:
         auto data   = msgpack_codec::pack(static_cast<int32_t>(result_code::OK), std::forward<Args>(args)...);
         auto s_data = std::string(data.data(), data.data() + data.size());
         asio::post(socket_.get_executor(),
-                   [this,  data = std::move(s_data), req_id, req_type, ref = shared_from_this()]() mutable {
+                   [this, data = std::move(s_data), req_id, req_type, ref = shared_from_this()]() mutable {
                        if (!reference_.is_valid()) {
                            return;
                        }
@@ -778,6 +779,7 @@ inline void ServerStreamReadWriter::read_head() {
         if (last_data_status_ >= rpc_stream_data_status::rpc_stream_finish) return;
         if (ec) {
             set_status(rpc_stream_data_status::rpc_stream_failed, std::move(ec));
+            notify_stream_abort.Emit();
         } else {
 #ifdef RPC_VERBOSE
             FDEBUG("server {:p} stream read head size data:{} type:{}", (void*)this,
@@ -852,6 +854,7 @@ inline void ServerStreamReadWriter::read_body(std::uint32_t offset) {
             if (last_data_status_ >= rpc_stream_data_status::rpc_stream_finish) return;
             if (ec) {
                 set_status(rpc_stream_data_status::rpc_stream_failed, std::move(ec));
+                notify_stream_abort.Emit();
             } else {
                 b_waiting_process_any_data.exchange(false);
                 auto current_read_offset = offset + length;
@@ -917,6 +920,7 @@ inline void ServerStreamReadWriter::handle_write() {
             if (last_data_status_ >= rpc_stream_data_status::rpc_stream_finish) return;
             if (ec) {
                 set_status(rpc_stream_data_status::rpc_stream_failed, ec);
+                notify_stream_abort.Emit();
                 return;
             }
             b_waiting_process_any_data.exchange(false);

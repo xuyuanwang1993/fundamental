@@ -10,6 +10,7 @@
 
 #include "fundamental/application/application.hpp"
 #include "fundamental/basic/log.h"
+#include "fundamental/basic/random_generator.hpp"
 #include "fundamental/delay_queue/delay_queue.h"
 #include "fundamental/thread_pool/thread_pool.h"
 
@@ -200,6 +201,42 @@ void test_broken_stream(rpc_conn conn) {
         },
         w);
 }
+void test_abort_stream(rpc_conn conn) {
+    auto c = conn.lock();
+    auto w = c->InitRpcStream();
+
+    rpc_stream_pool.Enqueue(
+        [](decltype(w) stream) {
+            bool aborted = false;
+            std::mutex lock;
+            std::condition_variable cv;
+            stream->notify_stream_abort.Connect([&]() {
+                FERR("stream aborted");
+                std::scoped_lock<std::mutex> locker(lock);
+                aborted = true;
+                cv.notify_one();
+            });
+            stream->EnableTimeoutCheck(1000);
+            stream->WriteDone();
+            auto g   = Fundamental::DefaultNumberGenerator<std::size_t>(0, 10);
+            auto cnt = g();
+            if (cnt < 5) {
+                stream->release_obj();
+                return;
+            }
+            FDEBUG("start abort stream wait");
+
+            { // block wait connection disconneted
+                std::unique_lock<std::mutex> locker(lock);
+                while (!aborted) {
+                    cv.wait_for(locker, std::chrono::milliseconds(10));
+                }
+            }
+            FDEBUG("finish abort stream wait");
+            stream->Finish(0);
+        },
+        w);
+}
 
 void test_echo_stream(rpc_conn conn) {
     auto c  = conn.lock();
@@ -302,6 +339,7 @@ void server_task(std::promise<void>& sync_p) {
     server.register_handler("test_write_stream", test_write_stream);
     server.register_handler("test_broken_stream", test_broken_stream);
     server.register_handler("test_echo_stream", test_echo_stream);
+    server.register_handler("test_abort_stream", test_abort_stream);
     server.register_handler("object_echo<int>", object_echo<int>);
     server.register_handler("object_echo<TestProxyRequest>", object_echo<TestProxyRequest>);
     server.register_handler("test_control_stream", test_control_stream);
