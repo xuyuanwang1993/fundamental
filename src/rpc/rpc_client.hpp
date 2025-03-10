@@ -677,8 +677,7 @@ private:
     }
 
     void write(std::uint64_t req_id, request_type type, rpc_service::rpc_buffer_type&& message, uint32_t func_id) {
-        size_t size = message.size();
-        FASSERT(size < MAX_BUF_LEN);
+        FASSERT(message.size() < MAX_BUF_LEN);
         asio::post(socket_.get_executor(),
                    [this, req_id, type, func_id, message = std::move(message), ptr = shared_from_this()]() mutable {
                        if (!reference_.is_valid()) {
