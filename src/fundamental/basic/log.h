@@ -240,7 +240,7 @@ inline constexpr std::array<char, N> __get_short_file_name__(const char (&file_n
     #define FLOG_DEBUGINFO(logger, logLevel, ...) (void)0
 #endif // !DISABLE_FLOG
 
-#ifndef NDEBUG
+#ifdef DEBUG
     #define FDEBUG(...)           FLOG(Fundamental::Logger::s_defaultLogger, Fundamental::LogLevel::debug, __VA_ARGS__)
     #define FDEBUG_I(logger, ...) FLOG(logger, Fundamental::LogLevel::debug, __VA_ARGS__)
 #else
