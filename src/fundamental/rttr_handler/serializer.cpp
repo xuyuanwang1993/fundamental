@@ -11,10 +11,13 @@ using namespace rttr;
 RTTR_REGISTRATION {
     using namespace rttr;
 
-    { RTTR_REGISTRATION_STANDARD_TYPE_VARIANTS(nlohmann::json); }
+    {
+        RTTR_REGISTRATION_STANDARD_TYPE_VARIANTS(nlohmann::json);
+    }
 }
 
-namespace {
+namespace
+{
 
 /////////////////////////////////////////////////////////////////////////////////////////
 Fundamental::json to_json_recursively(const instance& obj, const Fundamental::RttrSerializeOption& option);
@@ -23,7 +26,11 @@ Fundamental::json to_json_recursively(const instance& obj, const Fundamental::Rt
 
 Fundamental::json write_variant(const variant& var, bool& flag, const Fundamental::RttrSerializeOption& option);
 Fundamental::json write_variant(const variant& var, const Fundamental::RttrSerializeOption& option);
-
+std::string write_variant_with_comment(const variant& var,
+                                       bool& flag,
+                                       std::string& indent_string,
+                                       std::size_t current_indent,
+                                       const Fundamental::RttrSerializeOption& option);
 bool write_atomic_types_to_json(const type& t, const variant& var, Fundamental::json& json_obj) {
     if (t.is_arithmetic()) {
         if (t == type::get<bool>())
@@ -168,6 +175,175 @@ Fundamental::json write_variant(const variant& var, const Fundamental::RttrSeria
     return write_variant(var, flag, option);
 }
 
+std::string write_variant_with_comment(const variant& var,
+                                       bool& flag,
+                                       std::string& indent_string,
+                                       std::size_t current_indent,
+                                       const Fundamental::RttrSerializeOption& option) {
+
+    std::string ret;
+    bool new_flag  = true;
+    bool new_flag2 = true;
+    Fundamental::json json_obj;
+    auto value_type   = var.get_type();
+    auto wrapped_type = value_type.is_wrapper() ? value_type.get_wrapped_type() : value_type;
+    bool is_wrapper   = wrapped_type != value_type;
+    do {
+        if (write_atomic_types_to_json(is_wrapper ? wrapped_type : value_type,
+                                       is_wrapper ? var.extract_wrapped_value() : var, json_obj)) {
+            ret += json_obj.dump();
+        } else if (var.is_sequential_container()) {
+
+            auto view        = var.create_sequential_view();
+            std::size_t size = view.get_size();
+            if (size == 0) {
+                ret = "[]";
+                break;
+            }
+            ret += "[\n";
+            const auto new_indent = current_indent + 4;
+            if (indent_string.size() < new_indent) {
+                indent_string.resize(indent_string.size() * 2, ' ');
+            }
+            std::size_t index = 0;
+            for (auto& item : view) {
+                ret.insert(ret.size(), indent_string.data(), new_indent);
+                variant wrapped_var = item.extract_wrapped_value();
+                ret += write_variant_with_comment(wrapped_var, new_flag, indent_string, new_indent, option);
+                if (index < size - 1) {
+                    ret += ",\n";
+                } else {
+                    ret += "\n";
+                }
+                ++index;
+            }
+
+            ret.insert(ret.size(), indent_string.data(), current_indent);
+            ret.push_back(']');
+
+        } else if (var.is_associative_container()) {
+            auto view        = var.create_associative_view();
+            std::size_t size = view.get_size();
+            if (size == 0) {
+                ret = "[]";
+                break;
+            }
+            ret += "[\n";
+            const auto new_indent = current_indent + 4;
+            if (indent_string.size() < new_indent) {
+                indent_string.resize(indent_string.size() * 2, ' ');
+            }
+            std::size_t index = 0;
+            for (auto& item : view) {
+                ret.insert(ret.size(), indent_string.data(), new_indent);
+                if (view.is_key_only_type()) {
+                    ret += write_variant_with_comment(item.first.extract_wrapped_value(), new_flag, indent_string,
+                                                      new_indent, option);
+                } else {
+                    ret.insert(ret.size(), indent_string.data(), new_indent);
+                    ret += "{\n";
+                    ret.insert(ret.size(), indent_string.data(), new_indent + 4);
+                    ret += "\"key\": ";
+                    ret += write_variant_with_comment(item.first.extract_wrapped_value(), new_flag, indent_string,
+                                                      new_indent + 4, option);
+                    ret += ",\n";
+                    ret.insert(ret.size(), indent_string.data(), new_indent + 4);
+                    ret += "\"value\": ";
+                    ret += write_variant_with_comment(item.second.extract_wrapped_value(), new_flag2, indent_string,
+                                                      new_indent + 4, option);
+                    ret += "\n";
+                    ret.insert(ret.size(), indent_string.data(), new_indent);
+                    ret += "}";
+                }
+                if (index < size - 1) {
+                    ret += ",\n";
+                } else {
+                    ret += "\n";
+                }
+                ++index;
+            }
+            ret.insert(ret.size(), indent_string.data(), current_indent);
+            ret.push_back(']');
+        } else if (var.is_type<nlohmann::json>()) {
+            using serializer_t = ::nlohmann::detail::serializer<nlohmann::json>;
+            using string_t     = std::string;
+            string_t result;
+            serializer_t s(::nlohmann::detail::output_adapter<char, string_t>(result), ' ',
+                           ::nlohmann::detail::error_handler_t::strict);
+            auto json_object = var.get_value<nlohmann::json>();
+            s.dump(json_object, true, true, 4, static_cast<unsigned int>(4 + current_indent));
+            ret = result;
+        } else {
+            std::size_t total_element_size = 0;
+            instance obj2                  = var;
+            instance obj = obj2.get_type().get_raw_type().is_wrapper() ? obj2.get_wrapped_instance() : obj2;
+
+            auto prop_list = obj.get_derived_type().get_properties();
+            for (auto& prop : prop_list) {
+                if (!option.ValidateSerialize(prop)) continue;
+
+                variant prop_value = prop.get_value(obj);
+                if (!prop_value) continue; // cannot serialize, because we cannot retrieve the value
+                ++total_element_size;
+            }
+            if (total_element_size == 0) {
+                ret = "{}";
+                break;
+            }
+            ret += "{\n";
+            const auto new_indent = current_indent + 4;
+            if (indent_string.size() < new_indent) {
+                indent_string.resize(indent_string.size() * 2, ' ');
+            }
+            std::size_t index = 0;
+            for (auto& prop : prop_list) {
+                if (!option.ValidateSerialize(prop)) continue;
+
+                variant prop_value = prop.get_value(obj);
+                if (!prop_value) continue; // cannot serialize, because we cannot retrieve the value
+                do {
+                    if (!flag) break;
+                    auto comment_value = prop.get_metadata(Fundamental::RttrMetaControlOption::CommentMetaDataKey());
+                    if (!comment_value.is_valid()) break;
+                    auto comment = comment_value.get_wrapped_value<std::string>();
+                    if (comment.size() < 2) break;
+                    if (std::strncmp(comment.data(), "//", 2) != 0) {
+                        if (comment.size() < 4) break;
+                        if (std::strncmp(comment.data(), "/*", 2) != 0) break;
+                        if (std::strncmp(comment.data() + comment.size() - 2, "*/", 2) != 0) break;
+                    }
+
+                    for (auto& c : comment) {
+                        if (!ret.empty() && *ret.rbegin() == '\n') {
+                            ret.insert(ret.size(), indent_string.data(), new_indent);
+                        }
+                        ret += c;
+                    }
+                    ret += "\n";
+                } while (0);
+
+                ret.insert(ret.size(), indent_string.data(), new_indent);
+                ret += "\"";
+                ret += prop.get_name().to_string();
+                ret += "\": ";
+
+                ret += write_variant_with_comment(prop_value, new_flag, indent_string, new_indent, option);
+                if (index < total_element_size - 1) {
+                    ret += ",\n";
+                } else {
+                    ret += "\n";
+                }
+                ++index;
+            }
+            ret.insert(ret.size(), indent_string.data(), current_indent);
+            ret.push_back('}');
+            flag = false;
+        };
+    } while (0);
+
+    return ret;
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////
 
 Fundamental::json to_json_recursively(const instance& obj2, const Fundamental::RttrSerializeOption& option) {
@@ -200,16 +376,26 @@ Fundamental::json to_json_recursively(const instance& obj2, const Fundamental::R
 /////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////
 
-namespace Fundamental {
-namespace io {
+namespace Fundamental
+{
+namespace io
+{
 
 std::string to_json(const rttr::variant& var, const RttrSerializeOption& option) {
     if (var.is_type<nlohmann::json>()) {
         return var.get_value<nlohmann::json>().dump(4);
     }
     Fundamental::json json_obj = to_json_obj(var, option);
-
     return json_obj.dump(4);
+}
+
+std::string to_comment_json(const rttr::variant& var, const RttrSerializeOption& option) {
+    if (var.is_type<nlohmann::json>()) {
+        return var.get_value<nlohmann::json>().dump(4);
+    }
+    bool flag = true;
+    std::string indent_str(512, ' ');
+    return write_variant_with_comment(var, flag, indent_str, 0, option);
 }
 
 Fundamental::json to_json_obj(const rttr::variant& var, const RttrSerializeOption& option) {

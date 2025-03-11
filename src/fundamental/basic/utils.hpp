@@ -5,6 +5,7 @@
 #include <functional>
 #include <string>
 #include <unordered_map>
+#include <string_view>
 
 #define F_UNUSED(x) (void)x
 
@@ -83,7 +84,9 @@ struct NetworkInfo {
     bool isLoopback = false;
 };
 std::unordered_map<std::string, NetworkInfo> GetLocalNetInformation();
+[[nodiscard]] std::string RemoveComments(std::string_view input);
 } // namespace Utils
+
 
 } // namespace Fundamental
 #endif // _HEAD_BASIC_UTILS_

@@ -1,12 +1,13 @@
 
 
+#include "TestRttrRegister.h"
 #include "fundamental/basic/log.h"
+#include "fundamental/basic/utils.hpp"
+#include "fundamental/delay_queue/delay_queue.h"
 #include "fundamental/rttr_handler/deserializer.h"
 #include "fundamental/rttr_handler/serializer.h"
-#include "fundamental/delay_queue/delay_queue.h"
-#include "TestRttrRegister.h"
-#include <rttr/registration>
 #include <iostream>
+#include <rttr/registration>
 using namespace rttr;
 
 enum class color
@@ -16,35 +17,25 @@ enum class color
     blue
 };
 
-struct point2d
-{
-    point2d()
-    {
+struct point2d {
+    point2d() {
     }
-    point2d(int x_, int y_) :
-    x(x_), y(y_)
-    {
+    point2d(int x_, int y_) : x(x_), y(y_) {
     }
     int x = 0;
     int y = 0;
 };
 
-struct shape
-{
-    shape()
-    {
+struct shape {
+    shape() {
     }
-    shape(std::string n) :
-    name(n)
-    {
+    shape(std::string n) : name(n) {
     }
 
-    void set_visible(bool v)
-    {
+    void set_visible(bool v) {
         visible = v;
     }
-    bool get_visible() const
-    {
+    bool get_visible() const {
         return visible;
     }
 
@@ -58,11 +49,8 @@ private:
     bool visible = false;
 };
 
-struct circle : shape
-{
-    circle(std::string n) :
-    shape(n)
-    {
+struct circle : shape {
+    circle(std::string n) : shape(n) {
     }
 
     double radius = 5.2;
@@ -73,52 +61,43 @@ struct circle : shape
     RTTR_ENABLE(shape)
 };
 
-struct vecTest
-{
+struct vecTest {
     std::vector<float> color;
 };
-struct MapTest
-{
+struct MapTest {
     std::map<std::string, vecTest> test;
 };
-struct CombineData
-{
+struct CombineData {
     point2d point;
     vecTest vec;
     MapTest map;
 };
 
-struct VecTest1
-{
+struct VecTest1 {
     int a;
     std::string b;
 };
-struct JsonTest
-{
+struct JsonTest {
     nlohmann::json test;
     std::vector<VecTest1> vecTest;
 };
 
-struct CommonGroupData
-{
+struct CommonGroupData {
     std::size_t commonInt = 0;
-    std::string commonStr  = "default common";
+    std::string commonStr = "default common";
 };
 
-struct LocalGroupData
-{
+struct LocalGroupData {
     std::size_t localInt = 0;
-    std::string localStr  = "default local";
+    std::string localStr = "default local";
 };
 
-struct CloudGroupData
-{
+struct CloudGroupData {
     std::size_t cloudInt = 0;
-    std::string cloudStr  = "default cloud";
+    std::string cloudStr = "default cloud";
 };
 
-struct TestSerializeControl
-{
+struct TestSerializeControl {
     CommonGroupData data;
     LocalGroupData localData;
     CloudGroupData cloudData;
@@ -126,17 +105,51 @@ struct TestSerializeControl
     std::map<std::size_t, CloudGroupData> cloudDataMap;
 };
 
-struct TestReferenceBind
-{
+struct TestReferenceBind {
     std::string data;
 };
 
-struct TestUnReferenceBind
-{
+struct TestUnReferenceBind {
     std::string data;
 };
-RTTR_REGISTRATION
-{
+
+struct CommentTestKey {
+    std::int32_t val = 0;
+    bool operator<(const CommentTestKey& other) const {
+        return val < other.val;
+    }
+    void update() {
+        val++;
+    }
+};
+
+struct CommentTestObject {
+    std::string str;
+    nlohmann::json jsonObj = nlohmann::json::array();
+    std::int32_t normal    = 0;
+    void update() {
+        str.push_back('a');
+        jsonObj.push_back(str);
+        ++normal;
+    }
+};
+
+struct ContainerComment {
+    CommentTestKey key;
+    CommentTestObject value;
+    std::vector<CommentTestObject> array;
+    std::set<CommentTestKey> set;
+    std::map<CommentTestKey, CommentTestObject> map;
+    void update() {
+        key.update();
+        value.update();
+        array.push_back(value);
+        set.insert(key);
+        map.emplace(key, value);
+    }
+};
+
+RTTR_REGISTRATION {
 
     rttr::registration::class_<shape>("shape")
         .constructor()(rttr::policy::ctor::as_object)
@@ -149,18 +162,15 @@ RTTR_REGISTRATION
     rttr::registration::class_<circle>("circle")
         .property("radius", &circle::radius)
         .property("points", &circle::points)
-        .property("no_serialize", &circle::no_serialize)(
-            metadata("NO_SERIALIZE", true));
+        .property("no_serialize", &circle::no_serialize)(metadata("NO_SERIALIZE", true));
 
     rttr::registration::class_<point2d>("point2d")
         .constructor()(rttr::policy::ctor::as_object)
         .property("x", &point2d::x)
         .property("y", &point2d::y);
 
-    rttr::registration::enumeration<color>("color")(
-        value("red", color::red),
-        value("blue", color::blue),
-        value("green", color::green));
+    rttr::registration::enumeration<color>("color")(value("red", color::red), value("blue", color::blue),
+                                                    value("green", color::green));
     rttr::registration::class_<vecTest>("vecTest")
         .constructor()(rttr::policy::ctor::as_object)
         .property("color", &vecTest::color);
@@ -172,9 +182,7 @@ RTTR_REGISTRATION
         .property("vec", &CombineData::vec)
         .property("map", &CombineData::map);
 
-    rttr::registration::class_<VecTest1>("VecTest1")
-        .property("a", &VecTest1::a)
-        .property("b", &VecTest1::b);
+    rttr::registration::class_<VecTest1>("VecTest1").property("a", &VecTest1::a).property("b", &VecTest1::b);
 
     // registration::class_<std::vector<VecTest1>>("std::vector<VecTest1>");
 
@@ -192,18 +200,22 @@ RTTR_REGISTRATION
         using RegisterType = LocalGroupData;
         rttr::registration::class_<RegisterType>("LocalGroupData")
             .property("localInt", &RegisterType::localInt)
-            .property("localStr", &RegisterType::localStr)(
-                metadata(Fundamental::RttrMetaControlOption::ExcludeMetaDataKey(), Fundamental::RttrControlMetaDataType { "all" }),
-                metadata(Fundamental::RttrMetaControlOption::IncludeMetaDataKey(), Fundamental::RttrControlMetaDataType { "local", "all" }));
+            .property("localStr",
+                      &RegisterType::localStr)(metadata(Fundamental::RttrMetaControlOption::ExcludeMetaDataKey(),
+                                                        Fundamental::RttrControlMetaDataType { "all" }),
+                                               metadata(Fundamental::RttrMetaControlOption::IncludeMetaDataKey(),
+                                                        Fundamental::RttrControlMetaDataType { "local", "all" }));
     }
     {
         using RegisterType = CloudGroupData;
         rttr::registration::class_<RegisterType>("CloudGroupData")
             .constructor()(rttr::policy::ctor::as_object)
             .property("cloudInt", &RegisterType::cloudInt)
-            .property("cloudStr", &RegisterType::cloudStr)(
-                metadata(Fundamental::RttrMetaControlOption::ExcludeMetaDataKey(), Fundamental::RttrControlMetaDataType { "all" }),
-                metadata(Fundamental::RttrMetaControlOption::IncludeMetaDataKey(), Fundamental::RttrControlMetaDataType { "cloud", "all" }));
+            .property("cloudStr",
+                      &RegisterType::cloudStr)(metadata(Fundamental::RttrMetaControlOption::ExcludeMetaDataKey(),
+                                                        Fundamental::RttrControlMetaDataType { "all" }),
+                                               metadata(Fundamental::RttrMetaControlOption::IncludeMetaDataKey(),
+                                                        Fundamental::RttrControlMetaDataType { "cloud", "all" }));
     }
     {
         using RegisterType = TestSerializeControl;
@@ -211,34 +223,85 @@ RTTR_REGISTRATION
             .constructor()(rttr::policy::ctor::as_object)
             .property("cloudData", &RegisterType::cloudData)
             .property("cloudDataMap", &RegisterType::cloudDataMap)(
-                metadata(Fundamental::RttrMetaControlOption::ExcludeMetaDataKey(), Fundamental::RttrControlMetaDataType { "nomap" }),
-                metadata(Fundamental::RttrMetaControlOption::IncludeMetaDataKey(), Fundamental::RttrControlMetaDataType { "cloud", "map", "all" }))
+                metadata(Fundamental::RttrMetaControlOption::ExcludeMetaDataKey(),
+                         Fundamental::RttrControlMetaDataType { "nomap" }),
+                metadata(Fundamental::RttrMetaControlOption::IncludeMetaDataKey(),
+                         Fundamental::RttrControlMetaDataType { "cloud", "map", "all" }))
             .property("data", &RegisterType::data)
             .property("localData", &RegisterType::localData)
             .property("localDataVec", &RegisterType::localDataVec)(
-                metadata(Fundamental::RttrMetaControlOption::ExcludeMetaDataKey(), Fundamental::RttrControlMetaDataType { "novec" }),
-                metadata(Fundamental::RttrMetaControlOption::IncludeMetaDataKey(), Fundamental::RttrControlMetaDataType { "cloud", "vec", "all" }));
+                metadata(Fundamental::RttrMetaControlOption::ExcludeMetaDataKey(),
+                         Fundamental::RttrControlMetaDataType { "novec" }),
+                metadata(Fundamental::RttrMetaControlOption::IncludeMetaDataKey(),
+                         Fundamental::RttrControlMetaDataType { "cloud", "vec", "all" }));
     }
     {
         using RegisterType = TestReferenceBind;
         rttr::registration::class_<RegisterType>("TestReferenceBind")
-            .property("data", &RegisterType::data)(
-                policy::prop::as_reference_wrapper);
+            .property("data", &RegisterType::data)(policy::prop::as_reference_wrapper);
     }
     {
         using RegisterType = TestUnReferenceBind;
-        rttr::registration::class_<RegisterType>("TestUnReferenceBind")
-            .property("data", &RegisterType::data);
+        rttr::registration::class_<RegisterType>("TestUnReferenceBind").property("data", &RegisterType::data);
+    }
+    {
+        using RegisterType = CommentTestKey;
+        rttr::registration::class_<RegisterType>("CommentTestKey")
+            .constructor()(rttr::policy::ctor::as_object)
+            .property("val", &RegisterType::val)(metadata(Fundamental::RttrMetaControlOption::CommentMetaDataKey(),
+                                                          std::string { "//val test comment" }));
+    }
+    {
+        using RegisterType = CommentTestObject;
+        rttr::registration::class_<RegisterType>("CommentTestObject")
+            .constructor()(rttr::policy::ctor::as_object)
+            .property("jsonObj", &RegisterType::jsonObj)(metadata(
+                Fundamental::RttrMetaControlOption::CommentMetaDataKey(), std::string { "//jsonObj test comment" }))
+            .property("normal",
+                      &RegisterType::normal)(metadata(Fundamental::RttrMetaControlOption::CommentMetaDataKey(),
+                                                      std::string { "invalid normal test comment" }))
+            .property("str", &RegisterType::str)(metadata(Fundamental::RttrMetaControlOption::CommentMetaDataKey(),
+                                                          std::string { "/*str test comment\n multi line test*/" }));
+    }
+    {
+        using RegisterType = ContainerComment;
+        rttr::registration::class_<RegisterType>("ContainerComment")
+            .constructor()(rttr::policy::ctor::as_object)
+            .property("array", &RegisterType::array)(
+                metadata(Fundamental::RttrMetaControlOption::CommentMetaDataKey(), std::string { "//array 数组" }))
+            .property("key", &RegisterType::key)(
+                metadata(Fundamental::RttrMetaControlOption::CommentMetaDataKey(), std::string { "//key 关键词" }))
+            .property("map", &RegisterType::map)(
+                metadata(Fundamental::RttrMetaControlOption::CommentMetaDataKey(), std::string { "//map 映射" }))
+            .property("set", &RegisterType::set)(
+                metadata(Fundamental::RttrMetaControlOption::CommentMetaDataKey(), std::string { "//set 集合" }))
+            .property("value", &RegisterType::value)(
+                metadata(Fundamental::RttrMetaControlOption::CommentMetaDataKey(), std::string { "//value 值" }));
     }
 }
 
 void TestPlugin();
-int main(int argc, char** argv)
-{
+int main(int argc, char** argv) {
     Fundamental::Logger::TestLogInstance();
     Fundamental::TestRttrInstance();
-    if (0)
     {
+        FINFO("test comment rttr json");
+        std::size_t max_test_cnt = 10;
+        ContainerComment v;
+        while (max_test_cnt > 0) {
+            v.update();
+            --max_test_cnt;
+            auto normal      = Fundamental::io::to_json_obj(v);
+            auto data        = Fundamental::io::to_comment_json(v);
+            auto filter_data = Fundamental::Utils::RemoveComments(data);
+            auto test_json   = nlohmann::json::parse(filter_data);
+            FASSERT(normal == test_json);
+        }
+        FINFO("test comment rttr json success");
+        return 0;
+    }
+
+    if (0) {
         FINFO("test rttr meta data");
         TestSerializeControl controlData;
         controlData.data.commonInt     = 1;
@@ -247,15 +310,13 @@ int main(int argc, char** argv)
         controlData.localData.localStr = "local test";
         controlData.cloudData.cloudInt = 3;
         controlData.cloudData.cloudStr = "cloud test";
-        for (std::size_t i = 1; i < 3; ++i)
-        {
+        for (std::size_t i = 1; i < 3; ++i) {
             LocalGroupData testGroupData;
             testGroupData.localInt = i;
             testGroupData.localStr = std::string("local vec ") + std::to_string(i);
             controlData.localDataVec.emplace_back(testGroupData);
         }
-        for (std::size_t i = 1; i < 3; ++i)
-        {
+        for (std::size_t i = 1; i < 3; ++i) {
             CloudGroupData testGroupData;
             testGroupData.cloudInt = i;
             testGroupData.cloudStr = std::string("cloud map ") + std::to_string(i);
@@ -268,7 +329,7 @@ int main(int argc, char** argv)
             Fundamental::RttrMetaControlOption option;
             option.includeDatas.insert("vec");
             {
-                FINFO("test only serialize output->{}", Fundamental::io::to_json(controlData,option));
+                FINFO("test only serialize output->{}", Fundamental::io::to_json(controlData, option));
             }
             {
                 TestSerializeControl deserializedData;
@@ -313,7 +374,7 @@ int main(int argc, char** argv)
             TestType instance;
             auto timeNow = Fundamental::Timer::GetTimeNow();
             property.set_value(instance, setData);
-            FWARN("cost {} ms", Fundamental::Timer::GetTimeNow()-timeNow);
+            FWARN("cost {} ms", Fundamental::Timer::GetTimeNow() - timeNow);
             assert(instance.data.size() == dataSize);
         }
         {
@@ -391,17 +452,14 @@ int main(int argc, char** argv)
         std::cout << "circle test:" << str << std::endl;
     }
 
-    std::cout << "Circle: c_1:\n"
-              << json_string << std::endl;
+    std::cout << "Circle: c_1:\n" << json_string << std::endl;
 
     circle c_2("Circle #2"); // create a new empty circle
 
     Fundamental::io::from_json(json_string, c_2); // deserialize it with the content of 'c_1'
-    std::cout << "\n############################################\n"
-              << std::endl;
+    std::cout << "\n############################################\n" << std::endl;
 
-    std::cout << "Circle c_2:\n"
-              << Fundamental::io::to_json(c_2) << std::endl;
+    std::cout << "Circle c_2:\n" << Fundamental::io::to_json(c_2) << std::endl;
 
     {
         vecTest v;
@@ -414,8 +472,7 @@ int main(int argc, char** argv)
         vecTest v2;
         Fundamental::io::from_json(str, v2);
         std::cout << "vec test paser:" << v2.color.size() << std::endl;
-        for (auto& i : v2.color)
-        {
+        for (auto& i : v2.color) {
             std::cout << i << std::endl;
         }
         Fundamental::io::set_property_by_json(v2, "color.1", Fundamental::io::to_json(0.55));
@@ -468,8 +525,7 @@ int main(int argc, char** argv)
     return 0;
 }
 DECALRE_PLUGIN_INIT_FUNCTION(TestRegisterLib);
-void TestPlugin()
-{
+void TestPlugin() {
 #ifdef NDEBUG
     static string_view library_name("TestRegisterLib");
 #else
@@ -477,15 +533,13 @@ void TestPlugin()
 #endif
     library lib(library_name); // load the actual plugin
 
-    if (!lib.load())
-    {
+    if (!lib.load()) {
         std::cerr << lib.get_error_string() << std::endl;
         return;
     }
     PROCESS_PLUGIN_INIT(TestRegisterLib);
     {
-        for (auto t : lib.get_types())
-        {
+        for (auto t : lib.get_types()) {
             std::cout << t.get_name() << std::endl;
         }
         // we cannot use the actual type, to get the type information,
@@ -493,8 +547,7 @@ void TestPlugin()
         auto t = type::get_by_name("TestTypeRegister");
 
         // iterate over all methods of the class
-        for (auto property : t.get_properties())
-        {
+        for (auto property : t.get_properties()) {
             std::cout << property.get_name() << std::endl;
         }
     }
@@ -512,15 +565,13 @@ void TestPlugin()
         abcd = Fundamental::io::to_json(v2);
         std::cout << "TestTypeRegister-test:" << abcd << std::endl;
     }
-    if (!lib.unload())
-    {
+    if (!lib.unload()) {
         std::cerr << lib.get_error_string() << std::endl;
         return;
     }
 
     auto t1 = type::get_by_name("MyPlugin");
-    if (t1.is_valid())
-    {
+    if (t1.is_valid()) {
         std::cerr << "the type: " << t1.get_name() << " should not be valid!";
     }
     {
@@ -537,7 +588,7 @@ void TestPlugin()
         abcd = Fundamental::io::to_json(v2);
         std::cout << "unload TestTypeRegister-test:" << abcd << std::endl;
     }
-    FWARN("exec member->{}",(void*)&TestInstance::x);
-    FWARN("exec func->{}",(void*)TestInstance::GetInstance1());
-    FWARN("exec external->{}",(void*)TestInstance::GetInstance2());
+    FWARN("exec member->{}", (void*)&TestInstance::x);
+    FWARN("exec func->{}", (void*)TestInstance::GetInstance1());
+    FWARN("exec external->{}", (void*)TestInstance::GetInstance2());
 }

@@ -9,6 +9,7 @@ namespace Fundamental {
 using json = nlohmann::json;
 namespace io {
 std::string to_json(const rttr::variant& var, const RttrSerializeOption& option = {});
+std::string to_comment_json(const rttr::variant& var, const RttrSerializeOption& option = {});
 json to_json_obj(const rttr::variant& var, const RttrSerializeOption& option = {});
 
 template <typename DataType>
