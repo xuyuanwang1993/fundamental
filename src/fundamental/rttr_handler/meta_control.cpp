@@ -3,13 +3,18 @@
 #include <vector>
 namespace Fundamental {
 std::string RttrMetaControlOption::ExcludeMetaDataKey() {
-    static constexpr const char* kExcludeMetaDataKey = "exclude_set_data";
+    static constexpr const char* kExcludeMetaDataKey = "__exclude_data__";
     return kExcludeMetaDataKey;
 }
 
 std::string RttrMetaControlOption::IncludeMetaDataKey() {
-    static constexpr const char* kIncludeMetaDataKey = "include_set_data";
+    static constexpr const char* kIncludeMetaDataKey = "__include_data__";
     return kIncludeMetaDataKey;
+}
+
+std::string RttrMetaControlOption::CommentMetaDataKey() {
+    static constexpr const char* kCommentMetaDataKey = "__comment_data__";
+    return kCommentMetaDataKey;
 }
 
 bool RttrMetaControlOption::HasInterSection(const RttrControlMetaDataType& data1,

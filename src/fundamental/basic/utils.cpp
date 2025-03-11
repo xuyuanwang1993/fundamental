@@ -117,5 +117,42 @@ std::unordered_map<std::string, NetworkInfo> GetLocalNetInformation() {
     } while (0);
     return ret;
 }
+std::string RemoveComments(std::string_view input) {
+    std::string result;
+    bool inSingleLineComment = false;
+    bool inMultiLineComment  = false;
+    for (size_t i = 0; i < input.size(); ++i) {
+        if (inSingleLineComment) {
+            if (input[i] == '\n') {
+                inSingleLineComment = false;
+                result += '\n';
+            }
+            // 单行注释下字符都忽略
+        } else if (inMultiLineComment) {
+            if (input[i] == '*' && i + 1 < input.size() && input[i + 1] == '/') {
+                inMultiLineComment = false;
+                // 跳过'/'
+                ++i;
+            }
+            // 忽略多行注释中间的内容
+        } else {
+            if (input[i] == '/' && i + 1 < input.size()) {
+                if (input[i + 1] == '/') {
+                    inSingleLineComment = true; // 开始单行注释
+                    i++;                        // 跳过下一个 '/'
+                } else if (input[i + 1] == '*') {
+                    inMultiLineComment = true; // 开始多行注释
+                    i++;                       // 跳过下一个 '*'
+                } else {
+                    result += input[i]; // 不是注释，保留字符
+                }
+            } else {
+                result += input[i]; // 不是注释，保留字符
+            }
+        }
+    }
+
+    return result;
+}
 } // namespace Utils
 } // namespace Fundamental

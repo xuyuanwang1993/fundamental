@@ -14,6 +14,7 @@ struct RttrMetaControlOption {
     RttrControlMetaDataType includeDatas;
     static std::string ExcludeMetaDataKey();
     static std::string IncludeMetaDataKey();
+    static std::string CommentMetaDataKey();
     static bool HasInterSection(const RttrControlMetaDataType& data1, const RttrControlMetaDataType& data2);
     bool ValidateSerialize(const rttr::property& prop) const;
 };

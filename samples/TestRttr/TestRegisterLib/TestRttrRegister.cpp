@@ -72,7 +72,7 @@ int * TestInstance::GetInstance2()
 }
 DECALRE_PLUGIN_INIT_FUNCTION(PLUGIN_NAME)
 {
-    FINFO("{} init", PLUGIN_NAME);
+    //FINFO("{} init", PLUGIN_NAME);
     FWARN("plugin member->{}",(void*)&TestInstance::x);
     FWARN("plugin func->{}",(void*)TestInstance::GetInstance1());
     FWARN("plugin external->{}",(void*)TestInstance::GetInstance2());
