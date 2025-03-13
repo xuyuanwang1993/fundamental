@@ -97,7 +97,7 @@ private:
     }
 
 private:
-    rpc_data_reference reference_;
+    network_data_reference reference_;
     std::mutex mutex;
     std::error_code last_err_;
     rpc_stream_packet read_packet_buffer;
@@ -627,7 +627,7 @@ private:
         socket_.shutdown(tcp::socket::shutdown_both, ignored_ec);
         socket_.close(ignored_ec);
     }
-    rpc_data_reference reference_;
+    network_data_reference reference_;
     std::weak_ptr<rpc_server> server_wref_;
     tcp::socket socket_;
     char head_[kRpcHeadLen];

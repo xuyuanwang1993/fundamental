@@ -5,15 +5,8 @@ file(GLOB lib_source
     *.h
     *.cpp
     *.hpp
-    basic/*.h
-    basic/*.cpp
-    basic/*.hpp
-    proxy/*.h
-    proxy/*.cpp
-    proxy/*.hpp
 )
 
-option(RPC_DISABLE_SSL "disable rpc ssl support." OFF)
 list(APPEND lib_source ${services_source})
 
 # Add to source group, TREE will enable cmake to config the folder layout automatically
@@ -33,20 +26,8 @@ set_target_properties(${lib_name} PROPERTIES
 # Config link dependencies
 target_link_libraries(${lib_name} PUBLIC
     BuildSettings
-    ${GLOB_NAMESPACE}network
+    asio
+    ${GLOB_NAMESPACE}fundamental${STATIC_LIB_SUFFIX}
 )
 
-if(RPC_DISABLE_SSL)
-    target_compile_definitions(${lib_name}
-        PUBLIC
-        RPC_DISABLE_SSL=1
-    )
-else()
-    find_package(OpenSSL REQUIRED)
-    target_link_libraries(${lib_name}
-        PUBLIC
-        OpenSSL::SSL
-        OpenSSL::Crypto
-    )
-endif()
 add_library(${GLOB_NAMESPACE}${lib_name} ALIAS ${lib_name})

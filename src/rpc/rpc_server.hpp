@@ -10,7 +10,7 @@
 #include <set>
 #include <thread>
 
-#include "basic/rpc_init.hpp"
+#include "network/network.hpp"
 #include "fundamental/events/event_system.h"
 
 using asio::ip::tcp;
@@ -237,7 +237,7 @@ private:
                        "The subscriber of the key: " + key + " does not exist.");
         }
     }
-    rpc_data_reference reference_;
+    network_data_reference reference_;
     std::atomic_bool has_started_ = false;
     tcp::acceptor acceptor_;
     std::size_t timeout_msec_ = 0;

@@ -16,6 +16,7 @@ if(F_BUILD_STATIC)
 
     if(FUNDAMENTAL_BUILD_NETWORK)
         add_subdirectory(TestTrafficProxy)
+        add_subdirectory(TestHttpServer)
         if(IMPORT_GTEST)
             add_subdirectory(TestRpc)
         endif()

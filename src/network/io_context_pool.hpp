@@ -9,6 +9,7 @@
 
 #include "fundamental/basic/utils.hpp"
 #include "fundamental/events/event_system.h"
+#include "fundamental/application/application.hpp"
 namespace network {
 /// A pool of io_context objects.
 class io_context_pool : public Fundamental::Singleton<io_context_pool> {
@@ -48,5 +49,16 @@ private:
     /// The signal_set is used to register for process termination notifications.
     asio::signal_set signals_;
 };
+inline void init_io_context_pool(std::size_t work_threads = std::thread::hardware_concurrency()) {
+    network::io_context_pool::s_excutorNums = work_threads;
+    network::io_context_pool::Instance().start();
+    Fundamental::Application::Instance().exitStarted.Connect([&]() {
+        network::io_context_pool::Instance().stop();
+    });
+    network::io_context_pool::Instance().notify_sys_signal.Connect(
+        [](std::error_code code, std::int32_t signo) { Fundamental::Application::Instance().Exit(); });
+}
+
+
 
 } // namespace network

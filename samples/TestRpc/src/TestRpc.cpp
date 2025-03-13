@@ -19,7 +19,7 @@ using namespace network;
 using namespace network::rpc_service;
 static Fundamental::ThreadPool& s_test_pool = Fundamental::ThreadPool::Instance<101>();
 
-#if 0
+#if 1
     #if 1
 TEST(rpc_test, test_connect) {
     Fundamental::Timer check_timer;

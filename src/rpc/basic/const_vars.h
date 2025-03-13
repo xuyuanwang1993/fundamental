@@ -8,6 +8,7 @@
 #include "fundamental/basic/log.h"
 #include "fundamental/basic/utils.hpp"
 #include "fundamental/events/event_system.h"
+#include "network/network.hpp"
 
 namespace network
 {
@@ -86,25 +87,7 @@ struct rpc_header {
                sizeof(std::uint32_t);
     }
 };
-struct rpc_data_reference {
-    Fundamental::Signal<void()> notify_release;
-    bool is_valid() const {
-        return !__has_released;
-    }
-    operator bool() const {
-        return is_valid();
-    }
-    bool operator!() const {
-        return !is_valid();
-    }
-    void release() {
-        auto expected_value = false;
-        if (__has_released.compare_exchange_strong(expected_value, true)) {
-            notify_release.Emit();
-        }
-    }
-    std::atomic_bool __has_released = false;
-};
+
 
 static constexpr std::size_t MAX_BUF_LEN     = 1024LLU * 1024 * 1024 * 4;
 static constexpr std::size_t kRpcHeadLen     = rpc_header::HeadLen();

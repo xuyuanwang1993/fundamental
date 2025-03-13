@@ -3,7 +3,7 @@
 #include "basic/md5.hpp"
 #include "basic/meta_util.hpp"
 #include "basic/rpc_client_proxy.hpp"
-#include "basic/rpc_init.hpp"
+#include "network/network.hpp"
 #include "basic/use_asio.hpp"
 
 #include <deque>
@@ -176,7 +176,7 @@ private:
     void handle_write();
 
 private:
-    rpc_data_reference reference_;
+    network_data_reference reference_;
     std::mutex mutex;
     std::error_code last_err_;
     rpc_stream_packet read_packet_buffer;
@@ -1055,7 +1055,7 @@ private:
             socket_.async_write_some(std::move(buffers), std::move(handler));
         }
     }
-    rpc_data_reference reference_;
+    network_data_reference reference_;
     asio::io_context& ios_;
     asio::ip::tcp::resolver resolver_;
     asio::ip::tcp::socket socket_;

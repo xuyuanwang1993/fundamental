@@ -90,7 +90,7 @@ protected:
     void StartServerRead();
 
 protected:
-    rpc_service::rpc_data_reference reference_;
+    network::network_data_reference reference_;
     const std::string proxy_host;
     const std::string proxy_service;
     /// Socket for the connection.
