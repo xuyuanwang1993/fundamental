@@ -34,6 +34,10 @@ target_link_libraries(${app_target_name}
     ${GLOB_NAMESPACE}http
 )
 
+target_link_libraries(${app_target_name}
+    PRIVATE
+    gtest
+)
 
 # Add target name
 target_compile_definitions(${app_target_name}
@@ -44,3 +48,18 @@ target_compile_definitions(${app_target_name}
 
 config_enable_sanitize_address_check(${app_target_name})
 
+install(FILES ${FUNDAMENTAL_ASSETS_PATH}/dh2048.pem
+    ${FUNDAMENTAL_ASSETS_PATH}/server.crt
+    ${FUNDAMENTAL_ASSETS_PATH}/server.key
+    ${FUNDAMENTAL_ASSETS_PATH}/client.key
+    ${FUNDAMENTAL_ASSETS_PATH}/client.crt
+    ${FUNDAMENTAL_ASSETS_PATH}/ca_root.crt
+    COMPONENT ssl-crt
+    DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+
+add_custom_command(TARGET ${app_target_name}
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E echo "ssl pem installing"
+    COMMAND ${CMAKE_COMMAND} --install . --component ssl-crt
+    COMMENT "post-build ssl pem install"
+    VERBATIM)

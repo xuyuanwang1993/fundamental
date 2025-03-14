@@ -10,8 +10,8 @@
 #include <set>
 #include <thread>
 
-#include "network/network.hpp"
 #include "fundamental/events/event_system.h"
+#include "network/network.hpp"
 
 using asio::ip::tcp;
 
@@ -20,28 +20,6 @@ namespace network
 namespace rpc_service
 {
 using rpc_conn = std::weak_ptr<connection>;
-
-struct protocal_helper {
-    static tcp::endpoint make_endpoint(std::uint16_t port) {
-#ifndef RPC_IPV4_ONLY
-        return tcp::endpoint(tcp::v6(), port);
-#else
-        return tcp::endpoint(tcp::v4(), port);
-#endif
-    }
-    static void init_acceptor(tcp::acceptor& acceptor, std::uint16_t port) {
-        auto end_point = make_endpoint(port);
-        acceptor.open(end_point.protocol());
-        acceptor.set_option(asio::ip::tcp::acceptor::reuse_address(true));
-#ifndef RPC_IPV4_ONLY
-        // 关闭 v6_only 选项，允许同时接受 IPv4 和 IPv6 连接
-        asio::ip::v6_only v6_option(false);
-        acceptor.set_option(v6_option);
-#endif
-        acceptor.bind(end_point);
-        acceptor.listen();
-    }
-};
 
 class rpc_server : private asio::noncopyable, public std::enable_shared_from_this<rpc_server> {
     friend class connection;
@@ -66,6 +44,8 @@ public:
     void start() {
         bool expected_value = false;
         if (!has_started_.compare_exchange_strong(expected_value, true)) return;
+        FINFO("start http server on {}:{}", acceptor_.local_endpoint().address().to_string(),
+              acceptor_.local_endpoint().port());
         do_accept();
     }
 
@@ -106,15 +86,20 @@ public:
         });
     }
     // this function will throw when param is invalid
-    void enable_ssl(rpc_server_ssl_config ssl_config) {
-#ifndef RPC_DISABLE_SSL
+    void enable_ssl(network_server_ssl_config ssl_config) {
+#ifndef NETWORK_DISABLE_SSL
         if (ssl_config.certificate_path.empty() || ssl_config.private_key_path.empty() ||
             !std::filesystem::is_regular_file(ssl_config.certificate_path) ||
             !std::filesystem::is_regular_file(ssl_config.private_key_path)) {
             throw std::invalid_argument("rpc_server/ssl need valid certificate and key file");
         }
+
         if (!ssl_config.tmp_dh_path.empty() && !std::filesystem::is_regular_file(ssl_config.tmp_dh_path)) {
             throw std::invalid_argument("tmp_dh_path is not existed");
+        }
+        if (!ssl_config.ca_certificate_path.empty() &&
+            !std::filesystem::is_regular_file(ssl_config.ca_certificate_path)) {
+            throw std::invalid_argument("ca_certificate is not existed");
         }
         std::swap(ssl_config_, ssl_config);
         if (!ssl_config_.passwd_cb) ssl_config_.passwd_cb = [](std::string) -> std::string { return "123456"; };
@@ -128,7 +113,12 @@ public:
                 [cb = ssl_config_.passwd_cb](std::size_t size, asio::ssl::context_base::password_purpose purpose) {
                     return cb(std::to_string(size) + " " + std::to_string(static_cast<std::size_t>(purpose)));
                 });
-
+            if (!ssl_config.ca_certificate_path.empty()) {
+                ssl_context->load_verify_file(ssl_config.ca_certificate_path);
+                ssl_context->set_verify_mode(::asio::ssl::verify_peer | ::asio::ssl::verify_fail_if_no_peer_cert);
+            } else {
+                ssl_context->set_verify_mode(::asio::ssl::verify_peer);
+            }
             ssl_context->use_certificate_chain_file(ssl_config_.certificate_path);
             ssl_context->use_private_key_file(ssl_config_.private_key_path, asio::ssl::context::pem);
             if (!ssl_config_.tmp_dh_path.empty()) ssl_context->use_tmp_dh_file(ssl_config_.tmp_dh_path);
@@ -199,7 +189,7 @@ private:
                                 }
                             }
                         });
-#ifndef RPC_DISABLE_SSL
+#ifndef NETWORK_DISABLE_SSL
                     if (ssl_context) {
                         new_conn->enable_ssl(*ssl_context);
                     }
@@ -248,9 +238,9 @@ private:
     std::mutex sub_mtx_;
 
     router router_;
-#ifndef RPC_DISABLE_SSL
+#ifndef NETWORK_DISABLE_SSL
     std::unique_ptr<asio::ssl::context> ssl_context = nullptr;
-    rpc_server_ssl_config ssl_config_;
+    network_server_ssl_config ssl_config_;
 #endif
     // proxy
     network::proxy::ProxyManager* proxy_manager = nullptr;

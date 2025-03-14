@@ -1,7 +1,11 @@
 #pragma once
+
 #include "io_context_pool.hpp"
+#include "use_asio.hpp"
+#include <functional>
 namespace network
 {
+static constexpr std::size_t kSslPreReadSize = 3;
 struct network_data_reference {
     Fundamental::Signal<void()> notify_release;
     bool is_valid() const {
@@ -22,6 +26,20 @@ struct network_data_reference {
     std::atomic_bool __has_released = false;
 };
 
+struct network_server_ssl_config {
+    std::function<std::string(std::string)> passwd_cb;
+    std::string certificate_path;
+    std::string private_key_path;
+    std::string tmp_dh_path;
+    std::string ca_certificate_path;
+};
+
+struct network_client_ssl_config {
+    std::string certificate_path;
+    std::string private_key_path;
+    std::string ca_certificate_path;
+};
+
 template <typename T>
 struct auto_network_storage_instance : Fundamental::NonCopyable {
     using HandleType = typename decltype(Fundamental::Application::Instance().exitStarted)::HandleType;
@@ -30,7 +48,7 @@ struct auto_network_storage_instance : Fundamental::NonCopyable {
     }
     ~auto_network_storage_instance() {
         release();
-        
+
         Fundamental::Application::Instance().exitStarted.DisConnect(handle_);
     }
     auto_network_storage_instance(auto_network_storage_instance&& other) noexcept :
@@ -49,10 +67,10 @@ struct auto_network_storage_instance : Fundamental::NonCopyable {
     decltype(auto) operator->() {
         return ref_ptr.get();
     }
-    void release()
-    {
+    void release() {
         ref_ptr->release_obj();
     }
+
 private:
     HandleType handle_;
     std::shared_ptr<T> ref_ptr;

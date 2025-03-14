@@ -6,7 +6,7 @@ file(GLOB lib_source
     *.cpp
     *.hpp
 )
-
+option(NETWORK_DISABLE_SSL "disable network ssl support." OFF)
 list(APPEND lib_source ${services_source})
 
 # Add to source group, TREE will enable cmake to config the folder layout automatically
@@ -22,6 +22,19 @@ target_include_directories(${lib_name} PUBLIC
 set_target_properties(${lib_name} PROPERTIES
     FOLDER ${src_root_dir}
 )
+if(NETWORK_DISABLE_SSL)
+    target_compile_definitions(${lib_name}
+        PUBLIC
+        NETWORK_DISABLE_SSL=1
+    )
+else()
+    find_package(OpenSSL REQUIRED)
+    target_link_libraries(${lib_name}
+        PUBLIC
+        OpenSSL::SSL
+        OpenSSL::Crypto
+    )
+endif()
 
 # Config link dependencies
 target_link_libraries(${lib_name} PUBLIC

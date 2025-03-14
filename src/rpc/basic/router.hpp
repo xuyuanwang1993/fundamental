@@ -4,7 +4,6 @@
 #include "codec.h"
 #include "md5.hpp"
 #include "meta_util.hpp"
-#include "use_asio.hpp"
 #include "const_vars.h"
 
 #include <functional>

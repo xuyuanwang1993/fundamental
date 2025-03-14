@@ -3,7 +3,7 @@
 
 #include "basic/const_vars.h"
 #include "basic/router.hpp"
-#include "basic/use_asio.hpp"
+
 #include "proxy/proxy_codec.hpp"
 #include "proxy/proxy_handler.hpp"
 #include "proxy/proxy_manager.hpp"
@@ -16,6 +16,7 @@
 #include <memory>
 #include <unordered_set>
 
+
 #include "fundamental/basic/log.h"
 #include "fundamental/events/event_system.h"
 
@@ -25,12 +26,6 @@ namespace network
 {
 namespace rpc_service
 {
-struct rpc_server_ssl_config {
-    std::function<std::string(std::string)> passwd_cb;
-    std::string certificate_path;
-    std::string private_key_path;
-    std::string tmp_dh_path;
-};
 
 class rpc_server;
 // call these interface not in io thread
@@ -193,7 +188,7 @@ public:
         delay_ = delay;
     }
 
-#ifndef RPC_DISABLE_SSL
+#ifndef NETWORK_DISABLE_SSL
     void enable_ssl(asio::ssl::context& ssl_context) {
         ssl_context_ref = &ssl_context;
     }
@@ -224,7 +219,7 @@ private:
 
     void do_ssl_handshake(const char* preread_data, std::size_t read_len) {
         // handle ssl
-#ifndef RPC_DISABLE_SSL
+#ifndef NETWORK_DISABLE_SSL
         auto self   = this->shared_from_this();
         ssl_stream_ = std::make_unique<asio::ssl::stream<asio::ip::tcp::socket&>>(socket_, *ssl_context_ref);
 
@@ -282,7 +277,7 @@ private:
     }
 
     bool is_ssl() const {
-#ifndef RPC_DISABLE_SSL
+#ifndef NETWORK_DISABLE_SSL
         return ssl_context_ref != nullptr;
 #else
         return false;
@@ -534,7 +529,7 @@ private:
     template <typename Handler>
     void async_buffer_read(std::vector<asio::mutable_buffer> buffers, Handler handler) {
         if (is_ssl()) {
-#ifndef RPC_DISABLE_SSL
+#ifndef NETWORK_DISABLE_SSL
             asio::async_read(*ssl_stream_, std::move(buffers), std::move(handler));
 #endif
         } else {
@@ -545,7 +540,7 @@ private:
     template <typename Handler>
     void async_buffer_read_some(std::vector<asio::mutable_buffer> buffers, Handler handler) {
         if (is_ssl()) {
-#ifndef RPC_DISABLE_SSL
+#ifndef NETWORK_DISABLE_SSL
             ssl_stream_->async_read_some(std::move(buffers), std::move(handler));
 #endif
         } else {
@@ -556,7 +551,7 @@ private:
     template <typename BufferType, typename Handler>
     void async_write_buffers(BufferType buffers, Handler handler) {
         if (is_ssl()) {
-#ifndef RPC_DISABLE_SSL
+#ifndef NETWORK_DISABLE_SSL
             asio::async_write(*ssl_stream_, std::move(buffers), std::move(handler));
 #endif
         } else {
@@ -566,7 +561,7 @@ private:
     template <typename BufferType, typename Handler>
     void async_write_buffers_some(BufferType&& buffers, Handler handler) {
         if (is_ssl()) {
-#ifndef RPC_DISABLE_SSL
+#ifndef NETWORK_DISABLE_SSL
             ssl_stream_->async_write_some(std::move(buffers), std::move(handler));
 #endif
         } else {
@@ -614,7 +609,7 @@ private:
             on_subscribers_removed(tmp, weak_from_this());
         }
 
-#ifndef RPC_DISABLE_SSL
+#ifndef NETWORK_DISABLE_SSL
         if (ssl_stream_) {
             asio::error_code ec;
             ssl_stream_->shutdown(ec);
@@ -651,7 +646,7 @@ private:
 
     router& router_;
     bool delay_ = false;
-#ifndef RPC_DISABLE_SSL
+#ifndef NETWORK_DISABLE_SSL
     std::unique_ptr<asio::ssl::stream<asio::ip::tcp::socket&>> ssl_stream_ = nullptr;
     asio::ssl::context* ssl_context_ref                                    = nullptr;
 #endif

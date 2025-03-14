@@ -1,23 +1,26 @@
 #pragma once
 
-
 #include <asio.hpp>
+#include <cstdint>
 #include <list>
 #include <memory>
-#include <vector>
 #include <stdexcept>
+#include <vector>
 
+#include "fundamental/application/application.hpp"
 #include "fundamental/basic/utils.hpp"
 #include "fundamental/events/event_system.h"
-#include "fundamental/application/application.hpp"
-namespace network {
+namespace network
+{
 /// A pool of io_context objects.
 class io_context_pool : public Fundamental::Singleton<io_context_pool> {
 private:
     std::shared_ptr<Fundamental::Signal<void(std::error_code /*ec*/, int /*signo*/)>> notify_sys_signal_storage;
+
 public:
     inline static std::size_t s_excutorNums = 0;
     Fundamental::Signal<void(std::error_code /*ec*/, int /*signo*/)>& notify_sys_signal;
+
 public:
     /// Construct the io_context pool.
     io_context_pool();
@@ -36,7 +39,6 @@ private:
     io_context_pool& operator=(const io_context_pool&) = delete;
     typedef std::shared_ptr<asio::io_context> io_context_ptr;
     typedef asio::executor_work_guard<asio::io_context::executor_type> io_context_work;
-    
 
     /// The pool of io_contexts.
     std::vector<io_context_ptr> io_contexts_;
@@ -52,13 +54,9 @@ private:
 inline void init_io_context_pool(std::size_t work_threads = std::thread::hardware_concurrency()) {
     network::io_context_pool::s_excutorNums = work_threads;
     network::io_context_pool::Instance().start();
-    Fundamental::Application::Instance().exitStarted.Connect([&]() {
-        network::io_context_pool::Instance().stop();
-    });
+    Fundamental::Application::Instance().exitStarted.Connect([&]() { network::io_context_pool::Instance().stop(); });
     network::io_context_pool::Instance().notify_sys_signal.Connect(
         [](std::error_code code, std::int32_t signo) { Fundamental::Application::Instance().Exit(); });
 }
-
-
 
 } // namespace network

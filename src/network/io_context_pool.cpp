@@ -42,6 +42,7 @@ void io_context_pool::start() {
                 io_contexts_[i]->run();
             } catch (const std::exception& e) {
                 FERR("asio context err:{}", e.what());
+                FASSERT(false, "asio context error please check your code logic,maybe some memory access error exist");
             }
         });
     }

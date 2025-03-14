@@ -4,7 +4,6 @@
 #include "basic/meta_util.hpp"
 #include "basic/rpc_client_proxy.hpp"
 #include "network/network.hpp"
-#include "basic/use_asio.hpp"
 
 #include <deque>
 #include <functional>
@@ -437,11 +436,11 @@ public:
         return post_future_call(request_type::rpc_publish, key, std::string(ret.data(), ret.data() + ret.size()));
     }
 
-    void enable_ssl(const std::string& ser_pem_path,
+    void enable_ssl(network_client_ssl_config client_ssl_config,
                     rpc_client_ssl_level enable_ssl_level = rpc_client_ssl_level::rpc_client_ssl_level_required) {
-#ifndef RPC_DISABLE_SSL
-        pem_path  = ser_pem_path;
-        ssl_level = enable_ssl_level;
+#ifndef NETWORK_DISABLE_SSL
+        ssl_config = client_ssl_config;
+        ssl_level  = enable_ssl_level;
 #endif
     }
 
@@ -486,7 +485,7 @@ private:
         if (!has_connected_ && !forced_close) return;
         has_connected_ = false;
         asio::error_code ec;
-#ifndef RPC_DISABLE_SSL
+#ifndef NETWORK_DISABLE_SSL
         if (ssl_stream_) {
             ssl_stream_->shutdown(ec);
             ssl_stream_->lowest_layer().cancel(ec);
@@ -538,7 +537,7 @@ private:
     }
 
     bool is_ssl() const {
-#ifndef RPC_DISABLE_SSL
+#ifndef NETWORK_DISABLE_SSL
         return ssl_level != rpc_client_ssl_level_none;
 #else
         return false;
@@ -933,7 +932,7 @@ private:
 
     void reset_socket() {
         asio::error_code igored_ec;
-#ifndef RPC_DISABLE_SSL
+#ifndef NETWORK_DISABLE_SSL
         if (ssl_stream_) {
             ssl_stream_->shutdown(igored_ec);
             ssl_stream_ = nullptr;
@@ -968,30 +967,41 @@ private:
         char subject_name[256];
         X509* cert = X509_STORE_CTX_get_current_cert(ctx.native_handle());
         X509_NAME_oneline(X509_get_subject_name(cert), subject_name, 256);
-#ifndef RPC_DISABLE_SSL
+#ifndef NETWORK_DISABLE_SSL
         FDEBUG("rpc client {:p} ssl Verifying:{}", (void*)this, subject_name);
 #endif
         return preverified;
     }
     void ssl_handshake() {
-#ifndef RPC_DISABLE_SSL
+#ifndef NETWORK_DISABLE_SSL
         asio::ssl::context ssl_context(asio::ssl::context::sslv23);
         ssl_context.set_default_verify_paths();
-        asio::error_code ec;
-        ssl_context.set_options(asio::ssl::context::default_workarounds, ec);
-        ssl_context.load_verify_file(pem_path, ec);
-        if (ec) {
+
+        try {
+            ssl_context.set_options(asio::ssl::context::default_workarounds);
+            if (!ssl_config.ca_certificate_path.empty()) {
+                ssl_context.load_verify_file(ssl_config.ca_certificate_path);
+            }
+            if (!ssl_config.private_key_path.empty()) {
+                ssl_context.use_private_key_file(ssl_config.private_key_path, asio::ssl::context::pem);
+            }
+            if (!ssl_config.certificate_path.empty()) {
+                ssl_context.use_certificate_chain_file(ssl_config.certificate_path);
+            }
+            ssl_level = rpc_client_ssl_level_required;
+        } catch (const std::exception& e) {
+            FERR("load ssl config failed {} :{} {} {}", e.what(), ssl_config.ca_certificate_path,
+                 ssl_config.certificate_path, ssl_config.private_key_path);
             if (ssl_level == rpc_client_ssl_level_required) {
                 close();
-                error_callback(ec);
+                error_callback(asio::error::make_error_code(asio::error::invalid_argument));
                 return;
             }
-        } else {
-            ssl_level = rpc_client_ssl_level_required;
         }
 
         ssl_stream_ = std::make_unique<asio::ssl::stream<asio::ip::tcp::socket&>>(socket_, ssl_context);
         if (ssl_level == rpc_client_ssl_level_required) {
+            // 单向验证   verify_fail_if_no_peer_cert->验证客户端证书
             ssl_stream_->set_verify_mode(asio::ssl::verify_peer);
             ssl_stream_->set_verify_callback(
                 std::bind(&rpc_client::verify_certificate, this, std::placeholders::_1, std::placeholders::_2));
@@ -1017,7 +1027,7 @@ private:
     template <typename Handler>
     void async_buffer_read(std::vector<asio::mutable_buffer> buffers, Handler handler) {
         if (is_ssl()) {
-#ifndef RPC_DISABLE_SSL
+#ifndef NETWORK_DISABLE_SSL
             asio::async_read(*ssl_stream_, std::move(buffers), std::move(handler));
 #endif
         } else {
@@ -1027,7 +1037,7 @@ private:
     template <typename Handler>
     void async_buffer_read_some(std::vector<asio::mutable_buffer> buffers, Handler handler) {
         if (is_ssl()) {
-#ifndef RPC_DISABLE_SSL
+#ifndef NETWORK_DISABLE_SSL
             ssl_stream_->async_read_some(std::move(buffers), std::move(handler));
 #endif
         } else {
@@ -1038,7 +1048,7 @@ private:
     template <typename BufferType, typename Handler>
     void async_write_buffers(BufferType&& buffers, Handler handler) {
         if (is_ssl()) {
-#ifndef RPC_DISABLE_SSL
+#ifndef NETWORK_DISABLE_SSL
             asio::async_write(*ssl_stream_, std::move(buffers), std::move(handler));
 #endif
         } else {
@@ -1048,7 +1058,7 @@ private:
     template <typename BufferType, typename Handler>
     void async_write_buffers_some(BufferType&& buffers, Handler handler) {
         if (is_ssl()) {
-#ifndef RPC_DISABLE_SSL
+#ifndef NETWORK_DISABLE_SSL
             ssl_stream_->async_write_some(std::move(buffers), std::move(handler));
 #endif
         } else {
@@ -1102,9 +1112,9 @@ private:
     //
     std::shared_ptr<RpcClientProxyInterface> proxy_interface;
     rpc_client_ssl_level ssl_level = rpc_client_ssl_level::rpc_client_ssl_level_none;
-#ifndef RPC_DISABLE_SSL
+#ifndef NETWORK_DISABLE_SSL
     std::unique_ptr<asio::ssl::stream<asio::ip::tcp::socket&>> ssl_stream_ = nullptr;
-    std::string pem_path;
+    network_client_ssl_config ssl_config;
 #endif
     // rpc handler
     std::atomic_bool has_upgrade = false;

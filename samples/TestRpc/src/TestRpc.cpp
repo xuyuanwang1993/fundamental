@@ -824,7 +824,7 @@ TEST(rpc_test, test_control_stream) {
     }
 }
     #endif
-    #if !defined(RPC_DISABLE_SSL) && 1
+    #if !defined(NETWORK_DISABLE_SSL) && 1
 TEST(rpc_test, test_ssl) {
     Fundamental::Timer check_timer;
     Fundamental::ScopeGuard check_guard(
@@ -832,7 +832,7 @@ TEST(rpc_test, test_ssl) {
 
     try {
         auto client = network::make_guard<rpc_client>("127.0.0.1", "9000");
-        client->enable_ssl("server.crt");
+        client->enable_ssl(network_client_ssl_config{"client.crt","client.key","ca_root.crt"});
         bool r = client->connect();
         if (!r) {
             EXPECT_TRUE(false && "connect timeout");
@@ -871,7 +871,7 @@ TEST(rpc_test, test_ssl_proxy) {
         [&]() { EXPECT_LE(check_timer.GetDuration<Fundamental::Timer::TimeScale::Millisecond>(), 100); });
     {
         auto client = network::make_guard<rpc_client>("127.0.0.1", "9000");
-        client->enable_ssl("server.crt");
+        client->enable_ssl(network_client_ssl_config{"client.crt","client.key","ca_root.crt"});
         client->set_proxy(network::rpc_service::CustomRpcProxy::make_shared(kProxyServiceName, kProxyServiceField,
                                                                             kProxyServiceToken));
         bool r = client->connect();
@@ -894,7 +894,7 @@ TEST(rpc_test, test_ssl_proxy) {
     }
     {
         auto client = network::make_guard<rpc_client>("127.0.0.1", "9000");
-        client->enable_ssl("", network::rpc_service::rpc_client_ssl_level_optional);
+        client->enable_ssl(network_client_ssl_config{"client.crt","client.key","ca_root.crt"}, network::rpc_service::rpc_client_ssl_level_optional);
         client->set_proxy(network::rpc_service::CustomRpcProxy::make_shared(kProxyServiceName, kProxyServiceField,
                                                                             kProxyServiceToken));
         bool r = client->connect();
@@ -918,7 +918,7 @@ TEST(rpc_test, test_ssl_proxy) {
 }
 TEST(rpc_test, test_ssl_proxy_echo_stream) {
     auto client = network::make_guard<rpc_client>();
-    client->enable_ssl("server.crt");
+    client->enable_ssl(network_client_ssl_config{"client.crt","client.key","ca_root.crt"});
     client->set_proxy(
         network::rpc_service::CustomRpcProxy::make_shared(kProxyServiceName, kProxyServiceField, kProxyServiceToken));
     [[maybe_unused]] bool r = client->connect("127.0.0.1", "9000");
@@ -941,7 +941,7 @@ TEST(rpc_test, test_ssl_concept) {
     // sudo tcpdump -i any -n -vv -X port 9000
     {
         auto client = network::make_guard<rpc_client>();
-        client->enable_ssl("server.crt", network::rpc_service::rpc_client_ssl_level_optional);
+        client->enable_ssl(network_client_ssl_config{"client.crt","client.key","ca_root.crt"}, network::rpc_service::rpc_client_ssl_level_optional);
         [[maybe_unused]] bool r = client->connect("127.0.0.1", "9000");
         EXPECT_TRUE(r && client->has_connected());
         auto stream = client->upgrade_to_stream("test_echo_stream");
@@ -953,7 +953,7 @@ TEST(rpc_test, test_ssl_concept) {
     }
     {
         auto client = network::make_guard<rpc_client>();
-        client->enable_ssl("server.crt_none", network::rpc_service::rpc_client_ssl_level_optional);
+        client->enable_ssl(network_client_ssl_config{"client_none.crt","client.key","ca_root.crt"}, network::rpc_service::rpc_client_ssl_level_optional);
         [[maybe_unused]] bool r = client->connect("127.0.0.1", "9000");
         EXPECT_TRUE(r && client->has_connected());
         auto stream = client->upgrade_to_stream("test_echo_stream");
@@ -981,7 +981,7 @@ TEST(rpc_test, test_ssl_proxy_echo_stream_mutithread) {
     auto nums      = s_test_pool.Count();
     auto task_func = []() {
         auto client = network::make_guard<rpc_client>();
-        client->enable_ssl("server.crt");
+        client->enable_ssl(network_client_ssl_config{"client.crt","client.key","ca_root.crt"});
         client->set_proxy(network::rpc_service::CustomRpcProxy::make_shared(kProxyServiceName, kProxyServiceField,
                                                                             kProxyServiceToken));
         [[maybe_unused]] bool r = client->connect("127.0.0.1", "9000");
