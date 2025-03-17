@@ -244,6 +244,16 @@ void http_response::set_body_size(std::size_t max_content_length) {
     max_body_size    = max_content_length;
     response_pack_status |= http_response_status_mask::http_response_body_size_set;
     response_pack_status |= http_response_status_mask::http_response_all_headeres_set;
+
+    asio::post(http_con_ref.socket_.get_executor(),
+               [this, max_content_length = max_content_length, ref = http_con_ref.shared_from_this()]() mutable {
+                   if (!ref->reference_.is_valid()) return;
+                   if (!can_set_body()) return;
+                   headers[0].value = std::to_string(max_content_length);
+                   max_body_size    = max_content_length;
+                   response_pack_status |= http_response_status_mask::http_response_body_size_set;
+                   response_pack_status |= http_response_status_mask::http_response_all_headeres_set;
+               });
 }
 
 void http_response::append_body(const void* data, std::size_t size) {
@@ -256,9 +266,9 @@ void http_response::append_body(const void* data, std::size_t size) {
     }
     asio::post(http_con_ref.socket_.get_executor(),
                [this, new_item = std::move(new_item), size = size, ref = http_con_ref.shared_from_this()]() mutable {
+                   if (!ref->reference_.is_valid()) return;
                    if (!can_set_body()) return;
                    Fundamental::ScopeGuard guard([this]() { perform_response(); });
-                   if (!ref->reference_.is_valid()) return;
                    if (size > 0) {
                        data_storage_.emplace_back() = std::move(new_item);
                        current_body_size += size;
@@ -282,9 +292,9 @@ void http_response::append_body(const void* ref_data, std::size_t size, std::fun
     }
     asio::post(http_con_ref.socket_.get_executor(),
                [this, new_item = std::move(new_item), size = size, ref = http_con_ref.shared_from_this()]() mutable {
+                   if (!ref->reference_.is_valid()) return;
                    if (!can_set_body()) return;
                    Fundamental::ScopeGuard guard([this]() { perform_response(); });
-                   if (!ref->reference_.is_valid()) return;
                    if (size > 0) {
                        data_storage_.emplace_back() = std::move(new_item);
                        current_body_size += size;
@@ -301,15 +311,15 @@ void http_response::append_body(std::string&& body) {
     if (!can_set_body()) return;
     data_item new_item;
     if (body.size() > 0) {
-        auto& new_item = data_storage_.emplace_back();
-        new_item.type  = data_type::str_data;
-        new_item.str   = std::move(body);
+        new_item.type = data_type::str_data;
+        new_item.str  = std::move(body);
     }
     asio::post(http_con_ref.socket_.get_executor(), [this, new_item = std::move(new_item), size = new_item.str.size(),
                                                      ref = http_con_ref.shared_from_this()]() mutable {
+        if (!ref->reference_.is_valid()) return;
         if (!can_set_body()) return;
         Fundamental::ScopeGuard guard([this]() { perform_response(); });
-        if (!ref->reference_.is_valid()) return;
+
         if (size > 0) {
             data_storage_.emplace_back() = std::move(new_item);
             current_body_size += size;
@@ -326,15 +336,14 @@ void http_response::append_body(std::vector<std::uint8_t>&& body) {
     if (!can_set_body()) return;
     data_item new_item;
     if (body.size() > 0) {
-        auto& new_item = data_storage_.emplace_back();
-        new_item.type  = data_type::vec_data;
-        new_item.vec   = std::move(body);
+        new_item.type = data_type::vec_data;
+        new_item.vec  = std::move(body);
     }
     asio::post(http_con_ref.socket_.get_executor(), [this, new_item = std::move(new_item), size = new_item.vec.size(),
                                                      ref = http_con_ref.shared_from_this()]() mutable {
+        if (!ref->reference_.is_valid()) return;
         if (!can_set_body()) return;
         Fundamental::ScopeGuard guard([this]() { perform_response(); });
-        if (!ref->reference_.is_valid()) return;
         if (size > 0) {
             data_storage_.emplace_back() = std::move(new_item);
             current_body_size += size;

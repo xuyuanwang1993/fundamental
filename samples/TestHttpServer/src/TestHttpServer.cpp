@@ -16,7 +16,7 @@ int main(int argc, char* argv[]) {
     options.logFormat            = "%^[%L]%H:%M:%S.%e%$[%t] %v ";
     options.logOutputProgramName = "test";
     options.logOutputPath        = "output";
-    // Fundamental::Logger::Initialize(std::move(options));
+    Fundamental::Logger::Initialize(std::move(options));
     // ::testing::InitGoogleTest(&argc, argv);
     run_server();
     // auto ret = RUN_ALL_TESTS();

@@ -1048,7 +1048,7 @@ TEST(rpc_test, test_ssl_proxy_echo_stream_mutithread) {
 int main(int argc, char** argv) {
     int mode = 0;
     if (argc > 1) mode = std::stoi(argv[1]);
-    // Fundamental::fs::SwitchToProgramDir(argv[0]);
+    Fundamental::fs::SwitchToProgramDir(argv[0]);
     Fundamental::Logger::LoggerInitOptions options;
     options.minimumLevel         = Fundamental::LogLevel::debug;
     options.logFormat            = "%^[%L]%H:%M:%S.%e%$[%t] %v ";

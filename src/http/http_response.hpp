@@ -79,7 +79,7 @@ public:
     /// [thread-unsafe] Add header info.
     void add_header(const std::string& name, const std::string& value);
 
-    /// [thread-unsafe] set body size first
+    /// [thread-safe] set body size first
     void set_body_size(std::size_t max_content_length);
 
     /// [thread-safe]

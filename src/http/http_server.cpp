@@ -7,9 +7,18 @@
 #include "fundamental/basic/filesystem_utils.hpp"
 #include "fundamental/basic/url_utils.hpp"
 #include "fundamental/thread_pool/thread_pool.h"
-#include "istream"
+#include "fundamental/tracker/time_tracker.hpp"
+
+#include <istream>
+
 namespace network::http
 {
+static std::string s_tag = "http_file_handler";
+using TrackerType        = Fundamental::STimeTracker<std::chrono::milliseconds>;
+static void TrackerOutPut(const std::string_view& msg) {
+    FDEBUG("{}", msg);
+}
+
 const http_handler http_server::s_default_file_handler =
     [](std::shared_ptr<http_connection> conn, http_response& response, http_request& request) {
         do {
@@ -51,6 +60,7 @@ const http_handler http_server::s_default_file_handler =
             // Open the file to send back.
             std::string full_path = root_path + requestPath;
             if (!std::filesystem::is_regular_file(full_path)) {
+                FDEBUG("{} is not existed", full_path);
                 response.stock_response(http_response::response_type::not_found);
                 break;
             }
@@ -66,13 +76,17 @@ const http_handler http_server::s_default_file_handler =
                     response.stock_response(http_response::not_found);
                     return;
                 }
+
                 auto size = std::filesystem::file_size(full_path);
+                DeclareTimeTacker(TrackerType, send_t, s_tag,
+                                  Fundamental::StringFormat("http send file:{} size:{}", full_path, size), 1000, true,
+                                  TrackerOutPut);
                 // notify headeres already
                 response.set_body_size(size);
-                std::array<std::uint8_t, 8192> read_buf;
+                std::array<std::uint8_t, 4096> read_buf;
                 std::condition_variable cv;
                 std::mutex notify_mutex;
-                std::size_t max_pending_size = 4 * 1024 * 1024; // 4M
+                std::size_t max_pending_size = 8 * 1024 * 1024; // 8M
                 std::size_t max_wait_ms      = 5000;
                 auto h                       = response.notify_pending_size.Connect([&](std::size_t pending_size) {
                     if (pending_size >= max_pending_size) return;
