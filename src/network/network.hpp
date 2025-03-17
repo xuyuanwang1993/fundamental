@@ -32,12 +32,16 @@ struct network_server_ssl_config {
     std::string private_key_path;
     std::string tmp_dh_path;
     std::string ca_certificate_path;
+    bool verify_client = true;
+    bool disable_ssl = false;
 };
 
 struct network_client_ssl_config {
     std::string certificate_path;
     std::string private_key_path;
     std::string ca_certificate_path;
+    bool verify_org  = true;
+    bool disable_ssl = false;
 };
 
 template <typename T>

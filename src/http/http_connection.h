@@ -94,7 +94,7 @@ private:
                                              return;
                                          }
                                          if (error) {
-                                             FDEBUG("perform ssl handshake failed {}", error.message());
+                                             FDEBUG("client perform ssl handshake failed {}", error.message());
                                              release_obj();
                                              return;
                                          }

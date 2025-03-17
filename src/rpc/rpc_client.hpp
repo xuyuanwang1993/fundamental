@@ -439,8 +439,9 @@ public:
     void enable_ssl(network_client_ssl_config client_ssl_config,
                     rpc_client_ssl_level enable_ssl_level = rpc_client_ssl_level::rpc_client_ssl_level_required) {
 #ifndef NETWORK_DISABLE_SSL
-        ssl_config = client_ssl_config;
-        ssl_level  = enable_ssl_level;
+        ssl_config_ = client_ssl_config;
+        ssl_level   = enable_ssl_level;
+        if (ssl_config_.verify_org) prepare_ssl_config();
 #endif
     }
 
@@ -538,7 +539,7 @@ private:
 
     bool is_ssl() const {
 #ifndef NETWORK_DISABLE_SSL
-        return ssl_level != rpc_client_ssl_level_none;
+        return !ssl_config_.disable_ssl && ssl_level != rpc_client_ssl_level_none;
 #else
         return false;
 #endif
@@ -962,36 +963,75 @@ private:
         // documentation for more details. Note that the callback is called once
         // for each certificate in the certificate chain, starting from the root
         // certificate authority.
-
-        // In this example we will simply print the certificate's subject name.
-        char subject_name[256];
-        X509* cert = X509_STORE_CTX_get_current_cert(ctx.native_handle());
-        X509_NAME_oneline(X509_get_subject_name(cert), subject_name, 256);
-#ifndef NETWORK_DISABLE_SSL
-        FDEBUG("rpc client {:p} ssl Verifying:{}", (void*)this, subject_name);
-#endif
+        do {
+            if (trusted_orgs.empty()) break;
+            // In this example we will simply print the certificate's subject name.
+            X509* cert = X509_STORE_CTX_get_current_cert(ctx.native_handle());
+            if (!cert) break;
+            auto org_name = read_org_name(cert);
+            if (!org_name.empty()) {
+                FDEBUG("rpc client {:p} ssl Verifying org:{}", (void*)this, org_name);
+                return trusted_orgs.find(org_name) != trusted_orgs.end();
+            }
+        } while (0);
         return preverified;
+    }
+#ifndef NETWORK_DISABLE_SSL
+    std::string read_org_name(X509* cert) {
+        do {
+            if (!cert) break;
+            X509_NAME* subject_name = X509_get_subject_name(cert);
+            if (!subject_name) {
+                break;
+            }
+            char org_name[256];
+            auto len = X509_NAME_get_text_by_NID(subject_name, NID_organizationName, org_name, sizeof(org_name));
+            if (len > 0) {
+                return org_name;
+            }
+        } while (0);
+        return "";
+    }
+#endif
+    void prepare_ssl_config() {
+#ifndef NETWORK_DISABLE_SSL
+        trusted_orgs.clear();
+        auto load_func = [this](const std::string& path) {
+            if (path.empty()) return;
+            FILE* fp = fopen(path.c_str(), "r");
+            if (!fp) {
+                return;
+            }
+            X509* cert = PEM_read_X509(fp, NULL, NULL, NULL);
+            fclose(fp);
+            if (!cert) return;
+            Fundamental::ScopeGuard g([&]() { X509_free(cert); });
+            auto org_name = read_org_name(cert);
+            if (!org_name.empty()) trusted_orgs.emplace(org_name);
+        };
+        load_func(ssl_config_.certificate_path);
+        load_func(ssl_config_.ca_certificate_path);
+#endif
     }
     void ssl_handshake() {
 #ifndef NETWORK_DISABLE_SSL
-        asio::ssl::context ssl_context(asio::ssl::context::sslv23);
-        ssl_context.set_default_verify_paths();
-
+        asio::ssl::context ssl_context(asio::ssl::context::tlsv13);
         try {
-            ssl_context.set_options(asio::ssl::context::default_workarounds);
-            if (!ssl_config.ca_certificate_path.empty()) {
-                ssl_context.load_verify_file(ssl_config.ca_certificate_path);
+            if (!ssl_config_.ca_certificate_path.empty()) {
+                ssl_context.load_verify_file(ssl_config_.ca_certificate_path);
             }
-            if (!ssl_config.private_key_path.empty()) {
-                ssl_context.use_private_key_file(ssl_config.private_key_path, asio::ssl::context::pem);
+            if (!ssl_config_.private_key_path.empty()) {
+                ssl_context.use_private_key_file(ssl_config_.private_key_path, asio::ssl::context::pem);
             }
-            if (!ssl_config.certificate_path.empty()) {
-                ssl_context.use_certificate_chain_file(ssl_config.certificate_path);
+            if (!ssl_config_.certificate_path.empty()) {
+                ssl_context.use_certificate_chain_file(ssl_config_.certificate_path);
             }
             ssl_level = rpc_client_ssl_level_required;
+            FDEBUG("load client ssl config success  ca:{} crt:{} key:{}", ssl_config_.ca_certificate_path,
+                   ssl_config_.certificate_path, ssl_config_.private_key_path);
         } catch (const std::exception& e) {
-            FERR("load ssl config failed {} :{} {} {}", e.what(), ssl_config.ca_certificate_path,
-                 ssl_config.certificate_path, ssl_config.private_key_path);
+            FERR("load ssl config failed {} :{} {} {}", e.what(), ssl_config_.ca_certificate_path,
+                 ssl_config_.certificate_path, ssl_config_.private_key_path);
             if (ssl_level == rpc_client_ssl_level_required) {
                 close();
                 error_callback(asio::error::make_error_code(asio::error::invalid_argument));
@@ -1001,13 +1041,13 @@ private:
 
         ssl_stream_ = std::make_unique<asio::ssl::stream<asio::ip::tcp::socket&>>(socket_, ssl_context);
         if (ssl_level == rpc_client_ssl_level_required) {
-            // 单向验证   verify_fail_if_no_peer_cert->验证客户端证书
             ssl_stream_->set_verify_mode(asio::ssl::verify_peer);
             ssl_stream_->set_verify_callback(
                 std::bind(&rpc_client::verify_certificate, this, std::placeholders::_1, std::placeholders::_2));
         } else {
             ssl_stream_->set_verify_mode(asio::ssl::verify_none);
         }
+        SSL_set_tlsext_host_name(ssl_stream_->native_handle(), host_.c_str());
         ssl_stream_->async_handshake(
             asio::ssl::stream_base::client, [this, ptr = shared_from_this()](const asio::error_code& ec) {
                 if (!reference_.is_valid()) {
@@ -1114,7 +1154,8 @@ private:
     rpc_client_ssl_level ssl_level = rpc_client_ssl_level::rpc_client_ssl_level_none;
 #ifndef NETWORK_DISABLE_SSL
     std::unique_ptr<asio::ssl::stream<asio::ip::tcp::socket&>> ssl_stream_ = nullptr;
-    network_client_ssl_config ssl_config;
+    network_client_ssl_config ssl_config_;
+    std::unordered_set<std::string> trusted_orgs;
 #endif
     // rpc handler
     std::atomic_bool has_upgrade = false;

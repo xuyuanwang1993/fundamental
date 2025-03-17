@@ -1,7 +1,7 @@
 [ req ]
 default_bits       = 2048
 distinguished_name = req_distinguished_name
-x509_extensions    = v3_ca
+req_extensions = v3_req
 prompt             = no
 
 [ req_distinguished_name ]
@@ -12,8 +12,10 @@ O  = FongWell_CA
 OU = RDD
 CN = FongWell_CA
 
-[ v3_ca ]
-keyUsage = critical, digitalSignature, keyEncipherment
-basicConstraints = CA:TRUE
+[ v3_req ]
+basicConstraints = critical, CA:TRUE, pathlen:0
+keyUsage = critical,keyCertSign, cRLSign
+
+
 
 

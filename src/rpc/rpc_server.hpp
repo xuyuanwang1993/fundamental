@@ -9,6 +9,7 @@
 #include <mutex>
 #include <set>
 #include <thread>
+#include <unordered_set>
 
 #include "fundamental/events/event_system.h"
 #include "network/network.hpp"
@@ -87,6 +88,7 @@ public:
     }
     // this function will throw when param is invalid
     void enable_ssl(network_server_ssl_config ssl_config) {
+        if (ssl_config.disable_ssl) return;
 #ifndef NETWORK_DISABLE_SSL
         if (ssl_config.certificate_path.empty() || ssl_config.private_key_path.empty() ||
             !std::filesystem::is_regular_file(ssl_config.certificate_path) ||
@@ -104,24 +106,27 @@ public:
         std::swap(ssl_config_, ssl_config);
         if (!ssl_config_.passwd_cb) ssl_config_.passwd_cb = [](std::string) -> std::string { return "123456"; };
 
-        unsigned long ssl_options =
-            asio::ssl::context::default_workarounds | asio::ssl::context::no_sslv2 | asio::ssl::context::single_dh_use;
-        ssl_context = std::make_unique<asio::ssl::context>(asio::ssl::context::sslv23);
+        unsigned long ssl_options = asio::ssl::context::no_sslv2 | asio::ssl::context::single_dh_use;
+        ssl_context               = std::make_unique<asio::ssl::context>(asio::ssl::context::tlsv13);
         try {
             ssl_context->set_options(ssl_options);
             ssl_context->set_password_callback(
                 [cb = ssl_config_.passwd_cb](std::size_t size, asio::ssl::context_base::password_purpose purpose) {
                     return cb(std::to_string(size) + " " + std::to_string(static_cast<std::size_t>(purpose)));
                 });
-            if (!ssl_config.ca_certificate_path.empty()) {
-                ssl_context->load_verify_file(ssl_config.ca_certificate_path);
-                ssl_context->set_verify_mode(::asio::ssl::verify_peer | ::asio::ssl::verify_fail_if_no_peer_cert);
-            } else {
-                ssl_context->set_verify_mode(::asio::ssl::verify_peer);
+            auto verify_flag = ::asio::ssl::verify_peer;
+            if (!ssl_config_.ca_certificate_path.empty()) {
+                ssl_context->load_verify_file(ssl_config_.ca_certificate_path);
+                if (ssl_config_.verify_client) verify_flag |= ::asio::ssl::verify_fail_if_no_peer_cert;
+                ;
             }
+            ssl_context->set_verify_mode(verify_flag);
+
             ssl_context->use_certificate_chain_file(ssl_config_.certificate_path);
             ssl_context->use_private_key_file(ssl_config_.private_key_path, asio::ssl::context::pem);
             if (!ssl_config_.tmp_dh_path.empty()) ssl_context->use_tmp_dh_file(ssl_config_.tmp_dh_path);
+            FDEBUG("load ssl config ca:{} key:{} crt:{} dh:{}", ssl_config_.ca_certificate_path,
+                   ssl_config_.private_key_path, ssl_config_.certificate_path, ssl_config_.tmp_dh_path);
         } catch (const std::exception& e) {
             throw std::invalid_argument(std::string("load ssl config failed ") + e.what());
         }
