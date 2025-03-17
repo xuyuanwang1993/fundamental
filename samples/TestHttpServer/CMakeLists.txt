@@ -31,9 +31,13 @@ target_include_directories(${app_target_name}
 target_link_libraries(${app_target_name}
     PRIVATE
     BuildSettings
-    ${GLOB_NAMESPACE}rpc
+    ${GLOB_NAMESPACE}http
 )
 
+target_link_libraries(${app_target_name}
+    PRIVATE
+    gtest
+)
 
 # Add target name
 target_compile_definitions(${app_target_name}
@@ -41,7 +45,8 @@ target_compile_definitions(${app_target_name}
     APP_NAME="${app_target_name}"
 )
 
-declare_benchmark_exe(${app_target_name})
+
+config_enable_sanitize_address_check(${app_target_name})
 
 install(FILES ${FUNDAMENTAL_ASSETS_PATH}/dh2048.pem
     ${FUNDAMENTAL_ASSETS_PATH}/server.crt

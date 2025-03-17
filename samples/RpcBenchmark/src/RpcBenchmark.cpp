@@ -17,6 +17,7 @@
 #include "test_server.h"
 
 #include "benchmark/benchmark.h"
+using namespace network;
 using network::rpc_service::rpc_client;
 template <std::size_t blockSize>
 static void TestNormal(benchmark::State& state) {
@@ -48,11 +49,11 @@ static void TestProxy(benchmark::State& state) {
         benchmark::DoNotOptimize(client->call<20000, std::string>("echo", msg));
     }
 }
-#ifndef RPC_DISABLE_SSL
+#ifndef NETWORK_DISABLE_SSL
 template <std::size_t blockSize>
 static void TestSslProxy(benchmark::State& state) {
     auto client=network::make_guard<rpc_client>("127.0.0.1", "9000");
-    client->enable_ssl("server.crt");
+    client->enable_ssl(network_client_ssl_config{"client.crt","client.key","ca_root.crt"});
     client->set_proxy(network::rpc_service::CustomRpcProxy::make_shared(kProxyServiceName, kProxyServiceField,
                                                                             kProxyServiceToken));
     client->connect();
@@ -69,7 +70,7 @@ static void TestSslProxy(benchmark::State& state) {
 template <std::size_t blockSize>
 static void TestSslProxyStream(benchmark::State& state) {
     auto client=network::make_guard<rpc_client>("127.0.0.1", "9000");
-    client->enable_ssl("server.crt");
+    client->enable_ssl(network_client_ssl_config{"client.crt","client.key","ca_root.crt"});
     client->set_proxy(network::rpc_service::CustomRpcProxy::make_shared(kProxyServiceName, kProxyServiceField,
                                                                             kProxyServiceToken));
     client->connect();
@@ -107,7 +108,7 @@ BENCHMARK_TEMPLATE(TestProxy, 1024 * 1024);
 BENCHMARK_TEMPLATE(TestProxy, 1024 * 1024 * 32);
 BENCHMARK_TEMPLATE(TestProxy, 1024 * 1024 * 128);
 BENCHMARK_TEMPLATE(TestProxy, 1024 * 1024 * 1024);
-#ifndef RPC_DISABLE_SSL
+#ifndef NETWORK_DISABLE_SSL
 BENCHMARK_TEMPLATE(TestSslProxy, 1);
 BENCHMARK_TEMPLATE(TestSslProxy, 1024);
 BENCHMARK_TEMPLATE(TestSslProxy, 4096);

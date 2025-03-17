@@ -7,17 +7,19 @@
     #pragma warning(default : 4996) // enable warning 4996 back
 #endif
 
+#include <algorithm>
 #include <cassert>
 #include <functional>
 #include <memory>
 #include <optional>
 #include <sstream>
 #include <string_view>
-#include <algorithm>
 
-namespace Fundamental {
+namespace Fundamental
+{
 
-enum LogLevel {
+enum LogLevel
+{
     trace    = 0,
     debug    = 1,
     info     = 2,
@@ -28,7 +30,8 @@ enum LogLevel {
 };
 using ErrorHandlerType    = std::function<void(const std::string&)>;
 using LogMessageCatchFunc = std::function<void(LogLevel level, const char* /*str*/, std::size_t /*size*/)>;
-namespace details {
+namespace details
+{
 class NativeLogSink;
 }
 class Logger {
@@ -146,7 +149,10 @@ inline std::string StringFormat(const char* fmt, const Arg1& arg1, const Args&..
 class LoggerStream final {
 public:
     explicit LoggerStream(Logger* logger, LogLevel level);
-    explicit LoggerStream(Logger* logger, LogLevel level, const char* fileName, const char* funcName,
+    explicit LoggerStream(Logger* logger,
+                          LogLevel level,
+                          const char* fileName,
+                          const char* funcName,
                           std::int32_t line);
     explicit LoggerStream(Logger* logger, LogLevel level, std::int32_t line);
     ~LoggerStream();
@@ -269,7 +275,8 @@ inline constexpr std::array<char, N> __get_short_file_name__(const char (&file_n
 #endif
 
 #define FINFOS Fundamental::LoggerStream(Fundamental::Logger::s_defaultLogger, Fundamental::LogLevel::info).stream()
-#define FINFOSL Fundamental::LoggerStream(Fundamental::Logger::s_defaultLogger, Fundamental::LogLevel::info,__LINE__).stream()
+#define FINFOSL                                                                                                        \
+    Fundamental::LoggerStream(Fundamental::Logger::s_defaultLogger, Fundamental::LogLevel::info, __LINE__).stream()
 #define FERRS                                                                                                          \
     Fundamental::LoggerStream(Fundamental::Logger::s_defaultLogger, Fundamental::LogLevel::err, LOG_FILE_NAME,         \
                               __func__, __LINE__)                                                                      \
@@ -293,7 +300,7 @@ inline constexpr std::array<char, N> __get_short_file_name__(const char (&file_n
                                   __func__, __LINE__)                                                                  \
             .null_stream()
 #endif
-#if !defined(NDEBUG) && !defined(DISABLE_ASSERT)
+#if defined(DEBUG) && !defined(DISABLE_ASSERT)
     #define ENABLE_FUNDAMENTAL_ASSERT_MACRO 1
     #define FASSERT_THROWN(_check, ...)                                                                                \
         if (!(_check)) {                                                                                               \
@@ -304,21 +311,20 @@ inline constexpr std::array<char, N> __get_short_file_name__(const char (&file_n
         }
 
     #define FASSERT(_check, ...) FASSERT_THROWN(_check, ##__VA_ARGS__)
-
-    #define FASSERT_ACTION(_check, _action, ...)                                                                       \
-        if (!(_check)) {                                                                                               \
-            auto __debugInfo__ = Fundamental::StringFormat("[{}:{}"                                                    \
-                                                           "(" STR_HELPER(__LINE__) ")] [####check####:" #_check "] ", \
-                                                           LOG_FILE_NAME, __func__);                                   \
-            Fundamental::Logger::s_defaultLogger->LogOutput(Fundamental::LogLevel::critical,                           \
-                                                            __debugInfo__ + Fundamental::StringFormat(__VA_ARGS__));   \
-            _action;                                                                                                   \
-        }
 #else
-    #define FASSERT(_check, ...)                 (void)0
-    #define FASSERT_ACTION(_check, _action, ...) (void)0
-    #define FASSERT_THROWN(_check, ...)          (void)0
+    #define FASSERT(_check, ...)        (void)0
+    #define FASSERT_THROWN(_check, ...) (void)0
 #endif
+
+#define FCON_ACTION(_check, _action, ...)                                                                           \
+    if (!(_check)) {                                                                                                   \
+        auto __debugInfo__ = Fundamental::StringFormat("[{}:{}"                                                        \
+                                                       "(" STR_HELPER(__LINE__) ")] [####check####:" #_check "] ",     \
+                                                       LOG_FILE_NAME, __func__);                                       \
+        Fundamental::Logger::s_defaultLogger->LogOutput(Fundamental::LogLevel::warn,                                   \
+                                                        __debugInfo__ + Fundamental::StringFormat(__VA_ARGS__));       \
+        _action;                                                                                                       \
+    }
 
 // add  more logger instance
 #define FINFO_I(logger, ...) FLOG(logger, Fundamental::LogLevel::info, ##__VA_ARGS__)

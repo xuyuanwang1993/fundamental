@@ -1,5 +1,4 @@
 #pragma once
-#include "use_asio.hpp"
 #include <cstdint>
 #include <functional>
 
@@ -111,7 +110,7 @@ private:
     }
 
 protected:
-    rpc_data_reference reference_;
+    network_data_reference reference_;
     std::int32_t curentStatus = HandShakeDataPending;
     // handshake
     /// if curentStatus&HandShakeDataPending!=0,you should filled this buffer

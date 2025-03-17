@@ -5,14 +5,7 @@ file(GLOB lib_source
     *.h
     *.cpp
     *.hpp
-    basic/*.h
-    basic/*.cpp
-    basic/*.hpp
-    proxy/*.h
-    proxy/*.cpp
-    proxy/*.hpp
 )
-
 
 list(APPEND lib_source ${services_source})
 
@@ -35,6 +28,5 @@ target_link_libraries(${lib_name} PUBLIC
     BuildSettings
     ${GLOB_NAMESPACE}network
 )
-
 
 add_library(${GLOB_NAMESPACE}${lib_name} ALIAS ${lib_name})

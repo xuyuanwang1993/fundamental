@@ -317,7 +317,7 @@ void server_task(std::promise<void>& sync_p) {
     auto s_server = network::make_guard<rpc_server>(9000);
     auto p        = s_server.get();
     auto& server  = *s_server.get();
-    server.enable_ssl({ nullptr, "server.crt", "server.key", "dh2048.pem" });
+    server.enable_ssl({ nullptr, "server.crt", "server.key", "dh2048.pem", "ca_root.crt"});
     dummy d;
     server.register_handler("add", &dummy::add, &d);
 

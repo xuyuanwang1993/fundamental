@@ -72,7 +72,7 @@ void TestDefaultLogger() {
     }
 
     do {
-        FASSERT_ACTION(false, break, "{}", "test assert return ");
+        FCON_ACTION(false, break, "{}", "test assert return ");
         FERR("should not output");
     } while (0);
     try {

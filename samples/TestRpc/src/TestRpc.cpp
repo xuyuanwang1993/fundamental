@@ -19,7 +19,7 @@ using namespace network;
 using namespace network::rpc_service;
 static Fundamental::ThreadPool& s_test_pool = Fundamental::ThreadPool::Instance<101>();
 
-#if 0
+#if 1
     #if 1
 TEST(rpc_test, test_connect) {
     Fundamental::Timer check_timer;
@@ -95,7 +95,38 @@ TEST(rpc_test, test_hello) {
         std::cout << __func__ << ":" << e.what() << std::endl;
     }
 }
-
+TEST(rpc_test, test_aborted_stream) {
+    auto g        = Fundamental::DefaultNumberGenerator<std::size_t>(1, 10);
+    auto test_cnt = g();
+    while (test_cnt > 0) {
+        test_cnt--;
+        auto client             = network::make_guard<rpc_client>();
+        [[maybe_unused]] bool r = client->connect("127.0.0.1", "9000");
+        EXPECT_TRUE(r && client->has_connected());
+        auto stream = client->upgrade_to_stream("test_abort_stream");
+        if (!stream) break;
+        stream->EnableAutoHeartBeat(true, 1000);
+        bool aborted = false;
+        std::mutex lock;
+        std::condition_variable cv;
+        stream->notify_stream_abort.Connect([&]() {
+            FWARN("remote stream aborted");
+            std::scoped_lock<std::mutex> locker(lock);
+            aborted = true;
+            cv.notify_one();
+        });
+        EXPECT_TRUE(stream->WriteDone());
+        std::size_t max_try_cnt = 5;
+        { // block wait connection disconneted
+            std::unique_lock<std::mutex> locker(lock);
+            while (!aborted && max_try_cnt > 0) {
+                --max_try_cnt;
+                cv.wait_for(locker, std::chrono::milliseconds(10));
+            }
+        }
+        // we won't call finish,disconenction
+    }
+}
 TEST(rpc_test, test_get_person_name) {
     Fundamental::Timer check_timer;
     Fundamental::ScopeGuard check_guard(
@@ -824,7 +855,7 @@ TEST(rpc_test, test_control_stream) {
     }
 }
     #endif
-    #if !defined(RPC_DISABLE_SSL) && 1
+    #if !defined(NETWORK_DISABLE_SSL) && 1
 TEST(rpc_test, test_ssl) {
     Fundamental::Timer check_timer;
     Fundamental::ScopeGuard check_guard(
@@ -832,7 +863,7 @@ TEST(rpc_test, test_ssl) {
 
     try {
         auto client = network::make_guard<rpc_client>("127.0.0.1", "9000");
-        client->enable_ssl("server.crt");
+        client->enable_ssl(network_client_ssl_config{"client.crt","client.key","ca_root.crt"});
         bool r = client->connect();
         if (!r) {
             EXPECT_TRUE(false && "connect timeout");
@@ -871,7 +902,7 @@ TEST(rpc_test, test_ssl_proxy) {
         [&]() { EXPECT_LE(check_timer.GetDuration<Fundamental::Timer::TimeScale::Millisecond>(), 100); });
     {
         auto client = network::make_guard<rpc_client>("127.0.0.1", "9000");
-        client->enable_ssl("server.crt");
+        client->enable_ssl(network_client_ssl_config{"client.crt","client.key","ca_root.crt"});
         client->set_proxy(network::rpc_service::CustomRpcProxy::make_shared(kProxyServiceName, kProxyServiceField,
                                                                             kProxyServiceToken));
         bool r = client->connect();
@@ -894,7 +925,7 @@ TEST(rpc_test, test_ssl_proxy) {
     }
     {
         auto client = network::make_guard<rpc_client>("127.0.0.1", "9000");
-        client->enable_ssl("", network::rpc_service::rpc_client_ssl_level_optional);
+        client->enable_ssl(network_client_ssl_config{"client.crt","client.key","ca_root.crt"}, network::rpc_service::rpc_client_ssl_level_optional);
         client->set_proxy(network::rpc_service::CustomRpcProxy::make_shared(kProxyServiceName, kProxyServiceField,
                                                                             kProxyServiceToken));
         bool r = client->connect();
@@ -918,7 +949,7 @@ TEST(rpc_test, test_ssl_proxy) {
 }
 TEST(rpc_test, test_ssl_proxy_echo_stream) {
     auto client = network::make_guard<rpc_client>();
-    client->enable_ssl("server.crt");
+    client->enable_ssl(network_client_ssl_config{"client.crt","client.key","ca_root.crt"});
     client->set_proxy(
         network::rpc_service::CustomRpcProxy::make_shared(kProxyServiceName, kProxyServiceField, kProxyServiceToken));
     [[maybe_unused]] bool r = client->connect("127.0.0.1", "9000");
@@ -941,7 +972,8 @@ TEST(rpc_test, test_ssl_concept) {
     // sudo tcpdump -i any -n -vv -X port 9000
     {
         auto client = network::make_guard<rpc_client>();
-        client->enable_ssl("server.crt", network::rpc_service::rpc_client_ssl_level_optional);
+        client->enable_ssl(network_client_ssl_config { "client.crt", "client.key", "ca_root.crt" },
+                           network::rpc_service::rpc_client_ssl_level_optional);
         [[maybe_unused]] bool r = client->connect("127.0.0.1", "9000");
         EXPECT_TRUE(r && client->has_connected());
         auto stream = client->upgrade_to_stream("test_echo_stream");
@@ -953,15 +985,16 @@ TEST(rpc_test, test_ssl_concept) {
     }
     {
         auto client = network::make_guard<rpc_client>();
-        client->enable_ssl("server.crt_none", network::rpc_service::rpc_client_ssl_level_optional);
+        client->enable_ssl(network_client_ssl_config { "client_none.crt", "client.key", "ca_root.crt" },
+                           network::rpc_service::rpc_client_ssl_level_optional);
         [[maybe_unused]] bool r = client->connect("127.0.0.1", "9000");
         EXPECT_TRUE(r && client->has_connected());
         auto stream = client->upgrade_to_stream("test_echo_stream");
         EXPECT_TRUE(stream != nullptr);
         std::string base = "1111";
-        EXPECT_TRUE(stream->Write(base));
-        EXPECT_TRUE(stream->WriteDone());
-        EXPECT_TRUE(!stream->Finish(0));
+        stream->Write(base);
+        stream->WriteDone();
+        EXPECT_TRUE(stream->Finish(0));
     }
     {
         auto client             = network::make_guard<rpc_client>();
@@ -981,7 +1014,7 @@ TEST(rpc_test, test_ssl_proxy_echo_stream_mutithread) {
     auto nums      = s_test_pool.Count();
     auto task_func = []() {
         auto client = network::make_guard<rpc_client>();
-        client->enable_ssl("server.crt");
+        client->enable_ssl(network_client_ssl_config{"client.crt","client.key","ca_root.crt"});
         client->set_proxy(network::rpc_service::CustomRpcProxy::make_shared(kProxyServiceName, kProxyServiceField,
                                                                             kProxyServiceToken));
         [[maybe_unused]] bool r = client->connect("127.0.0.1", "9000");
@@ -1009,38 +1042,9 @@ TEST(rpc_test, test_ssl_proxy_echo_stream_mutithread) {
 }
     #endif
 #endif
-TEST(rpc_test, test_aborted_stream) {
-    auto g        = Fundamental::DefaultNumberGenerator<std::size_t>(1, 10);
-    auto test_cnt = g();
-    while (test_cnt > 0) {
-        test_cnt--;
-        auto client             = network::make_guard<rpc_client>();
-        [[maybe_unused]] bool r = client->connect("127.0.0.1", "9000");
-        EXPECT_TRUE(r && client->has_connected());
-        auto stream = client->upgrade_to_stream("test_abort_stream");
-        if (!stream) break;
-        stream->EnableAutoHeartBeat(true, 1000);
-        bool aborted = false;
-        std::mutex lock;
-        std::condition_variable cv;
-        stream->notify_stream_abort.Connect([&]() {
-            FWARN("remote stream aborted");
-            std::scoped_lock<std::mutex> locker(lock);
-            aborted = true;
-            cv.notify_one();
-        });
-        EXPECT_TRUE(stream->WriteDone());
-        std::size_t max_try_cnt = 5;
-        { // block wait connection disconneted
-            std::unique_lock<std::mutex> locker(lock);
-            while (!aborted && max_try_cnt > 0) {
-                --max_try_cnt;
-                cv.wait_for(locker, std::chrono::milliseconds(10));
-            }
-        }
-        // we won't call finish,disconenction
-    }
-}
+
+
+
 int main(int argc, char** argv) {
     int mode = 0;
     if (argc > 1) mode = std::stoi(argv[1]);

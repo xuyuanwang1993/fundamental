@@ -50,6 +50,9 @@ config_enable_sanitize_address_check(${app_target_name})
 install(FILES ${FUNDAMENTAL_ASSETS_PATH}/dh2048.pem
     ${FUNDAMENTAL_ASSETS_PATH}/server.crt
     ${FUNDAMENTAL_ASSETS_PATH}/server.key
+    ${FUNDAMENTAL_ASSETS_PATH}/client.key
+    ${FUNDAMENTAL_ASSETS_PATH}/client.crt
+    ${FUNDAMENTAL_ASSETS_PATH}/ca_root.crt
     COMPONENT ssl-crt
     DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
