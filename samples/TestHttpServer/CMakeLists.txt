@@ -34,11 +34,6 @@ target_link_libraries(${app_target_name}
     ${GLOB_NAMESPACE}http
 )
 
-target_link_libraries(${app_target_name}
-    PRIVATE
-    gtest
-)
-
 # Add target name
 target_compile_definitions(${app_target_name}
     PRIVATE

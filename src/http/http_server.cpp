@@ -15,7 +15,7 @@ namespace network::http
 {
 static std::string s_tag = "http_file_handler";
 using TrackerType        = Fundamental::STimeTracker<std::chrono::milliseconds>;
-static void TrackerOutPut(const std::string_view& msg) {
+[[maybe_unused]] static void TrackerOutPut(const std::string_view& msg) {
     FDEBUG("{}", msg);
 }
 

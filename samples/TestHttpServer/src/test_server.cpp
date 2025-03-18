@@ -30,11 +30,11 @@ void OnHttpBinary(std::shared_ptr<http_connection> conn, http_response& response
 }
 
 std::unique_ptr<std::thread> s_thread;
-void server_task(std::promise<void>& sync_p) {
+void server_task(std::promise<void>& sync_p,const std::string &root_path) {
     http_server_config config;
     config.port                = 9000;
     config.head_case_sensitive = false;
-    config.root_path           = std::filesystem::current_path().string();
+    config.root_path           = root_path;
     auto s_server              = network::make_guard<http_server>(config);
     s_server->enable_default_handler();
     network_server_ssl_config ssl_config;
@@ -56,9 +56,9 @@ void server_task(std::promise<void>& sync_p) {
     sync_p.set_value();
 }
 
-void run_server() {
+void run_server(const std::string &root_path) {
     std::promise<void> sync_p;
-    s_thread = std::make_unique<std::thread>([&]() { server_task(sync_p); });
+    s_thread = std::make_unique<std::thread>([&]() { server_task(sync_p,root_path); });
     sync_p.get_future().get();
 }
 

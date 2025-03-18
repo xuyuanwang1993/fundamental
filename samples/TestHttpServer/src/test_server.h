@@ -36,6 +36,6 @@ struct DelayControlStream{
 constexpr const char* kProxyServiceName  = "rpc_service";
 constexpr const char* kProxyServiceField = "rpc_field";
 constexpr const char* kProxyServiceToken = "rpc_token";
-void run_server();
+void run_server(const std::string &root_path);
 void exit_server();
 void server_task(std::promise<void>& sync_p);
