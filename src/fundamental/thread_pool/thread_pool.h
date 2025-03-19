@@ -19,19 +19,21 @@
 
 #include <atomic>
 #include <condition_variable>
-#include <deque>
 #include <functional> //bind
 #include <future>
 #include <iostream>
+#include <map>
 #include <memory>
 #include <mutex>
-#include <queue> //priority_queue
+#include <queue>
 #include <thread>
 #include <vector>
-namespace Fundamental {
+namespace Fundamental
+{
 using clock_t = std::chrono::steady_clock;
 
-enum ThreadPoolType : std::int32_t {
+enum ThreadPoolType : std::int32_t
+{
     ShortTimeThreadPool = 0,
     LongTimeThreadPool  = 1,
     BlockTimeThreadPool = 2,
@@ -40,7 +42,8 @@ enum ThreadPoolType : std::int32_t {
     ConsumerThreadPool  = 5
 };
 
-enum ThreadPoolTaskStatus : std::uint32_t {
+enum ThreadPoolTaskStatus : std::uint32_t
+{
     ThreadTaskWaitting,
     ThreadTaskRunning,
     ThreadTaskDone,
@@ -54,16 +57,22 @@ struct ThreadPoolTaskStatusSyncerWarpper {
 template <typename ResultType>
 struct ThreadPoolTaskToken {
     bool CancelTask() {
-        ThreadPoolTaskStatus old = status->status.load();
-        if (status->status.compare_exchange_strong(old, ThreadTaskCancelled)) {
-            return true;
-        }
-        return false;
+        auto expected = ThreadPoolTaskStatus::ThreadTaskWaitting;
+        return status->status.compare_exchange_strong(expected, ThreadPoolTaskStatus::ThreadTaskCancelled);
     }
     std::shared_ptr<ThreadPoolTaskStatusSyncerWarpper> status = std::make_shared<ThreadPoolTaskStatusSyncerWarpper>();
     std::future<ResultType> resultFuture;
 };
 
+struct ThreadPoolConfig {
+    static constexpr std::int64_t kDefaultIdleWaitTimeMsec = 10000;
+    static constexpr std::size_t kMinWorkThreadsNum        = 1;
+    bool enable_auto_scaling                               = true;
+    // 0 means no limit
+    std::size_t max_threads_limit    = 0;
+    std::size_t min_work_threads_num = kMinWorkThreadsNum;
+    std::int64_t ilde_wait_time_ms   = kDefaultIdleWaitTimeMsec;
+};
 class ThreadPool final {
     struct Task {
         clock_t::time_point time;
@@ -109,23 +118,26 @@ public:
     ThreadPool& operator=(ThreadPool&&)      = delete;
 
     std::size_t Count() const;
+    std::size_t PendingTasks() const;
     void Spawn(int count = 1);
-    void Join();
+    /// @brief  join all work threads
+    /// @return joined thread nums
+    std::size_t Join();
 
-    bool RunOne();
+    bool RunOne(std::int64_t idle_wait_time_ms, bool& is_timeout);
 
     template <typename _Callable, typename... _Args>
     auto Enqueue(_Callable&& f, _Args&&... args) -> ThreadPoolTaskToken<std::invoke_result_t<_Callable, _Args...>> {
-        return Schedule(clock_t::now(), std::forward<_Callable>(f), std::forward<_Args>(args)...);
+        return Schedule<true>(clock_t::now(), std::forward<_Callable>(f), std::forward<_Args>(args)...);
     }
 
     template <typename _Callable, typename... _Args>
     auto Schedule(clock_t::duration delay, _Callable&& f, _Args&&... args)
         -> ThreadPoolTaskToken<std::invoke_result_t<_Callable, _Args...>> {
-        return Schedule(clock_t::now() + delay, std::forward<_Callable>(f), std::forward<_Args>(args)...);
+        return Schedule<true>(clock_t::now() + delay, std::forward<_Callable>(f), std::forward<_Args>(args)...);
     }
 
-    template <typename _Callable, typename... _Args>
+    template <bool prepare_worker, typename _Callable, typename... _Args>
     auto Schedule(clock_t::time_point time, _Callable&& f, _Args&&... args)
         -> ThreadPoolTaskToken<std::invoke_result_t<_Callable, _Args...>> {
 
@@ -149,22 +161,32 @@ public:
         std::unique_lock<std::mutex> lock(m_tasksMutex);
         m_tasks.push({ time, task, result.status });
         m_condition.notify_one();
+        [[maybe_unused]] auto current_size = m_tasks.size();
+        lock.unlock();
+        if constexpr (prepare_worker) {
+            PrepareWorkers(current_size);
+        }
         return result;
     }
 
+    void InitThreadPool(const ThreadPoolConfig& config);
     bool InThreadPool();
-
-protected:
     ThreadPool(std::int32_t type = ThreadPoolType::ShortTimeThreadPool) : type(type) {
     }
     ~ThreadPool();
 
-    Task Dequeue(); // returns null function if joining
+protected:
+    Task Dequeue(std::int64_t idle_wait_time_ms, bool& is_timeout); // returns null function if joining
     void Run(std::size_t index);
+    void PrepareWorkers(std::size_t current_task_nums);
 
 private:
+    std::atomic_bool has_alread_configed = false;
+    ThreadPoolConfig config_;
+    std::size_t spawn_cnt = 0;
     const std::int32_t type;
-    std::vector<std::thread> m_workers;
+    std::atomic<std::size_t> waiting_threads = 0;
+    std::map<std::size_t, std::unique_ptr<std::thread>> m_workers;
     std::atomic<bool> m_joining { false };
 
     std::priority_queue<Task, std::deque<Task>, std::greater<Task>> m_tasks;

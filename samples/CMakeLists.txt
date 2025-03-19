@@ -34,6 +34,7 @@ if(F_BUILD_STATIC)
         add_subdirectory(TestParallel)
         add_subdirectory(TestRandomGenerator)
         add_subdirectory(TestIntegerCodec)
+        add_subdirectory(TestThreadPool)
     endif()
 
     if(IMPORT_BENCHMARK)

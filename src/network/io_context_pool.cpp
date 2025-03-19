@@ -32,7 +32,7 @@ void io_context_pool::start() {
         work_.push_back(asio::make_work_guard(*io_contexts_.back()));
     }
 
-    auto& threadpool = Fundamental::ThreadPool::Instance<Fundamental::BlockTimeThreadPool>();
+    auto& threadpool = Fundamental::ThreadPool::BlockTimePool();
     // enqueue all of the io_contexts run task
     for (std::size_t i = 0; i < io_contexts_.size(); ++i) {
         threadpool.Spawn(1);

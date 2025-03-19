@@ -591,10 +591,8 @@ TEST(rpc_test, test_call_rpc_stream_with_no_stream_action) {
     auto client             = network::make_guard<rpc_client>();
     [[maybe_unused]] bool r = client->connect("127.0.0.1", "9000");
     EXPECT_TRUE(r && client->has_connected());
-    auto func=[&](){
-        client->call<5000,void>("test_echo_stream");
-    };
-    EXPECT_THROW(func(),std::logic_error);
+    auto func = [&]() { client->call<5000, void>("test_echo_stream"); };
+    EXPECT_THROW(func(), std::logic_error);
 }
 
     #if 1
@@ -863,7 +861,7 @@ TEST(rpc_test, test_ssl) {
 
     try {
         auto client = network::make_guard<rpc_client>("127.0.0.1", "9000");
-        client->enable_ssl(network_client_ssl_config{"client.crt","client.key","ca_root.crt"});
+        client->enable_ssl(network_client_ssl_config { "client.crt", "client.key", "ca_root.crt" });
         bool r = client->connect();
         if (!r) {
             EXPECT_TRUE(false && "connect timeout");
@@ -902,7 +900,7 @@ TEST(rpc_test, test_ssl_proxy) {
         [&]() { EXPECT_LE(check_timer.GetDuration<Fundamental::Timer::TimeScale::Millisecond>(), 100); });
     {
         auto client = network::make_guard<rpc_client>("127.0.0.1", "9000");
-        client->enable_ssl(network_client_ssl_config{"client.crt","client.key","ca_root.crt"});
+        client->enable_ssl(network_client_ssl_config { "client.crt", "client.key", "ca_root.crt" });
         client->set_proxy(network::rpc_service::CustomRpcProxy::make_shared(kProxyServiceName, kProxyServiceField,
                                                                             kProxyServiceToken));
         bool r = client->connect();
@@ -925,7 +923,8 @@ TEST(rpc_test, test_ssl_proxy) {
     }
     {
         auto client = network::make_guard<rpc_client>("127.0.0.1", "9000");
-        client->enable_ssl(network_client_ssl_config{"client.crt","client.key","ca_root.crt"}, network::rpc_service::rpc_client_ssl_level_optional);
+        client->enable_ssl(network_client_ssl_config { "client.crt", "client.key", "ca_root.crt" },
+                           network::rpc_service::rpc_client_ssl_level_optional);
         client->set_proxy(network::rpc_service::CustomRpcProxy::make_shared(kProxyServiceName, kProxyServiceField,
                                                                             kProxyServiceToken));
         bool r = client->connect();
@@ -949,7 +948,7 @@ TEST(rpc_test, test_ssl_proxy) {
 }
 TEST(rpc_test, test_ssl_proxy_echo_stream) {
     auto client = network::make_guard<rpc_client>();
-    client->enable_ssl(network_client_ssl_config{"client.crt","client.key","ca_root.crt"});
+    client->enable_ssl(network_client_ssl_config { "client.crt", "client.key", "ca_root.crt" });
     client->set_proxy(
         network::rpc_service::CustomRpcProxy::make_shared(kProxyServiceName, kProxyServiceField, kProxyServiceToken));
     [[maybe_unused]] bool r = client->connect("127.0.0.1", "9000");
@@ -1014,7 +1013,7 @@ TEST(rpc_test, test_ssl_proxy_echo_stream_mutithread) {
     auto nums      = s_test_pool.Count();
     auto task_func = []() {
         auto client = network::make_guard<rpc_client>();
-        client->enable_ssl(network_client_ssl_config{"client.crt","client.key","ca_root.crt"});
+        client->enable_ssl(network_client_ssl_config { "client.crt", "client.key", "ca_root.crt" });
         client->set_proxy(network::rpc_service::CustomRpcProxy::make_shared(kProxyServiceName, kProxyServiceField,
                                                                             kProxyServiceToken));
         [[maybe_unused]] bool r = client->connect("127.0.0.1", "9000");
@@ -1043,8 +1042,6 @@ TEST(rpc_test, test_ssl_proxy_echo_stream_mutithread) {
     #endif
 #endif
 
-
-
 int main(int argc, char** argv) {
     int mode = 0;
     if (argc > 1) mode = std::stoi(argv[1]);
@@ -1055,6 +1052,7 @@ int main(int argc, char** argv) {
     options.logOutputProgramName = "test";
     options.logOutputPath        = "output";
     Fundamental::Logger::Initialize(std::move(options));
+    s_test_pool.InitThreadPool(Fundamental::ThreadPoolConfig { false });
     s_test_pool.Spawn(4);
     if (mode == 0) {
         ::testing::InitGoogleTest(&argc, argv);

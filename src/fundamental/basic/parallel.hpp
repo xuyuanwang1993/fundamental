@@ -9,7 +9,7 @@ namespace internal {
 void _InitThreadPool();
 
 inline decltype(auto) GetParallelThreadPool() {
-    return ThreadPool::Instance<PrallelThreadPool>();
+    return ThreadPool::PrallelTaskPool();
 }
 
 } // namespace internal
