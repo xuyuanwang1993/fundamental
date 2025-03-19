@@ -1,6 +1,7 @@
 #include "parallel.hpp"
 #include <atomic>
-namespace Fundamental::internal {
+namespace Fundamental::internal
+{
 static void InitParallelThreadPool() {
     std::size_t threadNums = std::thread::hardware_concurrency();
     try {
@@ -12,7 +13,11 @@ static void InitParallelThreadPool() {
     } catch (const std::exception&) {
     }
     auto& pool = GetParallelThreadPool();
-    pool.Spawn(threadNums);
+    ThreadPoolConfig config;
+    config.max_threads_limit    = threadNums;
+    config.min_work_threads_num = 2;
+    config.ilde_wait_time_ms    = 10000;
+    pool.InitThreadPool(config);
 }
 
 void _InitThreadPool() {

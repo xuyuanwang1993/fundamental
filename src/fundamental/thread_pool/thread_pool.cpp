@@ -16,12 +16,30 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 #include "thread_pool.h"
+#include "fundamental/basic/log.h"
 #include "fundamental/basic/utils.hpp"
-namespace Fundamental {
+#include <exception>
+
+namespace Fundamental
+{
+
+void ThreadPool::InitThreadPool(const ThreadPoolConfig& config) {
+    auto expected = false;
+    if (!has_alread_configed.compare_exchange_strong(expected, true)) {
+        FERR("thread pool has already configed or has call spawn before init pool, please check your code");
+        return;
+    }
+    config_ = config;
+    if (config_.min_work_threads_num < ThreadPoolConfig::kMinWorkThreadsNum)
+        config_.min_work_threads_num = ThreadPoolConfig::kMinWorkThreadsNum;
+    if (config_.ilde_wait_time_ms < 10) config_.ilde_wait_time_ms = config_.kDefaultIdleWaitTimeMsec;
+}
+
 bool ThreadPool::InThreadPool() {
-    std::unique_lock<std::mutex> lock(m_workersMutex);
-    return std::any_of(m_workers.begin(), m_workers.end(),
-                       [](const std::thread& t) -> bool { return t.get_id() == std::this_thread::get_id(); });
+    std::scoped_lock<std::mutex> lock(m_workersMutex);
+    return std::any_of(m_workers.begin(), m_workers.end(), [](const decltype(m_workers)::value_type& t) -> bool {
+        return t.second->get_id() == std::this_thread::get_id();
+    });
 }
 
 ThreadPool::~ThreadPool() {
@@ -29,39 +47,99 @@ ThreadPool::~ThreadPool() {
 }
 
 std::size_t ThreadPool::Count() const {
-    std::unique_lock<std::mutex> lock(m_workersMutex);
+    std::scoped_lock<std::mutex> lock(m_workersMutex);
     return m_workers.size();
 }
 
+std::size_t ThreadPool::PendingTasks() const {
+    std::scoped_lock<std::mutex> lock(m_tasksMutex);
+    return m_tasks.size();
+}
+
 void ThreadPool::Spawn(int count) {
-    std::unique_lock<std::mutex> lock(m_workersMutex);
-    m_joining = false;
-    while (count-- > 0)
-        m_workers.emplace_back(std::bind(&ThreadPool::Run, this, m_workers.size()));
-}
+    if (m_joining || count < 1) return;
+    auto expected_value = false;
+    if (has_alread_configed.compare_exchange_strong(expected_value, true)) {
+        FDEBUG("we recommend you to call InitThreadPool before call Spawn to reserve work threads");
+        config_.min_work_threads_num = count;
+    }
+    std::scoped_lock<std::mutex> lock(m_workersMutex);
+    std::int32_t left_threads =
+        config_.max_threads_limit > 0 ? static_cast<std::int32_t>(config_.max_threads_limit - m_workers.size()) : count;
+    count = count > left_threads ? left_threads : count;
+    if (m_workers.size() + count < config_.min_work_threads_num) {
+        count += config_.min_work_threads_num - m_workers.size();
+    }
+    if (count == 0) return;
 
-void ThreadPool::Join() {
-    std::unique_lock<std::mutex> lock(m_workersMutex);
-    m_joining = true;
-    m_condition.notify_all();
-
-    for (auto& w : m_workers)
-        w.join();
-
-    m_workers.clear();
-}
-
-void ThreadPool::Run(std::size_t index) {
-    Fundamental::Utils::SetThreadName("thp_" + std::to_string(type) + "_" + std::to_string(index));
-    while (RunOne()) {
+    while (count-- > 0) {
+        m_workers[spawn_cnt] = std::make_unique<std::thread>(std::bind(&ThreadPool::Run, this, spawn_cnt));
+        ++spawn_cnt;
     }
 }
 
-bool ThreadPool::RunOne() {
-    auto task = Dequeue();
+std::size_t ThreadPool::Join() {
+    FCON_ACTION(!InThreadPool(), throw std::runtime_error("try not call thread_pool' Join() in itself"),
+                "try not call thread pool join in itself");
+    auto expected = false;
+    if (!m_joining.compare_exchange_strong(expected, true)) return 0;
+    {
+        std::scoped_lock<std::mutex> locker(m_tasksMutex);
+        m_condition.notify_all();
+    }
+    std::scoped_lock<std::mutex> lock(m_workersMutex);
+    std::size_t ret = m_workers.size();
+    for (auto& w : m_workers)
+        if (w.second->joinable()) w.second->join();
+    m_workers.clear();
+    return ret;
+}
+
+void ThreadPool::Run(std::size_t index) {
+    std::string thread_name = "thp_" + std::to_string(type) + "_" + std::to_string(index);
+    Fundamental::Utils::SetThreadName(thread_name);
+    bool is_timeout = false;
+    // we won't auto release reserved threads
+    std::int64_t ilde_wait_max_time_ms = index >= config_.min_work_threads_num ? config_.ilde_wait_time_ms : 0;
+    while (RunOne(ilde_wait_max_time_ms, is_timeout)) {
+        if (is_timeout && config_.enable_auto_scaling) {
+            Schedule<false>(clock_t::now(), [this, index]() {
+                // avoid dead lock
+                if (m_joining) return;
+                std::unique_ptr<std::thread> op_thread;
+                {
+                    std::scoped_lock<std::mutex> lock(m_workersMutex);
+                    auto iter = m_workers.find(index);
+                    if (iter != m_workers.end()) op_thread = std::move(iter->second);
+                    m_workers.erase(iter);
+                }
+                if (op_thread && op_thread->joinable()) op_thread->join();
+            });
+            break;
+        }
+    }
+}
+
+void ThreadPool::PrepareWorkers(std::size_t current_task_nums) {
+    if (!config_.enable_auto_scaling) return;
+    auto pending_wait_size = waiting_threads.load();
+    if (pending_wait_size < current_task_nums) Spawn(current_task_nums - pending_wait_size);
+}
+
+bool ThreadPool::RunOne(std::int64_t idle_wait_time_ms, bool& is_timeout) {
+    // increase cnt for finished process tasks
+    ++waiting_threads;
+    // reset timeout flag
+    is_timeout = false;
+    auto task  = Dequeue(idle_wait_time_ms, is_timeout);
+    // decrease cnt for start process tasks
+    --waiting_threads;
+    if (is_timeout) return true;
     if (task.func) {
-        if (task.status->status.load() == ThreadPoolTaskStatus::ThreadTaskCancelled) return true;
-        task.status->status.exchange(ThreadPoolTaskStatus::ThreadTaskRunning);
+        auto expected = ThreadPoolTaskStatus::ThreadTaskWaitting;
+        // task maybe cancelled
+        if (!task.status->status.compare_exchange_strong(expected, ThreadPoolTaskStatus::ThreadTaskRunning))
+            return true;
         task.func();
         task.status->status.exchange(ThreadPoolTaskStatus::ThreadTaskDone);
         return true;
@@ -69,7 +147,7 @@ bool ThreadPool::RunOne() {
     return false;
 }
 
-ThreadPool::Task ThreadPool::Dequeue() {
+ThreadPool::Task ThreadPool::Dequeue(std::int64_t idle_wait_time_ms, bool& is_timeout) {
     std::unique_lock<std::mutex> lock(m_tasksMutex);
     while (true) {
         if (!m_tasks.empty()) {
@@ -84,8 +162,13 @@ ThreadPool::Task ThreadPool::Dequeue() {
             m_condition.wait_until(lock, m_tasks.top().time);
         } else {
             if (m_joining) break;
-
-            m_condition.wait(lock);
+            if (idle_wait_time_ms > 0) {
+                auto status = m_condition.wait_for(lock, std::chrono::milliseconds(idle_wait_time_ms));
+                is_timeout  = status == std::cv_status::timeout;
+                if (is_timeout) break;
+            } else {
+                m_condition.wait(lock);
+            }
         }
     }
     return ThreadPool::Task();

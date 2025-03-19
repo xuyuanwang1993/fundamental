@@ -123,7 +123,7 @@ TEST_F(TestParallel, TestEnv)
 
         },
         10);
-    EXPECT_EQ(std::thread::hardware_concurrency() - 1, Fundamental::GetParallelWorkerNums());
+    EXPECT_GE(std::thread::hardware_concurrency() - 1, Fundamental::GetParallelWorkerNums());
 }
 
 TEST_F(TestParallel, BenchMark)

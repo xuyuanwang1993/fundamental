@@ -98,7 +98,7 @@ target_link_libraries(BuildSettings INTERFACE
 )
 target_enable_clang_tidy(BuildSettings)
 
-
+# enable memory access check for debug mode
 function(config_enable_sanitize_address_check target_name)
     target_compile_options(${target_name} PRIVATE
         "$<$<CONFIG:Debug>:-fstack-protector>"
@@ -106,7 +106,7 @@ function(config_enable_sanitize_address_check target_name)
     target_compile_options(${target_name} PRIVATE
         "$<$<CONFIG:Debug>:-fsanitize=address>"
     )
-    
+
     target_link_options(${target_name} PRIVATE
         "$<$<CONFIG:Debug>:-fsanitize=address>"
     )
@@ -117,6 +117,15 @@ function(config_enable_sanitize_address_check target_name)
     )
 endfunction()
 
+# enable profiling
+# run you program to generate gmon.out
+# then  'gprof program gmon.out > analysis.txt'
+function(config_enable_pg_profiling target_name)
+    target_compile_options(${target_name} PRIVATE -pg
+    )
+    target_link_options(${target_name} PRIVATE -pg
+    )
+endfunction()
 
 function(add_plugin plugin_name)
     if(PLUGIN_USE_STATIC)
