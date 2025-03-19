@@ -62,6 +62,7 @@ TEST(thread_pool_test, test_join_exception) {
     ThreadPool pool;
     ThreadPoolConfig config;
     config.max_threads_limit    = std::thread::hardware_concurrency();
+    //0 means no limit
     config.min_work_threads_num = 0;
     config.enable_auto_scaling  = true;
     config.ilde_wait_time_ms    = 10;

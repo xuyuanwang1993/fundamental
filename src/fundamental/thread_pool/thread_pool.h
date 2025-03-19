@@ -65,12 +65,13 @@ struct ThreadPoolTaskToken {
 };
 
 struct ThreadPoolConfig {
-    static constexpr std::int64_t kDefaultIdleWaitTimeMsec = 1000;
+    static constexpr std::int64_t kDefaultIdleWaitTimeMsec = 10000;
     static constexpr std::size_t kMinWorkThreadsNum        = 1;
     bool enable_auto_scaling                               = true;
-    std::size_t max_threads_limit                          = std::thread::hardware_concurrency() * 2;
-    std::size_t min_work_threads_num                       = kMinWorkThreadsNum;
-    std::int64_t ilde_wait_time_ms                         = kDefaultIdleWaitTimeMsec;
+    // 0 means no limit
+    std::size_t max_threads_limit    = 0;
+    std::size_t min_work_threads_num = kMinWorkThreadsNum;
+    std::int64_t ilde_wait_time_ms   = kDefaultIdleWaitTimeMsec;
 };
 class ThreadPool final {
     struct Task {
