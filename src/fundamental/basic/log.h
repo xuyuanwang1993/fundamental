@@ -338,6 +338,7 @@ inline constexpr std::array<char, N> __get_short_file_name__(const char (&file_n
     #define FDEBUGS_I(logger) Fundamental::LoggerStream(logger, Fundamental::LogLevel::debug).null_stream()
 #endif
 #define FINFOS_I(logger) Fundamental::LoggerStream(logger, Fundamental::LogLevel::info).stream()
+#define FINFOSL_I(logger) Fundamental::LoggerStream(logger, Fundamental::LogLevel::info, __LINE__).stream()
 #define FERRS_I(logger)                                                                                                \
     Fundamental::LoggerStream(logger, Fundamental::LogLevel::err, LOG_FILE_NAME, __func__, __LINE__).stream()
 #define FFAILS_I(logger)                                                                                               \
