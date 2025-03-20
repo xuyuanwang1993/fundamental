@@ -40,7 +40,7 @@ public:
 };
 
 template <typename value_type, class derived_t>
-class data_storage_acessor {
+class data_storage_accessor {
 public:
     // return true if persist data success
     bool persist_data(std::string table_name, std::string key, value_type data, const storage_config& config) {
@@ -53,7 +53,7 @@ public:
 };
 
 template <class derived_t>
-class data_storage_acessor<void, derived_t> {
+class data_storage_accessor<void, derived_t> {
 public:
     using value_type = void;
 

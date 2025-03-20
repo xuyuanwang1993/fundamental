@@ -94,7 +94,7 @@ protected:
 
 template <typename ValueType = std::string>
 class memory_storage : public storage::memory_storage_data<ValueType>,
-                       public data_storage_acessor<ValueType, memory_storage<ValueType>> {
+                       public data_storage_accessor<ValueType, memory_storage<ValueType>> {
 public:
     using value_type         = ValueType;
     using super              = storage::memory_storage_data<ValueType>;
@@ -152,11 +152,10 @@ public:
 
 template <>
 class memory_storage<void> : public storage::memory_storage_data<void>,
-                             public data_storage_acessor<void, memory_storage<void>> {
+                             public data_storage_accessor<void, memory_storage<void>> {
 public:
     using value_type         = void;
     using super              = storage::memory_storage_data<void>;
-    using normal_access_type = storage::memory_storage_data<void>;
 
 public:
     memory_storage(DelayQueue* delay_queue) : super(delay_queue) {
