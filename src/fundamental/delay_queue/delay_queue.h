@@ -4,12 +4,14 @@
 #include <functional>
 #include <limits>
 #include <mutex>
-namespace Fundamental {
+namespace Fundamental
+{
 class Timer {
 
 public:
     // Type of time scales
-    enum class TimeScale : std::uint8_t {
+    enum class TimeScale : std::uint8_t
+    {
         Second = 0,
         Millisecond
     };
@@ -58,7 +60,9 @@ public:
      * autoManager : when delay task is stopped, it will be released
      * Notice! task won't start automatically
      */
-    HandleType AddDelayTask(std::int64_t intervalMs, const TaskType& task, bool isSingle = false,
+    HandleType AddDelayTask(std::int64_t intervalMs,
+                            const TaskType& task,
+                            bool isSingle    = false,
                             bool autoManager = true);
     /*
      * start a delay task
@@ -75,6 +79,11 @@ public:
      * return false when handle is invalid
      */
     bool UpdateTaskInterval(HandleType handle, std::int64_t intervalMs);
+    /*
+     * modify a task with timepoint update
+     * return false when the handle is invalid or the task is not working
+     */
+    bool ModifyTaskNextExpiredTimepoint(HandleType handle, std::int64_t modify_value_ms);
     /*
      * restart a delay task
      * return false when handle is invalid

@@ -2,7 +2,8 @@
 
 #include <list>
 #include <set>
-namespace Fundamental {
+namespace Fundamental
+{
 
 Timer::Timer() {
     Reset();
@@ -61,10 +62,14 @@ std::string Timer::ToTimeStr(std::time_t t, const char* format) {
 
 using HandleType = DelayQueue::HandleType;
 
-namespace details {
+namespace details
+{
 struct DelayTaskSession {
     void SetNextTimeout(std::int64_t currentTimePoint) {
         nextTimeout = currentTimePoint + interval;
+    }
+    void ModifyNextTimeout(std::int64_t modify_value) {
+        nextTimeout += modify_value;
     }
     std::intptr_t owner = 0;
     DelayQueue::TaskType task;
@@ -78,7 +83,9 @@ struct DelayTaskSession {
 } // namespace details
 
 struct DelayQueue::Imp {
-    inline HandleType AddDelayTask(std::int64_t intervalMs, const TaskType& task, bool isSingle = false,
+    inline HandleType AddDelayTask(std::int64_t intervalMs,
+                                   const TaskType& task,
+                                   bool isSingle    = false,
                                    bool autoManager = true) {
         if (intervalMs < 0 || !task) return DelayQueue::kInvalidHandle;
         if (stateCb) stateCb();
@@ -160,7 +167,18 @@ struct DelayQueue::Imp {
         session->interval = intervalMs;
         return true;
     }
-
+    inline bool ModifyTaskNextExpiredTimepoint(HandleType handle, std::int64_t modify_value_ms) {
+        if (stateCb) stateCb();
+        std::scoped_lock<std::mutex> locker(dataMutex);
+        if (!ValidateInternal(handle)) return false;
+        auto* session = Cast(handle);
+        if (!session->bWorking) return false;
+        processingTasks.erase(std::make_pair(session->nextTimeout, handle));
+        session->bWorking = true;
+        session->ModifyNextTimeout(modify_value_ms);
+        processingTasks.insert(std::make_pair(session->nextTimeout, handle));
+        return true;
+    }
     inline void HandleEvent() {
 
         std::list<HandleType> expiredHandles;
@@ -248,6 +266,10 @@ bool DelayQueue::StopDelayTask(HandleType handle) {
 
 bool DelayQueue::UpdateTaskInterval(HandleType handle, std::int64_t intervalMs) {
     return pImp->UpdateTaskInterval(handle, intervalMs);
+}
+
+bool DelayQueue::ModifyTaskNextExpiredTimepoint(HandleType handle, std::int64_t modify_value_ms) {
+    return pImp->ModifyTaskNextExpiredTimepoint(handle, modify_value_ms);
 }
 
 bool DelayQueue::RestartDelayTask(HandleType handle) {

@@ -17,6 +17,7 @@ file(GLOB lib_source
     tracker/*.h
     tracker/*.cpp
     tracker/*.hpp
+
 )
 set(extra_libs)
 #prepare rttr
@@ -39,6 +40,9 @@ if(FUNDAMENTAL_BUILD_EVENTS)
         application/*.h
         application/*.cpp
         application/*.hpp
+        data_storage/*.h
+        data_storage/*.cpp
+        data_storage/*.hpp
     )
     list(APPEND lib_source ${events_source})
     list(APPEND extra_libs eventpp)

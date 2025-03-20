@@ -79,7 +79,7 @@ void ThreadPool::Spawn(int count) {
 }
 
 std::size_t ThreadPool::Join() {
-    FCON_ACTION(!InThreadPool(), throw std::runtime_error("try not call thread_pool' Join() in itself"),
+    FASSERT_ACTION(!InThreadPool(), throw std::runtime_error("try not call thread_pool' Join() in itself"),
                 "try not call thread pool join in itself");
     auto expected = false;
     if (!m_joining.compare_exchange_strong(expected, true)) return 0;
