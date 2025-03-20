@@ -316,7 +316,7 @@ inline constexpr std::array<char, N> __get_short_file_name__(const char (&file_n
     #define FASSERT_THROWN(_check, ...) (void)0
 #endif
 
-#define FCON_ACTION(_check, _action, ...)                                                                           \
+#define FASSERT_ACTION(_check, _action, ...)                                                                           \
     if (!(_check)) {                                                                                                   \
         auto __debugInfo__ = Fundamental::StringFormat("[{}:{}"                                                        \
                                                        "(" STR_HELPER(__LINE__) ")] [####check####:" #_check "] ",     \

@@ -32,7 +32,7 @@ void http_router::update_route_table(const std::string& pattern,
                                      const http_handler& handler,
                                      std::uint32_t method_mask) {
     std::scoped_lock<std::mutex> locker(mutex_);
-    FCON_ACTION(route_tables.count(pattern) == 0, , "http pattern is alreay existed");
+    FASSERT_ACTION(route_tables.count(pattern) == 0, , "http pattern is alreay existed");
     auto &item        = route_tables[pattern];
     item.handler     = handler;
     item.method_mask = method_mask;

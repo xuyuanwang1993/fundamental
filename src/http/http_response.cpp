@@ -180,13 +180,13 @@ void http_response::prepare() {
 }
 
 bool http_response::can_set_header() const {
-    FCON_ACTION(!(response_pack_status.load() & http_response_status_mask::http_response_all_headeres_set),
+    FASSERT_ACTION(!(response_pack_status.load() & http_response_status_mask::http_response_all_headeres_set),
                 return false, "all http headeres has already set,check your code");
     return true;
 }
 
 bool http_response::can_set_body() const {
-    FCON_ACTION(!(response_pack_status.load() & http_response_status_mask::http_response_body_set), return false,
+    FASSERT_ACTION(!(response_pack_status.load() & http_response_status_mask::http_response_body_set), return false,
                 "body has set finished ,check your code");
     return true;
 }
