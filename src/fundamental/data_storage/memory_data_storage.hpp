@@ -11,16 +11,18 @@ namespace Fundamental
 
 namespace storage
 {
-template <typename DataType, typename = std::void_t<>>
-struct memory_storage_item {
-    DataType data;
+struct memory_storage_item_common {
     Fundamental::DelayQueue::HandleType handle = Fundamental::DelayQueue::kInvalidHandle;
+    std::function<void()> remove_cb            = nullptr;
+};
+template <typename DataType, typename = std::void_t<>>
+struct memory_storage_item : memory_storage_item_common {
+    DataType data;
 };
 
 template <typename DataType>
-struct memory_storage_item<DataType, std::void_t<std::enable_if_t<std::is_void_v<DataType>>>> {
-    Fundamental::DelayQueue::HandleType handle = Fundamental::DelayQueue::kInvalidHandle;
-};
+struct memory_storage_item<DataType, std::void_t<std::enable_if_t<std::is_void_v<DataType>>>>
+: memory_storage_item_common {};
 
 template <typename ValueType>
 class memory_storage_data : public data_storage_interface<memory_storage_data<ValueType>> {
@@ -56,9 +58,19 @@ public:
     }
 
     bool remove_data(std::string table_name, std::string key) {
-        std::scoped_lock<std::mutex> locker(data_mutex);
+        std::unique_lock<std::mutex> locker(data_mutex);
         auto table_iter = storage.find(table_name);
-        return table_iter == storage.end() ? false : table_iter->second.erase(key) > 0;
+        if (table_iter == storage.end()) return false;
+        auto data_iter = table_iter->second.find(key);
+        if (data_iter == table_iter->second.end()) return false;
+
+        storage::memory_storage_item<ValueType> remove_item = std::move(data_iter->second);
+        table_iter->second.erase(data_iter);
+        locker.unlock();
+        if (remove_item.handle != Fundamental::DelayQueue::kInvalidHandle)
+            delay_queue->RemoveDelayTask(remove_item.handle);
+        if (remove_item.remove_cb) remove_item.remove_cb();
+        return true;
     }
     bool update_key_expired_time(std::string table_name, std::string key, std::int64_t update_expired_time_msec) {
         std::scoped_lock<std::mutex> locker(data_mutex);
@@ -76,10 +88,17 @@ public:
 
 protected:
     void release_data() {
-        std::scoped_lock<std::mutex> locker(data_mutex);
-        for (auto& table : storage) {
+        decltype(storage) copy;
+        {
+            std::scoped_lock<std::mutex> locker(data_mutex);
+            std::swap(copy, storage);
+        }
+
+        for (auto& table : copy) {
             for (auto& item : table.second) {
-                delay_queue->StopDelayTask(item.second.handle);
+                if (item.second.handle != Fundamental::DelayQueue::kInvalidHandle)
+                    delay_queue->RemoveDelayTask(item.second.handle);
+                if (item.second.remove_cb) item.second.remove_cb();
             }
         }
     }
@@ -116,10 +135,11 @@ public:
                 return false;
             }
             // clear status
-            super::delay_queue->StopDelayTask(item.handle);
+            super::delay_queue->RemoveDelayTask(item.handle);
             item.handle = Fundamental::DelayQueue::kInvalidHandle;
         }
-        item.data = std::move(data);
+        item.data      = std::move(data);
+        item.remove_cb = config.remove_cb;
         if (config.expired_time_msec > 0) {
             item.handle = super::delay_queue->AddDelayTask(
                 config.expired_time_msec,
@@ -127,7 +147,7 @@ public:
                     super::remove_data(table_name, key);
                     super::expired_signal_.Emit(table_name, key);
                 },
-                true);
+                true, false);
             super::delay_queue->StartDelayTask(item.handle);
         }
         return true;
@@ -173,9 +193,10 @@ public:
                 return false;
             }
             // clear status
-            super::delay_queue->StopDelayTask(item.handle);
+            super::delay_queue->RemoveDelayTask(item.handle);
             item.handle = Fundamental::DelayQueue::kInvalidHandle;
         }
+        item.remove_cb = config.remove_cb;
         if (config.expired_time_msec > 0) {
             item.handle = super::delay_queue->AddDelayTask(
                 config.expired_time_msec,
@@ -183,7 +204,7 @@ public:
                     super::remove_data(table_name, key);
                     expired_signal_.Emit(table_name, key);
                 },
-                true);
+                true, false);
             super::delay_queue->StartDelayTask(item.handle);
         }
         return true;

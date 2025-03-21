@@ -62,6 +62,43 @@ TEST(data_storage_test, set_test) {
     EXPECT_TRUE(storage.table_size(test_table) == 0);
 }
 
+TEST(data_storage_test, shared_ptr_remove_test) {
+    struct TestItem {
+        TestItem(int& ref) : ref(ref) {
+            ++ref;
+        }
+        ~TestItem() {
+            --ref;
+            FINFO("release Test item");
+        }
+        int& ref;
+    };
+
+    memory_storage<std::shared_ptr<TestItem>> storage(&queue);
+    std::string test_table = "table";
+    std::string test_key   = "key";
+    std::int32_t ref       = 0;
+    {
+        storage_config test_config;
+
+        auto data                     = std::make_shared<TestItem>(ref);
+        test_config.remove_cb         = [data]() { FINFO("data removed"); };
+        test_config.expired_time_msec = 5;
+        storage.expired_signal().Connect(
+            [](std::string_view table, std::string_view key) -> Fundamental::SignalBrokenType {
+                FINFO("table:{} key:{} is expired", table, key);
+                return Fundamental::SignalBrokenType(false);
+            });
+        EXPECT_TRUE(storage.persist_data(test_table, test_key, std::move(data), test_config));
+    }
+
+    EXPECT_TRUE(storage.table_size(test_table) == 1);
+    EXPECT_EQ(ref, 1);
+    std::this_thread::sleep_for(std::chrono::milliseconds(8));
+    EXPECT_TRUE(storage.table_size(test_table) == 0);
+    EXPECT_EQ(ref, 0);
+}
+
 int main(int argc, char* argv[]) {
     queue.SetStateChangedCallback([]() { WakeUp(); });
     std::thread t([&]() {
