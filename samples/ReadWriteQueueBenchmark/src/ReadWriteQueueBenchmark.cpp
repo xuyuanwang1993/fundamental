@@ -14,21 +14,12 @@
 
 #include "benchmark/benchmark.h"
 
-void LockFreeSigleThread(benchmark::State& state) {
-    Fundamental::BlockingReaderWriterCircularBuffer<std::size_t> q(31);
-    std::size_t t = 0;
-    for (auto _ : state) {
-        q.wait_enqueue(0);
-        q.wait_dequeue(t);
-    }
-}
-
 void LockFreeQueueSigleThread(benchmark::State& state) {
-    Fundamental::ReaderWriterQueue<std::size_t> q(31);
+    Fundamental::BlockingReaderWriterQueue<std::size_t> q(31);
     std::size_t t = 0;
     for (auto _ : state) {
-        q.try_enqueue(0);
-        q.try_dequeue(t);
+        q.enqueue(0);
+        q.wait_dequeue(t);
     }
 }
 
@@ -41,38 +32,19 @@ void LockSigleThread(benchmark::State& state) {
     }
 }
 
-void LockFreeMultiThread(benchmark::State& state) {
-    Fundamental::BlockingReaderWriterCircularBuffer<std::size_t> q(31);
+void LockFreeQueueMultiThread(benchmark::State& state) {
+    Fundamental::BlockingReaderWriterQueue<std::size_t> q(31);
 
     bool finished = false;
     std::thread t([&]() {
         std::size_t i = 0;
         while (!finished) {
-            q.try_enqueue(++i);
+            q.enqueue(++i);
         }
     });
     std::size_t value = 0;
     for (auto _ : state) {
         q.wait_dequeue(value);
-    }
-    finished = true;
-    t.join();
-}
-
-void LockFreeQueueMultiThread(benchmark::State& state) {
-    Fundamental::ReaderWriterQueue<std::size_t> q(31);
-
-    bool finished = false;
-    std::thread t([&]() {
-        std::size_t i = 0;
-        while (!finished) {
-            q.try_enqueue(++i);
-        }
-    });
-    std::size_t value = 0;
-    for (auto _ : state) {
-        while (!q.try_dequeue(value)) {
-        };
     }
     finished = true;
     t.join();
@@ -95,12 +67,9 @@ void LockMultiThread(benchmark::State& state) {
     t.join();
 }
 
-BENCHMARK(LockFreeSigleThread)->Iterations(10000000);
-
 BENCHMARK(LockFreeQueueSigleThread)->Iterations(10000000);
 BENCHMARK(LockSigleThread)->Iterations(10000000);
 
-BENCHMARK(LockFreeMultiThread)->Iterations(10000000);
 BENCHMARK(LockFreeQueueMultiThread)->Iterations(10000000);
 BENCHMARK(LockMultiThread)->Iterations(10000000);
 int main(int argc, char* argv[]) {
