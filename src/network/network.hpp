@@ -33,7 +33,7 @@ struct network_server_ssl_config {
     std::string tmp_dh_path;
     std::string ca_certificate_path;
     bool verify_client = true;
-    bool disable_ssl = false;
+    bool disable_ssl   = false;
 };
 
 struct network_client_ssl_config {
@@ -59,7 +59,10 @@ struct auto_network_storage_instance : Fundamental::NonCopyable {
     handle_(std::move(other.handle_)), ref_ptr(std::move(other.ref_ptr)) {
     }
 
-    auto_network_storage_instance& operator==(auto_network_storage_instance&& other) noexcept {
+    auto_network_storage_instance& operator=(auto_network_storage_instance&& other) noexcept {
+        release();
+        Fundamental::Application::Instance().exitStarted.DisConnect(handle_);
+
         handle_ = std::move(other.handle_);
         ref_ptr = std::move(other.ref_ptr);
         return *this;
@@ -72,7 +75,7 @@ struct auto_network_storage_instance : Fundamental::NonCopyable {
         return ref_ptr.get();
     }
     void release() {
-        ref_ptr->release_obj();
+        if (ref_ptr) ref_ptr->release_obj();
     }
 
 private:
