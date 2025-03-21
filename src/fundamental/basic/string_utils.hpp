@@ -21,6 +21,29 @@
 
 namespace Fundamental
 {
+inline constexpr std::size_t StringHash(const char* str, std::size_t seed) {
+    if (!str) return seed;
+    std::size_t i = 0;
+    while (std::size_t ch = static_cast<std::size_t>(str[i])) {
+        seed = seed * 65599 + ch;
+        ++i;
+    }
+
+    return seed;
+}
+
+/*
+ * compute str hash helper
+ */
+template <typename First, typename... Rest>
+inline constexpr std::size_t StringsHash(std::size_t seed, First first, Rest... rest) {
+    seed = StringHash(first, seed);
+    // Recusively iterate all levels
+    if constexpr (sizeof...(Rest) > 0) {
+        seed = StringsHash<Rest...>(seed, std::forward<Rest>(rest)...);
+    }
+    return seed;
+}
 
 // Type trait used for determine if T is c string or std::string
 template <typename T>

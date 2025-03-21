@@ -3,6 +3,9 @@
 #include <functional>
 #include <memory>
 #include <set>
+
+#include "fundamental/basic/string_utils.hpp"
+
 namespace Fundamental {
 using EventType = std::size_t;
 struct Event {
@@ -22,30 +25,6 @@ struct EventPolicy {
         return event->eventType;
     }
 };
-
-inline constexpr std::size_t ComputeStrHash(const char* str, std::size_t seed) {
-    if (!str) return seed;
-    std::size_t i = 0;
-    while (std::size_t ch = static_cast<std::size_t>(str[i])) {
-        seed = seed * 65599 + ch;
-        ++i;
-    }
-
-    return seed;
-}
-
-/*
- * compute str hash helper
- */
-template <typename First, typename... Rest>
-inline constexpr std::size_t ComputeEventHash(std::size_t seed, First first, Rest... rest) {
-    seed = ComputeStrHash(first, seed);
-    // Recusively iterate all levels
-    if constexpr (sizeof...(Rest) > 0) {
-        seed = ComputeEventHash<Rest...>(seed, std::forward<Rest>(rest)...);
-    }
-    return seed;
-}
 
 template <typename TargetType>
 auto ConstCastEvent(const Fundamental::EventPointerType& event) {

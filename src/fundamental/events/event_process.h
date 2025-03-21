@@ -11,7 +11,7 @@ struct EngineProcessEvent : Fundamental::Event {
     using TaskType = std::function<void()>;
     // an event must contain 'kEventType' field;
     constexpr inline static std::size_t kEventType =
-        ComputeEventHash(0, "EngineProcessEvent", "EngineProcessEvent", "Interface") | 1;
+        StringsHash(0, "EngineProcessEvent", "EngineProcessEvent", "Interface") | 1;
 
     EngineProcessEvent(const TaskType& task) : Event(kEventType), task(task) {
     }

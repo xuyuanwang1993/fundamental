@@ -15,7 +15,7 @@ using EventHandleType =
 struct InternalNotifyQueuedEvent : Fundamental::Event {
     // an event must contain 'kEventType' field;
     constexpr inline static std::size_t kEventType =
-        ComputeEventHash(0, "InternalNotifyQueuedEvent", "InternalNotifyQueuedEvent", "internal") | 1;
+        StringsHash(0, "InternalNotifyQueuedEvent", "InternalNotifyQueuedEvent", "internal") | 1;
 
     InternalNotifyQueuedEvent() : Event(kEventType) {
     }
