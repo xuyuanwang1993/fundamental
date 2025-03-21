@@ -66,6 +66,10 @@ public:
 
         storage::memory_storage_item<ValueType> remove_item = std::move(data_iter->second);
         table_iter->second.erase(data_iter);
+        //remove empty table
+        if (table_iter->second.empty()) {
+            storage.erase(table_iter);
+        }
         locker.unlock();
         if (remove_item.handle != Fundamental::DelayQueue::kInvalidHandle)
             delay_queue->RemoveDelayTask(remove_item.handle);
