@@ -7,6 +7,54 @@
 
 namespace Fundamental
 {
+
+/*
+///
+When using CRTP for multiple inheritance, the final subclass needs to
+explicitly specify the method instances to be called for all explicitly
+inherited CRTP base class methods, either by using the using directive
+to specify the method instances or by reimplementing the methods.
+///
+
+template <class derived>
+class Base2 {
+public:
+    using derived_ = derived;
+
+public:
+    void Add() {
+        imp().Add();
+    }
+    size_t Result() const {
+        return imp().Result();
+    }
+
+protected:
+    derived& imp() {
+        return *(static_cast<derived*>(this));
+    };
+    const derived& imp() const {
+        return *(static_cast<const derived*>(this));
+    };
+};
+
+class Derived1 : public Base2<Derived1> {
+public:
+    void Add() {
+    }
+    size_t Result() const {
+        return 0;
+    }
+};
+
+class Derived2 : public Derived1, public Base2<Derived2> {
+public:
+    using Derived1::Result;
+    void Add() {
+        Derived1::Add();
+    }
+};
+*/
 using ExpiredSignalType =
     Fundamental::Signal<Fundamental::SignalBrokenType(std::string_view /*table_name*/, std::string_view /*key*/)>;
 
