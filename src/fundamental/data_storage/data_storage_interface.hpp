@@ -14,6 +14,12 @@ When using CRTP for multiple inheritance, the final subclass needs to
 explicitly specify the method instances to be called for all explicitly
 inherited CRTP base class methods, either by using the using directive
 to specify the method instances or by reimplementing the methods.
+
+If accessing a CRTP instance is done through the form of base<derived_t>*,
+caution must be exercised when releasing the object to ensure that resources
+are properly released. In this case, the destructor of derived_t will not be called.
+If there are additional resource operations that need to be performed,
+ the destructor of the relevant CRTP base class should be declared as a virtual function in such scenarios.
 ///
 
 template <class derived>

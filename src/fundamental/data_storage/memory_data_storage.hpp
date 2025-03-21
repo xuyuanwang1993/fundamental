@@ -37,6 +37,7 @@ public:
                        "need a valid delay queu ref");
     }
     ~memory_storage_data() {
+        release_data();
     }
     bool init() {
         return true;
@@ -96,14 +97,13 @@ template <typename ValueType = std::string>
 class memory_storage : public storage::memory_storage_data<ValueType>,
                        public data_storage_accessor<ValueType, memory_storage<ValueType>> {
 public:
-    using value_type         = ValueType;
-    using super              = storage::memory_storage_data<ValueType>;
+    using value_type = ValueType;
+    using super      = storage::memory_storage_data<ValueType>;
 
 public:
     memory_storage(DelayQueue* delay_queue) : super(delay_queue) {
     }
     ~memory_storage() {
-        super::release_data();
     }
     bool persist_data(std::string table_name, std::string key, value_type data, const storage_config& config) {
         std::scoped_lock<std::mutex> locker(super::data_mutex);
@@ -154,14 +154,13 @@ template <>
 class memory_storage<void> : public storage::memory_storage_data<void>,
                              public data_storage_accessor<void, memory_storage<void>> {
 public:
-    using value_type         = void;
-    using super              = storage::memory_storage_data<void>;
+    using value_type = void;
+    using super      = storage::memory_storage_data<void>;
 
 public:
     memory_storage(DelayQueue* delay_queue) : super(delay_queue) {
     }
     ~memory_storage() {
-        super::release_data();
     }
     bool persist_data(std::string table_name, std::string key, const storage_config& config) {
         std::scoped_lock<std::mutex> locker(super::data_mutex);
