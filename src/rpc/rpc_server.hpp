@@ -45,7 +45,7 @@ public:
     void start() {
         bool expected_value = false;
         if (!has_started_.compare_exchange_strong(expected_value, true)) return;
-        FINFO("start http server on {}:{}", acceptor_.local_endpoint().address().to_string(),
+        FINFO("start rpc server on {}:{}", acceptor_.local_endpoint().address().to_string(),
               acceptor_.local_endpoint().port());
         do_accept();
     }
