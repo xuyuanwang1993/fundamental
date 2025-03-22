@@ -133,6 +133,8 @@ public:
     std::error_code GetLastError() const;
     void EnableAutoHeartBeat(bool enable, std::size_t timeout_msec = 15000);
     void release_obj();
+    std::string get_remote_peer_ip() const;
+    std::uint16_t get_remote_peer_port() const;
 
 private:
     void start() {
@@ -479,6 +481,12 @@ public:
         }
         return ret;
     }
+    auto get_remote_peer_ip() const {
+        return remote_ip;
+    }
+    auto get_remote_peer_port() const {
+        return remote_port;
+    }
 
 private:
     void close(bool forced_close = false) {
@@ -578,6 +586,8 @@ private:
                                             return;
                                         }
                                         if (!error_handle_func(ec)) return;
+                                        remote_ip   = socket_.remote_endpoint().address().to_string();
+                                        remote_port = socket_.remote_endpoint().port();
 #ifdef RPC_VERBOSE
                                         FDEBUG("{:p} rpc connect to {}:{}", (void*)this, endpoint.address().to_string(),
                                                endpoint.port());
@@ -1159,6 +1169,9 @@ private:
 #endif
     // rpc handler
     std::atomic_bool has_upgrade = false;
+    // remote endpoint
+    std::string remote_ip;
+    std::uint16_t remote_port = 0;
 };
 
 inline ClientStreamReadWriter::ClientStreamReadWriter(std::shared_ptr<rpc_client> client) :
@@ -1278,6 +1291,12 @@ inline void ClientStreamReadWriter::release_obj() {
         deadline_.cancel();
         client_->close(true);
     });
+}
+inline std::string ClientStreamReadWriter::get_remote_peer_ip() const {
+    return client_->get_remote_peer_ip();
+}
+inline std::uint16_t ClientStreamReadWriter::get_remote_peer_port() const {
+    return client_->get_remote_peer_port();
 }
 inline void ClientStreamReadWriter::read_head() {
     std::vector<asio::mutable_buffer> buffers;

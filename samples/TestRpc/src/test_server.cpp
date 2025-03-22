@@ -58,7 +58,8 @@ std::string translate(rpc_conn conn, const std::string& orignal) {
 }
 
 void hello(rpc_conn conn, const std::string& str) {
-    FINFOS << "hello from client:" << str;
+    auto ptr=conn.lock();
+    FINFO("hello from client [{}:{}]:{}",ptr->get_remote_peer_ip(),ptr->get_remote_peer_port(),str);
 }
 
 std::string get_person_name(rpc_conn conn, const person& p) {
@@ -245,7 +246,7 @@ void test_echo_stream(rpc_conn conn) {
     FWARN("try start test_echo_stream");
     rpc_stream_pool.Enqueue(
         [id](decltype(w) stream) {
-            FWARN("test_echo_stream start");
+            FWARN("test_echo_stream start {} {}",stream->get_remote_peer_ip(),stream->get_remote_peer_port());
             std::string msg;
             while (stream->Read(msg, 5000)) {
                 if (!stream->Write(msg.substr(0, msg.size() > 100 ? 100 : msg.size()) + " from server")) break;
