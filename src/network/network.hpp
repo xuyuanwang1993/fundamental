@@ -50,20 +50,17 @@ struct auto_network_storage_instance : Fundamental::NonCopyable {
     auto_network_storage_instance(std::shared_ptr<T> ptr) : ref_ptr(std::move(ptr)) {
         handle_ = Fundamental::Application::Instance().exitStarted.Connect([&]() { release(); });
     }
+    auto_network_storage_instance() = default;
     ~auto_network_storage_instance() {
-        release();
-
         Fundamental::Application::Instance().exitStarted.DisConnect(handle_);
+        release();
     }
     auto_network_storage_instance(auto_network_storage_instance&& other) noexcept :
-    handle_(std::move(other.handle_)), ref_ptr(std::move(other.ref_ptr)) {
+    auto_network_storage_instance(std::move(other.ref_ptr)) {
     }
 
     auto_network_storage_instance& operator=(auto_network_storage_instance&& other) noexcept {
         release();
-        Fundamental::Application::Instance().exitStarted.DisConnect(handle_);
-
-        handle_ = std::move(other.handle_);
         ref_ptr = std::move(other.ref_ptr);
         return *this;
     }
@@ -76,11 +73,12 @@ struct auto_network_storage_instance : Fundamental::NonCopyable {
     }
     void release() {
         if (ref_ptr) ref_ptr->release_obj();
+        ref_ptr = nullptr;
     }
 
 private:
-    HandleType handle_;
     std::shared_ptr<T> ref_ptr;
+    HandleType handle_;
 };
 
 template <typename ClassType, typename... Args>
