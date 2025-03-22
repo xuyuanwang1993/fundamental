@@ -1041,7 +1041,6 @@ TEST(rpc_test, test_ssl_proxy_echo_stream_mutithread) {
 }
     #endif
 #endif
-
 int main(int argc, char** argv) {
     int mode = 0;
     if (argc > 1) mode = std::stoi(argv[1]);

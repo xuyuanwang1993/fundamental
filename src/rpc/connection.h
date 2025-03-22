@@ -16,7 +16,6 @@
 #include <memory>
 #include <unordered_set>
 
-
 #include "fundamental/basic/log.h"
 #include "fundamental/events/event_system.h"
 
@@ -49,6 +48,8 @@ public:
     void EnableTimeoutCheck(std::size_t timeout_msec = 15000);
     ServerStreamReadWriter(std::shared_ptr<connection> conn);
     void release_obj();
+    std::string get_remote_peer_ip() const;
+    std::uint16_t get_remote_peer_port() const;
 
 private:
     void start() {
@@ -132,6 +133,8 @@ public:
     }
 
     void start() {
+        remote_ip   = socket_.remote_endpoint().address().to_string();
+        remote_port = socket_.remote_endpoint().port();
         if (is_ssl()) {
             ssl_handshake();
         } else {
@@ -210,6 +213,12 @@ public:
     }
     bool has_closed() const {
         return !reference_.is_valid();
+    }
+    auto get_remote_peer_ip() const {
+        return remote_ip;
+    }
+    auto get_remote_peer_port() const {
+        return remote_port;
     }
 
 private:
@@ -652,6 +661,9 @@ private:
 #endif
     // proxy
     network::proxy::ProxyManager* proxy_manager_ = nullptr;
+    // remote endpoint
+    std::string remote_ip;
+    std::uint16_t remote_port = 0;
 };
 
 inline ServerStreamReadWriter::ServerStreamReadWriter(std::shared_ptr<connection> conn) :
@@ -668,6 +680,12 @@ inline void ServerStreamReadWriter::release_obj() {
         }
         conn_->release_obj();
     });
+}
+inline std::string ServerStreamReadWriter::get_remote_peer_ip() const {
+    return conn_->get_remote_peer_ip();
+}
+inline std::uint16_t ServerStreamReadWriter::get_remote_peer_port() const {
+    return conn_->get_remote_peer_port();
 }
 inline ServerStreamReadWriter::~ServerStreamReadWriter() {
     FDEBUG("release stream writer {:p} with connection:{:p}", (void*)this, (void*)conn_.get());
