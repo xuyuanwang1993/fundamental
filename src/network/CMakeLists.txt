@@ -36,6 +36,11 @@ else()
     )
 endif()
 
+target_compile_definitions(${lib_name}
+    PUBLIC
+    ASIO_NO_TYPEID=1
+)
+
 # Config link dependencies
 target_link_libraries(${lib_name} PUBLIC
     BuildSettings
@@ -44,3 +49,4 @@ target_link_libraries(${lib_name} PUBLIC
 )
 
 add_library(${GLOB_NAMESPACE}${lib_name} ALIAS ${lib_name})
+config_disable_rtti(${lib_name})
