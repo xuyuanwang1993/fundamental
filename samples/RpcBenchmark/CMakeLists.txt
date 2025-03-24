@@ -58,3 +58,4 @@ add_custom_command(TARGET ${app_target_name}
     COMMAND ${CMAKE_COMMAND} --install . --component ssl-crt
     COMMENT "post-build ssl pem install"
     VERBATIM)
+

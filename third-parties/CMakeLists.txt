@@ -41,3 +41,9 @@ if(FUNDAMENTAL_BUILD_NETWORK)
     target_include_directories(asio_lib INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/asio-source)
     add_library(asio ALIAS asio_lib)
 endif()
+
+
+if(FUNDAMENTAL_ENABLE_SCRIPT_SUPPORT)
+#config chaiscript
+add_subdirectory(ChaiScript)
+endif()

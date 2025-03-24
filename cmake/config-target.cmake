@@ -120,10 +120,11 @@ endfunction()
 
 # disable rtti for no debug mode
 function(config_disable_rtti target_name)
-    target_compile_options(${target_name} PUBLIC
-        "$<$<NOT:$<CONFIG:Debug>>:$<$<CXX_COMPILER_ID:GNU,Clang>:-fno-rtti>>"
-        "$<$<NOT:$<CONFIG:Debug>>:$<$<CXX_COMPILER_ID:MSVC>:/GR->>"
-    )
+    # TODO fix no rtti compile error
+    # target_compile_options(${target_name} PRIVATE
+    #     "$<$<NOT:$<CONFIG:Debug>>:$<$<CXX_COMPILER_ID:GNU,Clang>:-fno-rtti>>"
+    #     "$<$<NOT:$<CONFIG:Debug>>:$<$<CXX_COMPILER_ID:MSVC>:/GR->>"
+    # )
 endfunction()
 
 # enable profiling
