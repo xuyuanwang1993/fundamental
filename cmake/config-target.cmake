@@ -69,8 +69,6 @@ target_compile_options(BuildSettings INTERFACE
     "$<$<CONFIG:Debug>:-O0;-Wall;-g2;-ggdb;-fno-omit-frame-pointer>"
     "$<$<CONFIG:RelWithDebInfo>:-O2;-Wall;-g>"
     "$<$<CONFIG:Release>:-O3;-Wall>"
-    "$<$<NOT:$<CONFIG:Debug>>:$<$<CXX_COMPILER_ID:GNU,Clang>:-fno-rtti>>"
-    "$<$<NOT:$<CONFIG:Debug>>:$<$<CXX_COMPILER_ID:MSVC>:/GR->>"
     "-fPIC"
 )
 
@@ -116,6 +114,15 @@ function(config_enable_sanitize_address_check target_name)
     target_link_libraries(
         ${target_name} PRIVATE
         "$<$<CONFIG:Debug>:asan>"
+    )
+endfunction()
+
+
+# disable rtti for no debug mode
+function(config_disable_rtti target_name)
+    target_compile_options(${target_name} PRIVATE
+        "$<$<NOT:$<CONFIG:Debug>>:$<$<CXX_COMPILER_ID:GNU,Clang>:-fno-rtti>>"
+        "$<$<NOT:$<CONFIG:Debug>>:$<$<CXX_COMPILER_ID:MSVC>:/GR->>"
     )
 endfunction()
 
