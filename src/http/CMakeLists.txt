@@ -30,3 +30,4 @@ target_link_libraries(${lib_name} PUBLIC
 )
 
 add_library(${GLOB_NAMESPACE}${lib_name} ALIAS ${lib_name})
+config_disable_rtti(${lib_name})

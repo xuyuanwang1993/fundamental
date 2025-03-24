@@ -26,7 +26,9 @@ void TestReport()
     std::string outstr;
     Fundamental::ReportMemoryTracker<T>(outstr);
     //we should not use typeid in production dev code
+#if DEBUG
     FINFO("class {}:{}",typeid(T).name(),outstr.c_str());
+#endif
 }
 void TestAllocateMemory()
 {
