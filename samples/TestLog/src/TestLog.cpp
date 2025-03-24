@@ -133,8 +133,8 @@ void TestFormatter(const std::string& format_str) {
 
 void TestStringFormat() {
     //
-    { FASSERT(Fundamental::StringFormat("test") == "test"); }
-    { FASSERT(Fundamental::StringFormat(1) == "1"); }
-    { FASSERT(Fundamental::StringFormat("{}", 1) == "1"); }
-    { FASSERT(Fundamental::StringFormat("{}{}", 1, "test") == "1test"); }
+    FASSERT(Fundamental::StringFormat("test") == "test");
+    FASSERT(Fundamental::StringFormat(1) == "1");
+    FASSERT(Fundamental::StringFormat("{}", 1) == "1");
+    FASSERT(Fundamental::StringFormat("{}{}", 1, "test") == "1test");
 }

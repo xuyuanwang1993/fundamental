@@ -70,9 +70,11 @@ target_link_libraries(${lib_name}_property INTERFACE
     nlohmann::json
     BuildSettings
 )
+
 if(F_BUILD_STATIC)
     # Create the static library
     add_library(${lib_name}${STATIC_LIB_SUFFIX} STATIC ${lib_source})
+    config_disable_rtti(${lib_name}${STATIC_LIB_SUFFIX})
     config_enable_sanitize_address_check(${lib_name}${STATIC_LIB_SUFFIX})
     # Config link dependencies
     target_link_libraries(${lib_name}${STATIC_LIB_SUFFIX}
@@ -85,6 +87,7 @@ endif()
 if(F_BUILD_SHARED)
     # Create the shared library
     add_library(${lib_name} SHARED ${lib_source})
+    config_disable_rtti(${lib_name})
     config_enable_sanitize_address_check(${lib_name})
     # Config link dependencies
     target_link_libraries(${lib_name}
