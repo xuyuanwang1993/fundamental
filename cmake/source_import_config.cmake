@@ -7,8 +7,10 @@ if(NOT FUNDAMENTAL_IMPORT_SRC)
 endif()
 
 if(FUNDAMENTAL_MAIN_PROJECT)
+    option(FUNDAMENTAL_ENABLE_SCRIPT_SUPPORT "enable chaiscript support." ON)
     option(FUNDAMENTAL_BUILD_NETWORK "enable build of fundamental network library." ON)
 else()
+    option(FUNDAMENTAL_ENABLE_SCRIPT_SUPPORT "enable chaiscript support." OFF)
     option(FUNDAMENTAL_BUILD_NETWORK "enable build of fundamental network library." OFF)
 endif()
 

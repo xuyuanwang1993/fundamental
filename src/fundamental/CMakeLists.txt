@@ -29,6 +29,9 @@ if(FUNDAMENTAL_BUILD_RTTR)
     )
     list(APPEND lib_source ${rttr_source})
     list(APPEND extra_libs ${RTTR_LIB})
+    if(FUNDAMENTAL_ENABLE_SCRIPT_SUPPORT)
+        list(APPEND extra_libs chaiscript)
+    endif()
 endif()
 
 if(FUNDAMENTAL_BUILD_EVENTS)
@@ -71,6 +74,7 @@ target_link_libraries(${lib_name}_property INTERFACE
     BuildSettings
 )
 
+
 if(F_BUILD_STATIC)
     # Create the static library
     add_library(${lib_name}${STATIC_LIB_SUFFIX} STATIC ${lib_source})
@@ -97,3 +101,6 @@ if(F_BUILD_SHARED)
 
     add_library(${GLOB_NAMESPACE}${lib_name} ALIAS ${lib_name})
 endif()
+
+
+
