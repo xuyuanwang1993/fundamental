@@ -69,6 +69,8 @@ target_compile_options(BuildSettings INTERFACE
     "$<$<CONFIG:Debug>:-O0;-Wall;-g2;-ggdb;-fno-omit-frame-pointer>"
     "$<$<CONFIG:RelWithDebInfo>:-O2;-Wall;-g>"
     "$<$<CONFIG:Release>:-O3;-Wall>"
+    "$<$<NOT:$<CONFIG:Debug>>:$<$<CXX_COMPILER_ID:GNU,Clang>:-fno-rtti>>"
+    "$<$<NOT:$<CONFIG:Debug>>:$<$<CXX_COMPILER_ID:MSVC>:/GR->>"
     "-fPIC"
 )
 
