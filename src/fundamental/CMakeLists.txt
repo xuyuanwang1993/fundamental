@@ -17,6 +17,9 @@ file(GLOB lib_source
     tracker/*.h
     tracker/*.cpp
     tracker/*.hpp
+    algorithm/*.h
+    algorithm/*.cpp
+    algorithm/*.hpp
 
 )
 set(extra_libs)
