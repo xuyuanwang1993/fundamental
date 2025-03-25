@@ -83,7 +83,7 @@ template <typename _Value,
 class range_set : public std::multiset<_Key, _Compare, _Alloc> {
     using super            = std::multiset<_Key, _Compare, _Alloc>;
     using range_value_type = typename _Key::value_type;
-
+    using iterator=typename super::iterator;
 public:
     range_set()  = default;
     ~range_set() = default;
@@ -97,23 +97,22 @@ public:
     ///  range_emplace [1,3) -> [1,4) [5,6) [10,15) return false
     ///  range_emplace [4,16) -> [1,16) return true
     template <typename... Args>
-    bool range_emplace(Args&&... args) {
+    std::pair<iterator, bool> range_emplace(Args&&... args) {
         range<range_value_type> new_range(std::forward<Args>(args)...);
-        if (!new_range) return false;
+        if (!new_range) return { iterator{}, false };
         auto ret   = super::equal_range(new_range);
         auto begin = ret.first;
         while (begin != ret.second) {
             assert(begin->has_intersection(new_range) || new_range.in_range(begin->up) ||
                    begin->in_range(new_range.up));
-            if (begin->contains(new_range)) return false;
+            if (begin->contains(new_range)) return { iterator{}, false };
             if (begin->has_patitial_intersection(new_range) || new_range.in_range(begin->up) ||
                 begin->in_range(new_range.up)) { // combine
                 new_range.range_combine(*begin);
             }
             super::erase(begin++);
         }
-        super::emplace(std::move(new_range));
-        return true;
+        return { super::emplace(std::move(new_range)), true };
     }
 
     /// @brief remove a range from set

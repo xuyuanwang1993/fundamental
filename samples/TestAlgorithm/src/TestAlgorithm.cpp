@@ -9,11 +9,19 @@ using namespace Fundamental;
 
 TEST(test_algorithm, range) {
     algorithm::range_set<std::size_t> set;
-    EXPECT_TRUE(set.range_emplace(1, 2));
-    EXPECT_TRUE(set.range_emplace(2, 6));
-    EXPECT_TRUE(set.range_emplace(10, 15));
+    {
+        auto ret = set.range_emplace(1, 2);
+        EXPECT_TRUE(ret.second && ret.first != set.end());
+    }
+    {
+        auto ret = set.range_emplace(2, 6);
+        EXPECT_TRUE(ret.second && ret.first != set.end());
+        EXPECT_EQ(ret.first->low,1);
+        EXPECT_EQ(ret.first->up,6);
+    }
+    EXPECT_TRUE(set.range_emplace(10, 15).second);
     EXPECT_EQ(set.size(), 2);
-    EXPECT_FALSE(set.range_emplace(1, 5));
+    EXPECT_FALSE(set.range_emplace(1, 5).second);
     EXPECT_TRUE(set.range_remove(1, 2));
     EXPECT_FALSE(set.range_remove(1, 2));
     EXPECT_TRUE(set.range_remove(11, 12));
