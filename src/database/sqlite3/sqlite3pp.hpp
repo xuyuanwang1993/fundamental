@@ -76,6 +76,9 @@ class database : noncopyable {
     friend class ext::aggregate;
 
 public:
+    constexpr static const char* kMemoryDbName = ":memory:";
+
+public:
     using busy_handler      = std::function<int(int)>;
     using commit_handler    = std::function<int()>;
     using rollback_handler  = std::function<void()>;
@@ -83,10 +86,10 @@ public:
     using authorize_handler = std::function<int(int, char const*, char const*, char const*, char const*)>;
     using backup_handler    = std::function<void(int, int, int)>;
 
-    explicit database(char const* dbname = nullptr,
-                      int flags          = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE,
-                      const char* vfs    = nullptr);
-
+    explicit database(char const* dbname,
+                      int flags       = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE,
+                      const char* vfs = nullptr);
+    explicit database(int flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, const char* vfs = nullptr);
     database(database&& db);
     database& operator=(database&& db);
 
@@ -395,6 +398,9 @@ inline database::database(char const* dbname, int flags, char const* vfs) : db_(
             throw database_error("can't connect database");
         }
     }
+}
+
+inline database::database(int flags, const char* vfs) : database(kMemoryDbName, flags, vfs) {
 }
 
 inline database::database(database&& db) :

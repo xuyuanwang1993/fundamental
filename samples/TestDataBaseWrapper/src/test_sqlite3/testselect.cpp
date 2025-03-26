@@ -39,6 +39,7 @@ TEST(test_sqlite3, testselect)
 
       qry.reset();
 
+
       for (sqlite3pp::query::iterator i = qry.begin(); i != qry.end(); ++i) {
 	int id = 0;
 	std::string name, phone;

@@ -10,7 +10,7 @@ file(GLOB file_source
 if(FUNDAMENTAL_ENABLE_SQLITE3_SUPPORT)
     file(GLOB test_sqlite3_src
         src/test_sqlite3/*.h
-        src/test_sqlite3/*.cpp
+        src/test_sqlite3/testdb.cpp
         src/test_sqlite3/*.hpp
     )
     list(APPEND file_source ${test_sqlite3_src})
