@@ -13,9 +13,6 @@ file(GLOB lib_source
     proxy/*.hpp
 )
 
-
-list(APPEND lib_source ${services_source})
-
 # Add to source group, TREE will enable cmake to config the folder layout automatically
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${lib_source})
 

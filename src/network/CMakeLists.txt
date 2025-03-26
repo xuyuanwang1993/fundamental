@@ -7,7 +7,6 @@ file(GLOB lib_source
     *.hpp
 )
 option(NETWORK_DISABLE_SSL "disable network ssl support." OFF)
-list(APPEND lib_source ${services_source})
 
 # Add to source group, TREE will enable cmake to config the folder layout automatically
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${lib_source})
