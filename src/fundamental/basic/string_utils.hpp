@@ -1,7 +1,3 @@
-//
-// Author: Jason Huang(jasonhuang1988@gmail.com) 2022
-//
-
 #pragma once
 
 #include <cctype>
