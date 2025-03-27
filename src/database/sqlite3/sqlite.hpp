@@ -1,30 +1,4 @@
-// sqlite3pp.h
-//
-// The MIT License
-//
-// Copyright (c) 2015 Wongoo Lee (iwongu at gmail dot com)
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in
-// all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-// THE SOFTWARE.
-
-#ifndef SQLITE3PP_H
-#define SQLITE3PP_H
-
+#pragma once
 #include <cstring>
 #include <functional>
 #include <iterator>
@@ -33,14 +7,17 @@
 #include <string>
 #include <tuple>
 
-#ifdef SQLITE3PP_LOADABLE_EXTENSION
+#ifdef IMPORT_SQLITE_LOADABLE_EXTENSION
     #include <sqlite3ext.h>
+    #ifndef SQLITE_EXTENSION_INIT_DONE
+        #define SQLITE_EXTENSION_INIT_DONE
 SQLITE_EXTENSION_INIT1
+    #endif
 #else
     #include <sqlite3.h>
 #endif
 
-namespace sqlite3pp
+namespace sqlite
 {
 class database;
 
@@ -76,6 +53,9 @@ class database : noncopyable {
     friend class ext::aggregate;
 
 public:
+    constexpr static const char* kMemoryDbName = ":memory:";
+
+public:
     using busy_handler      = std::function<int(int)>;
     using commit_handler    = std::function<int()>;
     using rollback_handler  = std::function<void()>;
@@ -83,10 +63,10 @@ public:
     using authorize_handler = std::function<int(int, char const*, char const*, char const*, char const*)>;
     using backup_handler    = std::function<void(int, int, int)>;
 
-    explicit database(char const* dbname = nullptr,
-                      int flags          = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE,
-                      const char* vfs    = nullptr);
-
+    explicit database(char const* dbname,
+                      int flags       = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE,
+                      const char* vfs = nullptr);
+    explicit database(int flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, const char* vfs = nullptr);
     database(database&& db);
     database& operator=(database&& db);
 
@@ -125,6 +105,9 @@ public:
     void set_rollback_handler(rollback_handler h);
     void set_update_handler(update_handler h);
     void set_authorize_handler(authorize_handler h);
+    sqlite3* native_handle() {
+        return db_;
+    }
 
 private:
     database(sqlite3* pdb) : db_(pdb), borrowing_(true) {
@@ -180,6 +163,9 @@ public:
     int step();
     int reset();
     int clear_bindings();
+    sqlite3_stmt* native_handle() {
+        return stmt_;
+    }
 
 protected:
     explicit statement(database& db, char const* stmt = nullptr);
@@ -397,6 +383,9 @@ inline database::database(char const* dbname, int flags, char const* vfs) : db_(
     }
 }
 
+inline database::database(int flags, const char* vfs) : database(kMemoryDbName, flags, vfs) {
+}
+
 inline database::database(database&& db) :
 db_(std::move(db.db_)), borrowing_(std::move(db.borrowing_)), bh_(std::move(db.bh_)), ch_(std::move(db.ch_)),
 rh_(std::move(db.rh_)), uh_(std::move(db.uh_)), ah_(std::move(db.ah_)) {
@@ -439,6 +428,7 @@ inline int database::disconnect() {
     auto rc = SQLITE_OK;
     if (db_) {
         rc = sqlite3_close(db_);
+
         if (rc == SQLITE_OK) {
             db_ = nullptr;
         }
@@ -858,6 +848,4 @@ inline database_error::database_error(char const* msg) : std::runtime_error(msg)
 
 inline database_error::database_error(database& db) : std::runtime_error(sqlite3_errmsg(db.db_)) {
 }
-} // namespace sqlite3pp
-
-#endif
+} // namespace sqlite

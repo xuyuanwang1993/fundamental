@@ -1,41 +1,17 @@
-// sqlite3ppext.h
-//
-// The MIT License
-//
-// Copyright (c) 2015 Wongoo Lee (iwongu at gmail dot com)
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in
-// all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-// THE SOFTWARE.
-
-#ifndef SQLITE3PPEXT_H
-#define SQLITE3PPEXT_H
+#pragma once
 
 #include <cstddef>
 #include <cstring>
 #include <map>
 #include <memory>
+#include <string_view>
 #include <tuple>
 #include <type_traits>
 #include <utility>
 
-#include "sqlite3pp.hpp"
+#include "sqlite.hpp"
 
-namespace sqlite3pp
+namespace sqlite
 {
 
 namespace ext
@@ -44,12 +20,12 @@ namespace internal
 {
 
 template <class R, class... Ps>
-void functionx_impl(sqlite3_context* ctx, int nargs, sqlite3_value** values) ;
+void functionx_impl(sqlite3_context* ctx, int nargs, sqlite3_value** values);
 template <class T, class... Ps>
-void stepx_impl(sqlite3_context* ctx, int nargs, sqlite3_value** values) ;
+void stepx_impl(sqlite3_context* ctx, int nargs, sqlite3_value** values);
 
 template <class T>
-void finishN_impl(sqlite3_context* ctx) ;
+void finishN_impl(sqlite3_context* ctx);
 void function_impl(sqlite3_context* ctx, int nargs, sqlite3_value** values);
 
 void step_impl(sqlite3_context* ctx, int nargs, sqlite3_value** values);
@@ -74,6 +50,7 @@ public:
     void result(double value);
     void result(long long int value);
     void result(std::string const& value);
+    void result(std::string_view value);
     void result(char const* value, bool fcopy);
     void result(void const* value, int n, bool fcopy);
     void result();
@@ -134,7 +111,7 @@ private:
     struct create_function_impl<R(Ps...)> {
         int operator()(sqlite3* db, void* fh, char const* name) {
             return sqlite3_create_function(db, name, sizeof...(Ps), SQLITE_UTF8, fh, internal::functionx_impl<R, Ps...>,
-                                           0, 0);
+                                           nullptr, nullptr);
         }
     };
 
@@ -154,6 +131,7 @@ public:
 
     template <class T, class... Ps>
     int create(char const* name);
+
 private:
     sqlite3* db_;
 
@@ -180,6 +158,7 @@ template <>
 struct Apply<0> {
     template <typename F, typename T, typename... A>
     static inline auto apply(F&& f, T&&, A&&... a) -> decltype(std::forward<F>(f)(std::forward<A>(a)...)) {
+
         return std::forward<F>(f)(std::forward<A>(a)...);
     }
 };
@@ -203,8 +182,7 @@ inline void stepx_impl(sqlite3_context* ctx, int nargs, sqlite3_value** values) 
     context c(ctx, nargs, values);
     T* t = static_cast<T*>(c.aggregate_data(sizeof(T)));
     if (c.aggregate_count() == 1) new (t) T;
-    apply_f([](T* tt, Ps... ps) { tt->step(ps...); },
-                                   std::tuple_cat(std::make_tuple(t), c.to_tuple<Ps...>()));
+    apply_f([](T* tt, Ps... ps) { tt->step(ps...); }, std::tuple_cat(std::make_tuple(t), c.to_tuple<Ps...>()));
 }
 
 template <class T>
@@ -288,7 +266,11 @@ inline void context::result(long long int value) {
 }
 
 inline void context::result(std::string const& value) {
-    result(value.c_str(), false);
+    sqlite3_result_text(ctx_, value.c_str(), value.size(), SQLITE_TRANSIENT);
+}
+
+inline void context::result(std::string_view value) {
+    sqlite3_result_text(ctx_, value.data(), value.size(), SQLITE_STATIC);
 }
 
 inline void context::result(char const* value, bool fcopy) {
@@ -345,10 +327,7 @@ inline int aggregate::create(char const* name) {
         return sqlite3_create_function(db_, name, sizeof...(Ps), SQLITE_UTF8, 0, 0, internal::stepx_impl<T, Ps...>,
                                        internal::finishN_impl<T>);
     }
-
 }
 } // namespace ext
 
-} // namespace sqlite3pp
-
-#endif
+} // namespace sqlite
