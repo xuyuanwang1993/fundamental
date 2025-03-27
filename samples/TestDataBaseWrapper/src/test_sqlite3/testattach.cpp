@@ -1,31 +1,43 @@
-#include <iostream>
-#include "database/sqlite3/sqlite3pp.hpp"
+#include "database/sqlite3/sqlite.hpp"
+#include "test_sqlite3_common.hpp"
+#include <filesystem>
 #include <gtest/gtest.h>
 using namespace std;
 
-TEST(test_sqlite3, testattach)
-{
-  try {
-    sqlite3pp::database db("foods.db");
-
-    db.attach("test.db", "test");
+TEST(test_sqlite3, testattach) {
+    Fundamental::ScopeGuard g([&]() { std::filesystem::remove("test.db"); });
     {
-      sqlite3pp::transaction xct(db);
-      {
-	sqlite3pp::query qry(db, "SELECT epi.* FROM episodes epi, test.contacts con WHERE epi.id = con.id");
-
-	for (sqlite3pp::query::iterator i = qry.begin(); i != qry.end(); ++i) {
-	  for (int j = 0; j < qry.column_count(); ++j) {
-	    cout << (*i).get<char const*>(j) << "\t";
-	  }
-	  cout << endl;
-	}
-	cout << endl;
-      }
+        std::filesystem::remove("test.db");
+        sqlite::database att_db = contacts_db("test.db");
+        default_init_contacts_db(att_db);
     }
-  }
-  catch (exception& ex) {
-    cout << ex.what() << endl;
-  }
+    if (1) return;
+    try {
 
+        sqlite::database db;
+        try {
+            // table is not existed
+            sqlite::query qry(db, "SELECT COUNT(*) from contacts");
+            EXPECT_TRUE(false);
+        } catch (...) {
+        }
+
+        db.attach("test.db", "test");
+        {
+            sqlite::query qry(db, "SELECT COUNT(*) from test.contacts");
+            auto iter = qry.begin();
+            EXPECT_TRUE(iter != qry.end());
+            EXPECT_EQ((*iter).get<int>(0), 2);
+        }
+        EXPECT_EQ(db.detach("test.db"), 0);
+        try {
+            // table is not existed
+            sqlite::query qry(db, "SELECT COUNT(*) from test.contacts");
+            EXPECT_TRUE(false);
+        } catch (...) {
+        }
+    } catch (exception& ex) {
+        FERR("ex:{}", ex.what());
+        EXPECT_TRUE(false);
+    }
 }

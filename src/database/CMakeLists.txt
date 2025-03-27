@@ -7,8 +7,7 @@ file(GLOB lib_source
     *.hpp
 )
 
-set(extra_include_dirs)
-set(extra_libs)
+add_library(${lib_name}_property INTERFACE)
 if(FUNDAMENTAL_ENABLE_SQLITE3_SUPPORT)
     file(GLOB sqlite3_src
         sqlite3/*.h
@@ -21,12 +20,19 @@ if(FUNDAMENTAL_ENABLE_SQLITE3_SUPPORT)
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(SQLITE3 REQUIRED sqlite3)
     if(SQLITE3_FOUND)
-        list(APPEND extra_libs ${SQLITE3_LIBRARIES})
-        list(APPEND extra_include_dirs ${SQLITE3_INCLUDE_DIRS})
+        target_include_directories(${lib_name}_property INTERFACE
+            ${SQLITE3_INCLUDE_DIRS}
+        )
+        target_link_libraries(${lib_name}_property INTERFACE
+            ${SQLITE3_LIBRARIES}
+        )
+
     else()
         message(FATAL_ERROR "you should install libsqlite3-dev package")
     endif()
-
+    if(FUNDAMENTAL_ENABLE_SQLITE3_LOADABLE_EXT_SUPPORT)
+        target_compile_definitions(${lib_name}_property INTERFACE IMPORT_SQLITE_LOADABLE_EXTENSION)
+    endif()
 endif()
 
 # Add to source group, TREE will enable cmake to config the folder layout automatically
@@ -36,7 +42,6 @@ add_library(${lib_name} STATIC ${lib_source})
 
 target_include_directories(${lib_name} PUBLIC
     ${src_root_dir}
-    ${extra_include_dirs}
 )
 
 set_target_properties(${lib_name} PROPERTIES
@@ -47,7 +52,7 @@ set_target_properties(${lib_name} PROPERTIES
 # Config link dependencies
 target_link_libraries(${lib_name} PUBLIC
     BuildSettings
-    ${extra_libs}
+    ${lib_name}_property
 )
 
 add_library(${GLOB_NAMESPACE}${lib_name} ALIAS ${lib_name})
