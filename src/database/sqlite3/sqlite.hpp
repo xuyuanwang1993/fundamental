@@ -9,10 +9,6 @@
 
 #ifdef IMPORT_SQLITE_LOADABLE_EXTENSION
     #include <sqlite3ext.h>
-    #ifndef SQLITE_EXTENSION_INIT_DONE
-        #define SQLITE_EXTENSION_INIT_DONE
-SQLITE_EXTENSION_INIT1
-    #endif
 #else
     #include <sqlite3.h>
 #endif
@@ -20,7 +16,6 @@ SQLITE_EXTENSION_INIT1
 namespace sqlite
 {
 class database;
-
 namespace ext
 {
 class function;
@@ -849,3 +844,7 @@ inline database_error::database_error(char const* msg) : std::runtime_error(msg)
 inline database_error::database_error(database& db) : std::runtime_error(sqlite3_errmsg(db.db_)) {
 }
 } // namespace sqlite
+
+#ifdef IMPORT_SQLITE_LOADABLE_EXTENSION
+inline SQLITE_EXTENSION_INIT1
+#endif
