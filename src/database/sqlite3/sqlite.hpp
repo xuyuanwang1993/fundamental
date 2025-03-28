@@ -136,9 +136,17 @@ public:
     int prepare(char const* stmt);
     int finish();
 
-    int bind(int idx, int value);
     int bind(int idx, double value);
-    int bind(int idx, long long int value);
+
+    template <typename T, typename = std::enable_if_t<std::is_integral_v<std::decay_t<T>>>>
+    int bind(int idx, T value) {
+        if constexpr (sizeof(T) <= 4) {
+            return sqlite3_bind_int(stmt_, idx, static_cast<std::int32_t>(value));
+        } else {
+            return sqlite3_bind_int64(stmt_, idx, static_cast<sqlite3_int64>(value));
+        }
+    }
+
     int bind(int idx, char const* value, copy_semantic fcopy);
     int bind(int idx, void const* value, int n, copy_semantic fcopy);
     int bind(int idx, std::string const& value, copy_semantic fcopy);
@@ -146,9 +154,13 @@ public:
     int bind(int idx);
     int bind(int idx, null_type);
 
-    int bind(char const* name, int value);
+    template <typename T, typename = std::enable_if_t<std::is_integral_v<std::decay_t<T>>>>
+    int bind(char const* name, T value) {
+        auto idx = sqlite3_bind_parameter_index(stmt_, name);
+        return bind(idx, value);
+    }
+
     int bind(char const* name, double value);
-    int bind(char const* name, long long int value);
     int bind(char const* name, char const* value, copy_semantic fcopy);
     int bind(char const* name, void const* value, int n, copy_semantic fcopy);
     int bind(char const* name, std::string const& value, copy_semantic fcopy);
@@ -589,16 +601,8 @@ inline int statement::clear_bindings() {
     return sqlite3_clear_bindings(stmt_);
 }
 
-inline int statement::bind(int idx, int value) {
-    return sqlite3_bind_int(stmt_, idx, value);
-}
-
 inline int statement::bind(int idx, double value) {
     return sqlite3_bind_double(stmt_, idx, value);
-}
-
-inline int statement::bind(int idx, long long int value) {
-    return sqlite3_bind_int64(stmt_, idx, value);
 }
 
 inline int statement::bind(int idx, char const* value, copy_semantic fcopy) {
@@ -626,17 +630,7 @@ inline int statement::bind(int idx, null_type) {
     return bind(idx);
 }
 
-inline int statement::bind(char const* name, int value) {
-    auto idx = sqlite3_bind_parameter_index(stmt_, name);
-    return bind(idx, value);
-}
-
 inline int statement::bind(char const* name, double value) {
-    auto idx = sqlite3_bind_parameter_index(stmt_, name);
-    return bind(idx, value);
-}
-
-inline int statement::bind(char const* name, long long int value) {
     auto idx = sqlite3_bind_parameter_index(stmt_, name);
     return bind(idx, value);
 }
