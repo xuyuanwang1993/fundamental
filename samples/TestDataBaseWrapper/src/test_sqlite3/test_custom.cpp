@@ -1,7 +1,11 @@
 #include "database/sqlite3/sqlite.hpp"
 #include "test_sqlite3_common.hpp"
+#include <filesystem>
 #include <gtest/gtest.h>
 #include <iostream>
+#define FORCE_TIME_TRACKER
+#include <fundamental/tracker/time_tracker.hpp>
+
 using namespace std;
 
 TEST(test_sqlite3, test_custom) {
@@ -121,7 +125,47 @@ TEST(test_sqlite3, test_custom) {
                 ++iter;
             }
         }
+        {
+            using Type = Fundamental::STimeTracker<std::chrono::milliseconds>;
+            DeclareTimeTacker(Type, build_t, "db", "build db", 1, true, nullptr);
+            std::size_t target_cnt = 1000000;
+            for (std::size_t i = 3; i < target_cnt; ++i) {
+                sqlite::command cmd(db, "INSERT  INTO pir (h1, h2, data) VALUES (?, ?, ?)");
+                std::string v = "1";
+                cmd.bind(1, i);
+                cmd.bind(2, i);
+                cmd.bind(3, v.data(), v.size(), sqlite::copy_semantic::copy);
+                cmd.execute();
+            }
+            StopTimeTracker(build_t);
+            DeclareTimeTacker(Type, export_t, "db", "export db", 1, true, nullptr);
+            db.attach("export.db", "export");
+            { // init table
+                db.execute(R"""(
+            CREATE TABLE IF NOT EXISTS export.pir (
+            id INTEGER PRIMARY KEY,
+            h1 INTEGER NOT NULL,
+            h2 INTEGER NOT NULL,
+            UNIQUE(h1, h2) 
+        );
+  )""");
+            }
+            { // load all data
+                sqlite::command cmd(db, "INSERT INTO export.pir (id, h1, h2) SELECT id, h1, h2 FROM main.pir;");
+                cmd.execute();
+            }
+            StopTimeTracker(export_t);
+            { // count data
+                DeclareTimeTacker(Type, count_t, "db", "count db", 1, true, nullptr);
+                sqlite::query qry(db, "SELECT COUNT(*) from pir");
+                auto iter = qry.begin();
+                EXPECT_TRUE(iter != qry.end());
+                auto row = *iter;
+                EXPECT_EQ((row.get<std::int32_t>(0)), target_cnt);
+            }
 
+            db.detach("export.db");
+        }
     } catch (exception& ex) {
         FERR("ex:{}", ex.what());
         EXPECT_TRUE(false);
