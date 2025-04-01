@@ -246,7 +246,7 @@ public:
 
             template <class T>
             getstream& operator>>(T& value) {
-                value = rws_->get(idx_, T());
+                value = rws_->get<T>(idx_);
                 ++idx_;
                 return *this;
             }
@@ -265,25 +265,23 @@ public:
 
         template <class T>
         T get(int idx) const {
-            return get(idx, T());
+            if constexpr (std::is_integral_v<std::decay_t<T>>) {
+                if constexpr (sizeof(T) <= 4) {
+                    return static_cast<T>(sqlite3_column_int(stmt_, idx));
+                } else {
+                    return static_cast<T>(sqlite3_column_int64(stmt_, idx));
+                }
+            } else {
+                throw std::runtime_error("imp specialized version");
+            }
         }
 
         template <class... Ts>
         std::tuple<Ts...> get_columns(typename convert<Ts>::to_int... idxs) const {
-            return std::make_tuple(get(idxs, Ts())...);
+            return std::make_tuple(get<Ts>(idxs)...);
         }
 
         getstream getter(int idx = 0);
-
-    private:
-        int get(int idx, int) const;
-        double get(int idx, double) const;
-        long long int get(int idx, long long int) const;
-        char const* get(int idx, char const*) const;
-        std::string get(int idx, std::string) const;
-        void const* get(int idx, void const*) const;
-        char16_t const* get(int idx, char16_t const*) const;
-        null_type get(int idx, null_type) const;
 
     private:
         sqlite3_stmt* stmt_;
@@ -713,36 +711,31 @@ inline int query::rows::column_bytes(int idx) const {
     return sqlite3_column_bytes(stmt_, idx);
 }
 
-inline int query::rows::get(int idx, int) const {
-    return sqlite3_column_int(stmt_, idx);
-}
-
-inline double query::rows::get(int idx, double) const {
+template <>
+inline double query::rows::get<double>(int idx) const {
     return sqlite3_column_double(stmt_, idx);
 }
 
-inline long long int query::rows::get(int idx, long long int) const {
-    return sqlite3_column_int64(stmt_, idx);
-}
-
-inline char const* query::rows::get(int idx, char const*) const {
+template <>
+inline char const* query::rows::get<char const*>(int idx) const {
     return reinterpret_cast<char const*>(sqlite3_column_text(stmt_, idx));
 }
-
-inline char16_t const* query::rows::get(int idx, char16_t const*) const {
+template <>
+inline char16_t const* query::rows::get<char16_t const*>(int idx) const {
     return reinterpret_cast<char16_t const*>(sqlite3_column_text16(stmt_, idx));
 }
-
-inline std::string query::rows::get(int idx, std::string) const {
-    char const* c = get(idx, (char const*)0);
+template <>
+inline std::string query::rows::get<std::string>(int idx) const {
+    char const* c = get<const char*>(idx);
     return c ? std::string(c) : std::string();
 }
-
-inline void const* query::rows::get(int idx, void const*) const {
+template <>
+inline void const* query::rows::get<void const*>(int idx) const {
     return sqlite3_column_blob(stmt_, idx);
 }
 
-inline null_type query::rows::get(int /*idx*/, null_type) const {
+template <>
+inline null_type query::rows::get<null_type>(int /*idx*/) const {
     return {};
 }
 
