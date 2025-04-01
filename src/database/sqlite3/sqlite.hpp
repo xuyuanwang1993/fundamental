@@ -7,11 +7,7 @@
 #include <string>
 #include <tuple>
 
-#ifdef IMPORT_SQLITE_LOADABLE_EXTENSION
-    #include <sqlite3ext.h>
-#else
-    #include <sqlite3.h>
-#endif
+#include "sqlite-common.hpp"
 
 namespace sqlite
 {
