@@ -178,12 +178,12 @@ template <typename T>
     return out;
 }
 
-template <typename Tuple, typename = decltype(std::tuple_size<Tuple>::value)>
+template <typename Tuple, typename V>
 inline void binary_pack_tuple(std::vector<std::uint8_t>& out, const Tuple& in) {
     internal::binary_pack_tuple_helper<0>(out, in);
 }
 
-template <typename Tuple, typename = decltype(std::tuple_size<Tuple>::value)>
+template <typename Tuple, typename V>
 [[nodiscard]] inline std::vector<std::uint8_t> binary_pack_tuple(const Tuple& in) {
     std::vector<std::uint8_t> out;
     internal::binary_pack_tuple_helper<0>(out, in);
@@ -213,7 +213,7 @@ inline bool binary_unpack(const void* data,
     return internal::binary_unpack_helper(p_data, len, out, ignore_invalid_properties, index);
 }
 
-template <typename Tuple, typename = decltype(std::tuple_size<Tuple>::value)>
+template <typename Tuple, typename V>
 inline bool binary_unpack_tuple(const void* data,
                                 std::size_t len,
                                 Tuple& t,

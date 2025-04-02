@@ -240,7 +240,7 @@ public:
     }
 
     void broken_call(Args... args) {
-        forEachIf([this, &args...](const Handle& handle, Callback& callback) -> bool {
+        forEachIf([=, &args...](const Handle& handle, Callback& callback) -> bool {
             // We can't use std::forward here, because if we use std::forward,
             // for arg that is passed by value, and the callback prototype accepts it by value,
             // std::forward will move it and may cause the original value invalid.

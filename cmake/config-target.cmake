@@ -87,6 +87,39 @@ if(ENABLE_DEBUG_MEMORY_TRACE)
     )
 endif()
 
+#add optimize config
+
+target_compile_options(BuildSettings INTERFACE
+    # LTO 编译选项（-flto 或 /GL）
+    $<$<NOT:$<CONFIG:Debug>>:
+    $<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>:-flto=auto>
+    $<$<CXX_COMPILER_ID:MSVC>:/GL>
+    >
+    # GCC/Clang 分节选项（为 --gc-sections 做准备）
+    $<$<NOT:$<CONFIG:Debug>>:
+    $<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>:
+    -ffunction-sections
+    -fdata-sections
+    >
+    >
+)
+
+target_link_options(BuildSettings INTERFACE
+    # LTO 链接选项（-flto 或 /LTCG）
+    $<$<NOT:$<CONFIG:Debug>>:
+    $<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>:-flto=auto>
+    $<$<CXX_COMPILER_ID:MSVC>:/LTCG>
+    >
+    # 无用代码剥离（--gc-sections 或 /OPT:REF）
+    $<$<NOT:$<CONFIG:Debug>>:
+    $<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>:-Wl,--gc-sections>
+    $<$<CXX_COMPILER_ID:MSVC>:/OPT:REF>
+    >
+    # 可选：MSVC 的代码段合并（类似 ICF）
+    $<$<NOT:$<CONFIG:Debug>>:
+    $<$<CXX_COMPILER_ID:MSVC>:/OPT:ICF>
+    >
+)
 
 
 set_target_properties(BuildSettings PROPERTIES POSITION_INDEPENDENT_CODE ON)
@@ -136,6 +169,22 @@ function(config_enable_pg_profiling target_name)
     target_link_options(${target_name} PRIVATE -pg
     )
 endfunction()
+
+#strip all debug info for no debug mode
+function(config_strip_debug_info target_name)
+    # 检查目标是否为可执行程序
+    get_property(target_type TARGET ${target_name} PROPERTY TYPE)
+    if(NOT target_type STREQUAL "EXECUTABLE") # 如果不是可执行文件，直接返回
+        return()
+    endif()
+    target_link_options(${target_name} PRIVATE
+        $<$<NOT:$<CONFIG:Debug>>:
+        $<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>:-Wl,--strip-all>
+        $<$<CXX_COMPILER_ID:MSVC>:/link /RELEASE>
+        >
+    )
+endfunction()
+
 
 function(add_plugin plugin_name)
     if(PLUGIN_USE_STATIC)
