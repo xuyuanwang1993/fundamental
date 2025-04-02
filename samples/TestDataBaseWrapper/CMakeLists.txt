@@ -49,5 +49,9 @@ target_compile_definitions(${app_target_name}
     PRIVATE
     APP_NAME="${app_target_name}"
 )
-declare_gtest_exe(${app_target_name})
+
+target_link_libraries(${app_target_name}
+PRIVATE
+  gtest
+)
 config_enable_sanitize_address_check(${app_target_name})

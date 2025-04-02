@@ -91,7 +91,7 @@ void connection::process_proxy_request() {
                         if (ptr) ptr->release_obj();
                     });
                     // unbind
-                    ret->reference_.notify_release.Connect([release_handle, s = server_wref_, this]() {
+                    ret->reference_.notify_release.Connect([release_handle, s = server_wref_]() {
                         auto ptr = s.lock();
                         if (ptr) ptr->reference_.notify_release.DisConnect(release_handle);
                     });

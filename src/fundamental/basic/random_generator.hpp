@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <limits>
 #include <random>
+#include <array>
 
 namespace Fundamental {
 

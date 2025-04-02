@@ -42,7 +42,7 @@ target_compile_definitions(${app_target_name}
 )
 
 declare_benchmark_exe(${app_target_name})
-
+config_strip_debug_info(${app_target_name})
 install(FILES ${FUNDAMENTAL_ASSETS_PATH}/dh2048.pem
     ${FUNDAMENTAL_ASSETS_PATH}/server.crt
     ${FUNDAMENTAL_ASSETS_PATH}/server.key

@@ -46,10 +46,11 @@ TEST(IntegerCodecTestBool, TestBasic) {
 }
 
 TYPED_TEST(IntegerCodecTest, TestAllNumberType) {
-    auto max_extra_bytes                  = sizeof(this->kMin);
-    std::uint8_t src[max_extra_bytes + 1] = {};
-    using ValueType                       = std::decay_t<decltype(this->kMin)>;
-    if constexpr (this->Signed)
+    auto max_extra_bytes                  = sizeof(TestFixture::kMin);
+    std::uint8_t src[max_extra_bytes + 1];
+    std::memset(src,0,max_extra_bytes + 1);
+    using ValueType                       = std::decay_t<decltype(TestFixture::kMin)>;
+    if constexpr (TestFixture::Signed)
     { // test len
         ValueType encode_v = 0;
         for (std::size_t shift = 0; shift < sizeof(ValueType) * 8 - 1; ++shift)
@@ -74,10 +75,10 @@ TYPED_TEST(IntegerCodecTest, TestAllNumberType) {
         }
         enum Test_Enum : ValueType
         {
-            Test_Enum_V0 = this->kMin,
+            Test_Enum_V0 = TestFixture::kMin,
             Test_Enum_V1 = 1,
             Test_Enum_V2 = -1,
-            Test_Enum_V3 = this->kMax,
+            Test_Enum_V3 = TestFixture::kMax,
         };
         {
             auto enum_v               = Test_Enum::Test_Enum_V0;
@@ -140,10 +141,10 @@ TYPED_TEST(IntegerCodecTest, TestAllNumberType) {
         }
         enum Test_Enum : ValueType
         {
-            Test_Enum_V0 = this->kMin,
+            Test_Enum_V0 = TestFixture::kMin,
             Test_Enum_V1 = 1,
-            Test_Enum_V2 = (this->kMin / 2 + this->kMax / 2),
-            Test_Enum_V3 = this->kMax,
+            Test_Enum_V2 = (TestFixture::kMin / 2 + TestFixture::kMax / 2),
+            Test_Enum_V3 = TestFixture::kMax,
         };
         {
             auto enum_v               = Test_Enum::Test_Enum_V0;

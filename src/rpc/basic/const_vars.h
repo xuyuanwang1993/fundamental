@@ -89,7 +89,7 @@ struct rpc_header {
 };
 
 
-static constexpr std::size_t MAX_BUF_LEN     = 1024LLU * 1024 * 1024 * 4;
+static constexpr std::size_t MAX_BUF_LEN     = 1024LLU * 1024 * 1024 * 2;
 static constexpr std::size_t kRpcHeadLen     = rpc_header::HeadLen();
 static constexpr std::size_t INIT_BUF_SIZE   = 2 * 1024;
 
