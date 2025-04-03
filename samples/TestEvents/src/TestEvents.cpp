@@ -29,14 +29,17 @@ struct NativeCallEvents : Fundamental::Event {
 };
 } // namespace Events
 static void TestSignal();
+static void TestAutoDisconnect();
 static void NativeLoop();
 static void NativeBindEventListener();
 static void StressTesting(std::size_t eventNum);
 int main(int argc, char* argv[]) {
     if (1) {
-        TestSignal();
+        TestAutoDisconnect();
+
         return 0;
     }
+    TestSignal();
     // init native
     g_nativeEventSystem = new Fundamental::EventSystem();
     NativeBindEventListener();
@@ -115,6 +118,30 @@ void TestSignal() {
     FASSERT(handle3);
     s3.reset();
     FASSERT(!handle3);
+}
+
+void TestAutoDisconnect() {
+    std::size_t cnt = 0;
+    Fundamental::Signal<void()> s1;
+    std::shared_ptr<bool> token = std::make_shared<bool>();
+    s1.Connect(token, [&, s_token=token]() mutable {
+        ++cnt;
+        if (cnt < 3) {
+            FINFO("auto disconnect normal");
+        }
+        if (cnt == 3) {
+            FINFO("auto disconnect test");
+            s_token.reset();
+        }
+        if (cnt > 3) {
+            FASSERT_ACTION(false, throw std::runtime_error("should not reach"));
+        }
+    });
+    token.reset();
+    s1.Emit();
+    s1.Emit();
+    s1.Emit();
+    s1.Emit();
 }
 
 void NativeBindEventListener() {

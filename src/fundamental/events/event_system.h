@@ -5,7 +5,9 @@
 #include "eventpp/eventqueue.h"
 #include <functional>
 #include <future>
+#include <memory>
 #include <set>
+
 namespace Fundamental
 {
 using EQ = eventpp::EventQueue<EventType, void(const EventPointerType&), EventPolicy>;
@@ -125,6 +127,32 @@ public:
     /// will be add to the process deque top
     /// @return the handle which can be used to cancel the excutor binding
     HandleType Connect(const Callback_& callback, bool append_mode = true);
+    template <typename T>
+    HandleType Connect(std::weak_ptr<T> token, const Callback_& callback, bool append_mode = true) {
+        std::shared_ptr<HandleType> reserve_handle = std::make_shared<HandleType>();
+        auto auto_disconnect_cb = [callback, token, this, reserve_handle](Args... args) -> ReturnType {
+            auto ptr = token.lock();
+            if (!ptr) {
+                this->DisConnect(*reserve_handle);
+                if constexpr (!std::is_void_v<ReturnType>) {
+                    return ReturnType {};
+                } else {
+                    return;
+                }
+            }
+            if constexpr (std::is_void_v<ReturnType>) {
+                callback(std::forward<Args>(args)...);
+            } else {
+                return callback(std::forward<Args>(args)...);
+            }
+        };
+        *reserve_handle = Connect(auto_disconnect_cb, append_mode);
+        return *reserve_handle;
+    }
+    template <typename T>
+    HandleType Connect(std::shared_ptr<T> token, const Callback_& callback, bool append_mode = true) {
+        return Connect(std::weak_ptr<T>(token), callback, append_mode);
+    }
     std::shared_ptr<SignalFuture> MakeSignalFuture() {
         auto ret    = std::make_shared<SignalFuture>();
         ret->handle = Connect([ret, this](Args...) -> void {
