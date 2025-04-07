@@ -408,9 +408,9 @@ int main(int argc, char* argv[]) {
         tuple_type gen2;
         FASSERT(binary_unpack_tuple(data2.data(), data2.size(), gen2, true, 0) == true);
         FASSERT(origin == gen2);
-        int a_c = 0;
-        int b_c = 0;
-        int c_c = 0;
+        [[maybe_unused]] int a_c = 0;
+        [[maybe_unused]] int b_c = 0;
+        [[maybe_unused]] int c_c = 0;
         FASSERT(binary_bacth_unpack(data.data(), data.size(), true, 0, a_c, b_c, c_c) == true);
         FASSERT(a == a_c && b == b_c && c == c_c);
         a_c = 0;
@@ -592,7 +592,7 @@ int main(int argc, char* argv[]) {
         basic_type gen;
         FINFOS << binary_unpack(data.data(), data.size(), gen);
         FINFOS << static_cast<std::uint64_t>(gen);
-        unregister_color n_c;
+        [[maybe_unused]] unregister_color n_c;
         FASSERT(!binary_unpack(data.data(), data.size(), n_c));
     }
 

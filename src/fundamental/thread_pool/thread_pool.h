@@ -123,6 +123,7 @@ public:
     /// @brief  join all work threads
     /// @return joined thread nums
     std::size_t Join();
+    bool WaitAllTaskFinished() const;
 
     bool RunOne(std::int64_t idle_wait_time_ms, bool& is_timeout);
 
@@ -192,7 +193,7 @@ private:
     std::priority_queue<Task, std::deque<Task>, std::greater<Task>> m_tasks;
 
     mutable std::mutex m_tasksMutex, m_workersMutex;
-    std::condition_variable m_condition;
+    mutable std::condition_variable m_condition, m_no_pending_cv;
 };
 
 } // namespace Fundamental

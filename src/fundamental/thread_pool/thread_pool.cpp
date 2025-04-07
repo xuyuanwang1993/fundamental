@@ -80,19 +80,38 @@ void ThreadPool::Spawn(int count) {
 
 std::size_t ThreadPool::Join() {
     FASSERT_ACTION(!InThreadPool(), throw std::runtime_error("try not call thread_pool' Join() in itself"),
-                "try not call thread pool join in itself");
+                   "try not call thread pool join in itself");
     auto expected = false;
     if (!m_joining.compare_exchange_strong(expected, true)) return 0;
     {
         std::scoped_lock<std::mutex> locker(m_tasksMutex);
         m_condition.notify_all();
+        m_no_pending_cv.notify_all();
     }
-    std::scoped_lock<std::mutex> lock(m_workersMutex);
-    std::size_t ret = m_workers.size();
-    for (auto& w : m_workers)
-        if (w.second->joinable()) w.second->join();
-    m_workers.clear();
+    std::size_t ret = 0;
+    {
+        std::scoped_lock<std::mutex> lock(m_workersMutex);
+        ret = m_workers.size();
+        for (auto& w : m_workers)
+            if (w.second->joinable()) w.second->join();
+        m_workers.clear();
+    }
+    {//clear all tasks
+        std::scoped_lock<std::mutex> locker(m_tasksMutex);
+        while (!m_tasks.empty())
+            m_tasks.pop();
+    }
+
     return ret;
+}
+
+bool ThreadPool::WaitAllTaskFinished() const {
+    std::unique_lock<std::mutex> lock(m_tasksMutex);
+    while (!m_joining) {
+        if (m_no_pending_cv.wait_for(lock, std::chrono::milliseconds(20), [&]() -> bool { return m_tasks.empty(); }))
+            return true;
+    }
+    return false;
 }
 
 void ThreadPool::Run(std::size_t index) {
@@ -161,6 +180,7 @@ ThreadPool::Task ThreadPool::Dequeue(std::int64_t idle_wait_time_ms, bool& is_ti
 
             m_condition.wait_until(lock, m_tasks.top().time);
         } else {
+            m_no_pending_cv.notify_all();
             if (m_joining) break;
             if (idle_wait_time_ms > 0) {
                 auto status = m_condition.wait_for(lock, std::chrono::milliseconds(idle_wait_time_ms));

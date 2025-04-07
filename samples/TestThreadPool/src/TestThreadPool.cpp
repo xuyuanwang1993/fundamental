@@ -53,7 +53,7 @@ TEST(thread_pool_test, test_auto_scaling) {
     // wait task finished
     while (pool.PendingTasks() != 0)
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
-    std::this_thread::sleep_for(std::chrono::milliseconds(15));
+    std::this_thread::sleep_for(std::chrono::milliseconds(30));
     // threads should be released by idle
     EXPECT_EQ(pool.Count(), ThreadPoolConfig::kMinWorkThreadsNum);
 }
@@ -61,15 +61,13 @@ TEST(thread_pool_test, test_auto_scaling) {
 TEST(thread_pool_test, test_join_exception) {
     ThreadPool pool;
     ThreadPoolConfig config;
-    config.max_threads_limit    = std::thread::hardware_concurrency();
-    //0 means no limit
-    config.min_work_threads_num = 0;
+    config.max_threads_limit = std::thread::hardware_concurrency();
+    // 0 means no limit
+    config.min_work_threads_num = 1;
     config.enable_auto_scaling  = true;
     config.ilde_wait_time_ms    = 10;
     pool.InitThreadPool(config);
-    auto taskFunc = [&]() {
-        EXPECT_TRUE(pool.InThreadPool());
-    };
+    auto taskFunc        = [&]() { EXPECT_TRUE(pool.InThreadPool()); };
     std::size_t test_cnt = 100;
     std::size_t index    = 0;
     while (index < test_cnt) {
@@ -77,10 +75,48 @@ TEST(thread_pool_test, test_join_exception) {
         pool.Enqueue(taskFunc);
     }
     pool.Enqueue([&]() { EXPECT_ANY_THROW(pool.Join()); });
-    // wait task finished
-    while (pool.PendingTasks() != 0)
+     while (pool.PendingTasks() != 0)
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
     pool.Join();
+}
+
+TEST(thread_pool_test, test_finish_wait) {
+
+    ThreadPoolConfig config;
+    config.max_threads_limit = 10;
+    // 0 means no limit
+    config.min_work_threads_num = 1;
+    config.enable_auto_scaling  = true;
+    config.ilde_wait_time_ms    = 10;
+    std::size_t test_cnt        = 10000;
+    {
+        ThreadPool pool;
+        pool.InitThreadPool(config);
+
+        std::size_t index                   = 0;
+        std::atomic<std::size_t> finish_cnt = 0;
+        while (index < test_cnt) {
+            ++index;
+            pool.Schedule(std::chrono::milliseconds(5), [&]() { ++finish_cnt; });
+        }
+        pool.Join();
+        EXPECT_TRUE(pool.PendingTasks() == 0);
+        EXPECT_LT(finish_cnt.load(), test_cnt);
+    }
+    {
+        ThreadPool pool;
+        pool.InitThreadPool(config);
+        std::size_t index                   = 0;
+        std::atomic<std::size_t> finish_cnt = 0;
+        while (index < test_cnt) {
+            ++index;
+            pool.Schedule(std::chrono::milliseconds(5), [&]() { ++finish_cnt; });
+        }
+        EXPECT_TRUE(pool.WaitAllTaskFinished());
+        pool.Join();
+        EXPECT_TRUE(pool.PendingTasks() == 0);
+        EXPECT_EQ(finish_cnt.load(), test_cnt);
+    }
 }
 
 int main(int argc, char** argv) {
