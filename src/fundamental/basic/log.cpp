@@ -83,7 +83,10 @@ public:
         if (m_bFileWriterWorking) return;
         m_pActualWriteCache  = &m_writeCache[0];
         m_bFileWriterWorking = true;
-        m_thread             = std::make_unique<std::thread>(&NativeLogSink::Run, this);
+        start_locker.test_and_set();
+        m_thread = std::make_unique<std::thread>(&NativeLogSink::Run, this);
+        while (start_locker.test_and_set())
+            ;
     }
 
     void StopFileOutputThread() {
@@ -109,7 +112,12 @@ protected:
 
     void Run() {
         Fundamental::Utils::SetThreadName("logger_thread");
+        Fundamental::ScopeGuard g([&]() {
+            m_fileHelper.flush();
+            m_fileHelper.close();
+        });
         std::unique_lock<std::mutex> locker(m_threadMutex);
+        start_locker.clear();
         while (m_bFileWriterWorking) {
             if ((*m_pActualWriteCache).empty()) m_threadCV.wait_for(locker, std::chrono::milliseconds(20));
             if ((*m_pActualWriteCache).empty()) continue;
@@ -244,6 +252,7 @@ private:
     std::list<std::string>* m_pActualWriteCache = nullptr;
     std::list<std::string> m_writeCache[2];
     std::unique_ptr<std::thread> m_thread;
+    std::atomic_flag start_locker = ATOMIC_FLAG_INIT;
     LogMessageCatchFunc m_catcher;
 };
 
