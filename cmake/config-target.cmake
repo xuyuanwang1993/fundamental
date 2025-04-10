@@ -174,7 +174,7 @@ endfunction()
 function(config_strip_debug_info target_name)
     # 检查目标是否为可执行程序
     get_property(target_type TARGET ${target_name} PROPERTY TYPE)
-    if(NOT target_type STREQUAL "EXECUTABLE") # 如果不是可执行文件，直接返回
+    if(NOT (target_type STREQUAL "EXECUTABLE" OR target_type STREQUAL "SHARED_LIBRARY" OR target_type STREQUAL "MODULE_LIBRARY"))
         return()
     endif()
     target_link_options(${target_name} PRIVATE
