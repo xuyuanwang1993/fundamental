@@ -8,6 +8,7 @@ option(F_BUILD_STATIC "build static fundamental lib" ON)
 option(F_BUILD_SHARED "build dynamic fundamental lib" OFF)
 option(ENABLE_DEBUG_MEMORY_TRACE "enable memory track" ON)
 option(CLANG_BUILD_WITH_STD_CXX "clang build with libstdc++" ON)
+option(F_ENABLE_COMPILE_OPTIMIZE "enable compile optimize" ON)
 
 set(RTTR_LIB RTTR::Core_Lib CACHE STRING "use rttr static lib")
 set(GLOB_NAMESPACE "fh::" CACHE STRING "generated lib namespace")
@@ -71,60 +72,62 @@ target_compile_options(BuildSettings INTERFACE
     "$<$<CONFIG:Release>:-O3;-Wall>"
     "-fPIC"
 )
-# Release 编译器通用优化
-target_compile_options(BuildSettings INTERFACE
-    $<$<CONFIG:Release>:
-    # GCC/Clang
-    $<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>>:
-    -fomit-frame-pointer # 省略帧指针
-    -fno-strict-aliasing # 宽松别名规则(某些代码需要)
-    -funroll-loops # 循环展开
-    -ffast-math # 快速数学计算
-    -fno-trapping-math # 禁用浮点陷阱
-    >
 
-    # MSVC
-    $<$<CXX_COMPILER_ID:MSVC>:
-    /Oy- # 禁用帧指针省略(调试更友好)
-    /fp:fast # 快速浮点模型
-    /Qpar # 自动并行化
-    /GL # 全程序优化
-    >
-    >
-)
-target_compile_options(BuildSettings INTERFACE
-    $<$<CONFIG:Release>:
-    $<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>>:
-    -finline-functions # 内联简单函数
-    -finline-limit=200 # 提高内联阈值
-    >
-    $<$<CXX_COMPILER_ID:MSVC>:
-    /Ob2 # 任意适合的内联
-    /inline # 启用内联展开
-    >
-    >
-)
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86|x86_64|AMD64")
+if(F_ENABLE_COMPILE_OPTIMIZE)
+    # Release 编译器通用优化
+    target_compile_options(BuildSettings INTERFACE
+        $<$<CONFIG:Release>:
+        # GCC/Clang
+        $<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>>:
+        -fomit-frame-pointer # 省略帧指针
+        -fno-strict-aliasing # 宽松别名规则(某些代码需要)
+        -funroll-loops # 循环展开
+        -ffast-math # 快速数学计算
+        -fno-trapping-math # 禁用浮点陷阱
+        >
+
+        # MSVC
+        $<$<CXX_COMPILER_ID:MSVC>:
+        /Oy- # 禁用帧指针省略(调试更友好)
+        /fp:fast # 快速浮点模型
+        /Qpar # 自动并行化
+        /GL # 全程序优化
+        >
+        >
+    )
     target_compile_options(BuildSettings INTERFACE
         $<$<CONFIG:Release>:
         $<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>>:
-        -mavx2 -mbmi2 -mfma
+        -finline-functions # 内联简单函数
+        -finline-limit=200 # 提高内联阈值
         >
         $<$<CXX_COMPILER_ID:MSVC>:
-        /arch:AVX2
+        /Ob2 # 任意适合的内联
+        /inline # 启用内联展开
         >
         >
     )
-elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "arm|aarch64")
-    target_compile_options(BuildSettings INTERFACE
-        $<$<CONFIG:Release>:
-        $<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>>:
-        -mcpu=native -mtune=native
-        >
-        >
-    )
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86|x86_64|AMD64")
+        target_compile_options(BuildSettings INTERFACE
+            $<$<CONFIG:Release>:
+            $<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>>:
+            -mavx2 -mbmi2 -mfma
+            >
+            $<$<CXX_COMPILER_ID:MSVC>:
+            /arch:AVX2
+            >
+            >
+        )
+    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "arm|aarch64")
+        target_compile_options(BuildSettings INTERFACE
+            $<$<CONFIG:Release>:
+            $<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>>:
+            -mcpu=native -mtune=native
+            >
+            >
+        )
+    endif()
 endif()
-
 target_compile_features(BuildSettings INTERFACE
     "cxx_std_17"
 )
@@ -155,8 +158,6 @@ target_compile_options(BuildSettings INTERFACE
     -fdata-sections
     >
     >
-    "$<$<CONFIG:RelWithDebInfo>:-Wl,-O2>"
-    "$<$<CONFIG:Release>:-Wl,-O3>"
 )
 
 target_link_options(BuildSettings INTERFACE
@@ -176,7 +177,12 @@ target_link_options(BuildSettings INTERFACE
     >
 
 )
-
+if(F_ENABLE_COMPILE_OPTIMIZE)
+    target_link_options(BuildSettings INTERFACE
+        "$<$<CONFIG:RelWithDebInfo>:-Wl,-O2>"
+        "$<$<CONFIG:Release>:-Wl,-O3>"
+    )
+endif()
 
 set_target_properties(BuildSettings PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
@@ -220,9 +226,9 @@ endfunction()
 # run you program to generate gmon.out
 # then  'gprof program gmon.out > analysis.txt'
 function(config_enable_pg_profiling target_name)
-    target_compile_options(${target_name} PRIVATE -pg
+    target_compile_options(${target_name} PRIVATE "$<$<CONFIG:Debug>:-pg>"
     )
-    target_link_options(${target_name} PRIVATE -pg
+    target_link_options(${target_name} PRIVATE "$<$<CONFIG:Debug>:-pg>"
     )
 endfunction()
 
