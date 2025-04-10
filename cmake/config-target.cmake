@@ -71,6 +71,59 @@ target_compile_options(BuildSettings INTERFACE
     "$<$<CONFIG:Release>:-O3;-Wall>"
     "-fPIC"
 )
+# Release 编译器通用优化
+target_compile_options(BuildSettings INTERFACE
+    $<$<CONFIG:Release>:
+    # GCC/Clang
+    $<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>>:
+    -fomit-frame-pointer # 省略帧指针
+    -fno-strict-aliasing # 宽松别名规则(某些代码需要)
+    -funroll-loops # 循环展开
+    -ffast-math # 快速数学计算
+    -fno-trapping-math # 禁用浮点陷阱
+    >
+
+    # MSVC
+    $<$<CXX_COMPILER_ID:MSVC>:
+    /Oy- # 禁用帧指针省略(调试更友好)
+    /fp:fast # 快速浮点模型
+    /Qpar # 自动并行化
+    /GL # 全程序优化
+    >
+    >
+)
+target_compile_options(BuildSettings INTERFACE
+    $<$<CONFIG:Release>:
+    $<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>>:
+    -finline-functions # 内联简单函数
+    -finline-limit=200 # 提高内联阈值
+    >
+    $<$<CXX_COMPILER_ID:MSVC>:
+    /Ob2 # 任意适合的内联
+    /inline # 启用内联展开
+    >
+    >
+)
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86|x86_64|AMD64")
+    target_compile_options(BuildSettings INTERFACE
+        $<$<CONFIG:Release>:
+        $<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>>:
+        -mavx2 -mbmi2 -mfma
+        >
+        $<$<CXX_COMPILER_ID:MSVC>:
+        /arch:AVX2
+        >
+        >
+    )
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "arm|aarch64")
+    target_compile_options(BuildSettings INTERFACE
+        $<$<CONFIG:Release>:
+        $<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>>:
+        -mcpu=native -mtune=native
+        >
+        >
+    )
+endif()
 
 target_compile_features(BuildSettings INTERFACE
     "cxx_std_17"
@@ -102,6 +155,8 @@ target_compile_options(BuildSettings INTERFACE
     -fdata-sections
     >
     >
+    "$<$<CONFIG:RelWithDebInfo>:-Wl,-O2>"
+    "$<$<CONFIG:Release>:-Wl,-O3>"
 )
 
 target_link_options(BuildSettings INTERFACE
@@ -119,6 +174,7 @@ target_link_options(BuildSettings INTERFACE
     $<$<NOT:$<CONFIG:Debug>>:
     $<$<CXX_COMPILER_ID:MSVC>:/OPT:ICF>
     >
+
 )
 
 
