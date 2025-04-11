@@ -1,4 +1,5 @@
 
+#include "fundamental/basic/error_code.hpp"
 #include "fundamental/basic/log.h"
 #include "fundamental/basic/utils.hpp"
 #include <chrono>
@@ -6,7 +7,8 @@
 #include <memory>
 // set USE_RAW_PTR to  0 will cause memory segmentation
 #define USE_RAW_PTR 1
-namespace {
+namespace
+{
 struct X {
     X() {
         str  = std::make_shared<std::string>();
@@ -67,7 +69,34 @@ TestNormal::~TestNormal() {
     std::cout << "access t2 " << t2->GetX() << std::endl;
 }
 } // namespace
+void test_errorcode() {
+    auto ec = Fundamental::make_error_code(1, std::system_category(), "test_msg");
+    {
+        auto exception = ec.make_excepiton();
+        FINFO("exception:{} {} {} {}", exception.code().category().name(), exception.code().value(),
+              exception.code().message(), exception.what());
+    }
+    {
+        try {
+            auto exception_ptr = ec.make_exception_ptr();
+            std::rethrow_exception(exception_ptr);
+        } catch (const std::system_error& e) {
+            FINFO("rethrow_exception:{} {} {} {}", e.code().category().name(), e.code().value(), e.code().message(),
+                  e.what());
+        }
+    }
+    auto ec_copy = ec;
+    FINFO("copy ec:{} {} {} {} {}", ec_copy.value(), ec_copy.message(), ec_copy.details(), ec_copy.details_c_str(),
+          ec_copy.details_view());
+    FINFO("StringFormat:{}", Fundamental::StringFormat(ec_copy));
+    FINFO("to_string:{}", Fundamental::to_string(ec_copy));
+    FINFO("[out directly]:{}", ec_copy);
+    Fundamental::error_code default_ec;
+    FINFO("default ec:{} {} {} {} {}", default_ec.value(), default_ec.message(), default_ec.details(),
+          default_ec.details_c_str(), default_ec.details_view());
+}
 int main(int argc, char** argv) {
+    test_errorcode();
     auto& a = t1;
     a->SetX();
     auto& c = t2;

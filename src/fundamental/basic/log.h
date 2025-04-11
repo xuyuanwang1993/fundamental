@@ -3,6 +3,7 @@
     #pragma warning(disable : 4996) // disable warning 4996
 #endif
 #include "spdlog/spdlog.h"
+#include <spdlog/fmt/ostr.h> //suport fmt custom types with  operator<<
 #ifdef _MSC_VER
     #pragma warning(default : 4996) // enable warning 4996 back
 #endif
@@ -15,8 +16,17 @@
 #include <sstream>
 #include <string_view>
 
+#include "error_code.hpp"
+
 namespace Fundamental
 {
+
+template <typename _CharT, typename _Traits>
+inline std::basic_ostream<_CharT, _Traits>& operator<<(std::basic_ostream<_CharT, _Traits>& __os,
+                                                       const Fundamental::error_code& code) {
+    return (__os << code.category().name() << ":" << code.value() << "(" << code.message() << ") "
+                 << code.details_view());
+}
 
 enum LogLevel
 {
@@ -144,6 +154,10 @@ inline std::string StringFormat(const char* fmt, const Arg1& arg1, const Args&..
         if (Logger::s_defaultLogger->errorHandler) Logger::s_defaultLogger->errorHandler(e.what());
         return "";
     }
+}
+
+inline std::string to_string(const Fundamental::error_code& code) {
+    return StringFormat(code);
 }
 
 class LoggerStream final {
@@ -337,7 +351,7 @@ inline constexpr std::array<char, N> __get_short_file_name__(const char (&file_n
 #else
     #define FDEBUGS_I(logger) Fundamental::LoggerStream(logger, Fundamental::LogLevel::debug).null_stream()
 #endif
-#define FINFOS_I(logger) Fundamental::LoggerStream(logger, Fundamental::LogLevel::info).stream()
+#define FINFOS_I(logger)  Fundamental::LoggerStream(logger, Fundamental::LogLevel::info).stream()
 #define FINFOSL_I(logger) Fundamental::LoggerStream(logger, Fundamental::LogLevel::info, __LINE__).stream()
 #define FERRS_I(logger)                                                                                                \
     Fundamental::LoggerStream(logger, Fundamental::LogLevel::err, LOG_FILE_NAME, __func__, __LINE__).stream()
