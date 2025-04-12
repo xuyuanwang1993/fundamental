@@ -20,6 +20,26 @@ public:
     std::error_code(__v, __cat), details__(details) {
     }
 
+    error_code(const error_code& other) :
+    std::error_code(other.value(), other.category()), details__(other.details_view()) {
+    }
+
+    error_code(error_code&& other) noexcept :
+    std::error_code(other.value(), other.category()), details__(std::move(other.details__)) {
+    }
+
+    error_code& operator=(const error_code& other) {
+        assign(other.value(), other.category());
+        details__ = other.details__;
+        return *this;
+    }
+    error_code& operator=(error_code&& other) {
+        assign(other.value(), other.category());
+        other.clear();
+        details__ = std::move(other.details__);
+        return *this;
+    }
+
     decltype(auto) make_excepiton() const {
         return std::system_error(*this, details__);
     }
@@ -40,7 +60,7 @@ public:
     }
 
 private:
-    const std::string details__;
+    std::string details__;
 };
 
 template <typename T>
