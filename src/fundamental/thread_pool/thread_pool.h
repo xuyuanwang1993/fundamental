@@ -32,11 +32,13 @@ namespace Fundamental
 {
 using clock_t = std::chrono::steady_clock;
 
+// see ThreadPool::Instance for more details
+
 enum ThreadPoolType : std::int32_t
 {
-    ShortTimeThreadPool = 0,
+    ShortTimeThreadPool = 0, // reserve at least one thread to recycle glocbal resources
     LongTimeThreadPool  = 1,
-    BlockTimeThreadPool = 2,
+    BlockTimeThreadPool = 2, // has no thread nums limit
     PrallelThreadPool   = 3,
     ProducerThreadPool  = 4,
     ConsumerThreadPool  = 5
@@ -65,18 +67,46 @@ struct ThreadPoolTaskToken {
 };
 
 struct ThreadPoolConfig {
-    static constexpr std::int64_t kDefaultIdleWaitTimeMsec = 10000;
-    static constexpr std::size_t kMinWorkThreadsNum        = 1;
+    static std::size_t normal_thread_num_limit() {
+        return std::thread::hardware_concurrency() * 2;
+    }
+    static constexpr std::int64_t kDefaultIdleWaitTimeMsec = 100;
     bool enable_auto_scaling                               = true;
     // 0 means no limit
     std::size_t max_threads_limit    = 0;
-    std::size_t min_work_threads_num = kMinWorkThreadsNum;
+    std::size_t min_work_threads_num = 0;
     std::int64_t ilde_wait_time_ms   = kDefaultIdleWaitTimeMsec;
 };
 class ThreadPool final {
+    struct ExecutorBase {
+        virtual ~ExecutorBase() = default;
+        virtual void execute() const {
+        }
+        virtual void operator()() {
+        }
+    };
+
+    template <typename _Callable>
+    struct Executor : public ExecutorBase {
+        Executor(_Callable&& f) : func(std::move(f)) {
+        }
+        Executor(Executor&& other) : func(std::move(other.func)) {
+        }
+        void operator()() override {
+            func();
+        }
+        Executor(const Executor& other)            = delete;
+        Executor& operator=(const Executor& other) = delete;
+        Executor& operator=(Executor&& other) {
+            func = std::move(other.func);
+            return *this;
+        }
+        _Callable func;
+    };
+
     struct Task {
         clock_t::time_point time;
-        std::function<void()> func = nullptr;
+        std::shared_ptr<ExecutorBase> func;
         std::shared_ptr<ThreadPoolTaskStatusSyncerWarpper> status;
         bool operator>(const Task& other) const {
             return time > other.time;
@@ -90,16 +120,25 @@ public:
     template <std::int32_t Index = ShortTimeThreadPool>
     static ThreadPool& Instance() {
         // Init handles joining on cleanup
-        static ThreadPool* instance = new ThreadPool(Index);
-        return *instance;
+        if constexpr (Index == ShortTimeThreadPool) {
+            static ThreadPool* instance = new ThreadPool(1, ThreadPoolConfig::normal_thread_num_limit(), Index);
+            return *instance;
+        } else if constexpr (Index == BlockTimeThreadPool) {
+            static ThreadPool* instance = new ThreadPool(0, 0, Index);
+            return *instance;
+        } else {
+            static ThreadPool* instance = new ThreadPool(0, ThreadPoolConfig::normal_thread_num_limit(), Index);
+            return *instance;
+        }
     }
-
+    // always reserve an thread
     static ThreadPool& DefaultPool() {
         return Instance<ShortTimeThreadPool>();
     }
     static ThreadPool& LongTimePool() {
         return Instance<LongTimeThreadPool>();
     }
+    // has no thread nums limit
     static ThreadPool& BlockTimePool() {
         return Instance<BlockTimeThreadPool>();
     }
@@ -160,7 +199,9 @@ public:
         ThreadPoolTaskToken<ResultType> result;
         result.resultFuture = std::move(promise->get_future());
         std::unique_lock<std::mutex> lock(m_tasksMutex);
-        m_tasks.push({ time, task, result.status });
+
+        m_tasks.push(
+            { time, std::make_shared<Executor<std::decay_t<decltype(task)>>>(std::move(task)), result.status });
         m_condition.notify_one();
         [[maybe_unused]] auto current_size = m_tasks.size();
         lock.unlock();
@@ -170,13 +211,20 @@ public:
         return result;
     }
 
-    void InitThreadPool(const ThreadPoolConfig& config);
+    bool InitThreadPool(const ThreadPoolConfig& config);
     bool InThreadPool();
     ThreadPool(std::int32_t type = ThreadPoolType::ShortTimeThreadPool) : type(type) {
     }
     ~ThreadPool();
 
 protected:
+    ThreadPool(std::size_t min_tread_num,
+               std::size_t max_thread_num,
+               std::int32_t type = ThreadPoolType::ShortTimeThreadPool) : type(type) {
+        has_alread_configed.exchange(true);
+        config_.max_threads_limit    = max_thread_num;
+        config_.min_work_threads_num = min_tread_num;
+    }
     Task Dequeue(std::int64_t idle_wait_time_ms, bool& is_timeout); // returns null function if joining
     void Run(std::size_t index);
     void PrepareWorkers(std::size_t current_task_nums);

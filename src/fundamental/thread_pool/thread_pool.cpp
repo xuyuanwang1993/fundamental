@@ -23,16 +23,15 @@
 namespace Fundamental
 {
 
-void ThreadPool::InitThreadPool(const ThreadPoolConfig& config) {
+bool ThreadPool::InitThreadPool(const ThreadPoolConfig& config) {
     auto expected = false;
     if (!has_alread_configed.compare_exchange_strong(expected, true)) {
         FERR("thread pool has already configed or has call spawn before init pool, please check your code");
-        return;
+        return false;
     }
     config_ = config;
-    if (config_.min_work_threads_num < ThreadPoolConfig::kMinWorkThreadsNum)
-        config_.min_work_threads_num = ThreadPoolConfig::kMinWorkThreadsNum;
-    if (config_.ilde_wait_time_ms < 10) config_.ilde_wait_time_ms = config_.kDefaultIdleWaitTimeMsec;
+    if (config_.ilde_wait_time_ms == 0) config_.ilde_wait_time_ms = config_.kDefaultIdleWaitTimeMsec;
+    return true;
 }
 
 bool ThreadPool::InThreadPool() {
@@ -96,7 +95,7 @@ std::size_t ThreadPool::Join() {
             if (w.second->joinable()) w.second->join();
         m_workers.clear();
     }
-    {//clear all tasks
+    { // clear all tasks
         std::scoped_lock<std::mutex> locker(m_tasksMutex);
         while (!m_tasks.empty())
             m_tasks.pop();
@@ -122,16 +121,17 @@ void ThreadPool::Run(std::size_t index) {
     std::int64_t ilde_wait_max_time_ms = index >= config_.min_work_threads_num ? config_.ilde_wait_time_ms : 0;
     while (RunOne(ilde_wait_max_time_ms, is_timeout)) {
         if (is_timeout && config_.enable_auto_scaling) {
-            Schedule<false>(clock_t::now(), [this, index]() {
-                // avoid dead lock
-                if (m_joining) return;
-                std::unique_ptr<std::thread> op_thread;
-                {
-                    std::scoped_lock<std::mutex> lock(m_workersMutex);
-                    auto iter = m_workers.find(index);
-                    if (iter != m_workers.end()) op_thread = std::move(iter->second);
-                    m_workers.erase(iter);
-                }
+            // remove current work thread
+            std::unique_ptr<std::thread> op_thread;
+            {
+                std::scoped_lock<std::mutex> lock(m_workersMutex);
+                auto iter = m_workers.find(index);
+                if (iter != m_workers.end()) op_thread = std::move(iter->second);
+                m_workers.erase(iter);
+            }
+            FASSERT(op_thread);
+            // let default pool excute join operation
+            DefaultPool().Schedule<false>(clock_t::now(), [op_thread = std::move(op_thread)]() mutable {
                 if (op_thread && op_thread->joinable()) op_thread->join();
             });
             break;
@@ -159,7 +159,7 @@ bool ThreadPool::RunOne(std::int64_t idle_wait_time_ms, bool& is_timeout) {
         // task maybe cancelled
         if (!task.status->status.compare_exchange_strong(expected, ThreadPoolTaskStatus::ThreadTaskRunning))
             return true;
-        task.func();
+        task.func->operator()();
         task.status->status.exchange(ThreadPoolTaskStatus::ThreadTaskDone);
         return true;
     }
