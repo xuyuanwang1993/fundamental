@@ -34,6 +34,13 @@ TEST(thread_pool_test, default_action) {
         std::this_thread::sleep_for(std::chrono::milliseconds(ThreadPoolConfig::kDefaultIdleWaitTimeMsec + 5));
         EXPECT_EQ(pool.Count(), 0);
     }
+    // test nocopyable data support
+    {
+        auto data1 = std::make_unique<std::int32_t>(0);
+        auto data2 = std::make_unique<std::int32_t>(1);
+        ThreadPool::DefaultPool().Enqueue(
+            [data1 = std::move(data1)](std::unique_ptr<std::int32_t> data2) mutable -> void {}, std::move(data2));
+    }
 }
 
 TEST(thread_pool_test, basic) {

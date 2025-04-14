@@ -183,14 +183,14 @@ public:
 
         using ResultType = std::invoke_result_t<_Callable, _Args...>;
         auto promise     = std::make_shared<std::promise<ResultType>>();
-        auto bound       = std::bind(std::forward<_Callable>(f), std::forward<_Args>(args)...);
-        auto task        = [bound = std::move(bound), promise]() mutable {
+        auto task = [func = std::forward<_Callable>(f), args_tuple = std::make_tuple(std::forward<_Args>(args)...),
+                     promise]() mutable {
             try {
                 if constexpr (std::is_same_v<ResultType, void>) {
-                    bound();
+                    std::apply(func, std::move(args_tuple));
                     promise->set_value();
                 } else {
-                    promise->set_value(bound());
+                    promise->set_value(std::apply(func, std::move(args_tuple)));
                 }
             } catch (const std::exception& e) {
                 promise->set_exception(std::make_exception_ptr(e));
