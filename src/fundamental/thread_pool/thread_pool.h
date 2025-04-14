@@ -39,7 +39,7 @@ enum ThreadPoolType : std::int32_t
     ShortTimeThreadPool = 0, // reserve at least one thread to recycle glocbal resources
     LongTimeThreadPool  = 1,
     BlockTimeThreadPool = 2, // has no thread nums limit
-    PrallelThreadPool   = 3,
+    PrallelThreadPool   = 3, // init with external config
     ProducerThreadPool  = 4,
     ConsumerThreadPool  = 5
 };
@@ -125,6 +125,9 @@ public:
             return *instance;
         } else if constexpr (Index == BlockTimeThreadPool) {
             static ThreadPool* instance = new ThreadPool(0, 0, Index);
+            return *instance;
+        } else if constexpr (Index == PrallelThreadPool) {
+            static ThreadPool* instance = new ThreadPool(Index);
             return *instance;
         } else {
             static ThreadPool* instance = new ThreadPool(0, ThreadPoolConfig::normal_thread_num_limit(), Index);
