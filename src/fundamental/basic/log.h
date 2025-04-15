@@ -321,7 +321,9 @@ inline constexpr std::array<char, N> __get_short_file_name__(const char (&file_n
             auto __debugInfo__ = Fundamental::StringFormat("[{}:{}"                                                    \
                                                            "(" STR_HELPER(__LINE__) ")] [####check####:" #_check "] ", \
                                                            LOG_FILE_NAME, __func__);                                   \
-            throw std::runtime_error(__debugInfo__ + Fundamental::StringFormat(__VA_ARGS__));                          \
+            auto __debug_msg__ = __debugInfo__ + Fundamental::StringFormat(__VA_ARGS__);                               \
+            Fundamental::Logger::s_defaultLogger->LogOutput(Fundamental::LogLevel::critical, __debug_msg__);               \
+            throw std::runtime_error(__debug_msg__);                                                                   \
         }
 
     #define FASSERT(_check, ...) FASSERT_THROWN(_check, ##__VA_ARGS__)
