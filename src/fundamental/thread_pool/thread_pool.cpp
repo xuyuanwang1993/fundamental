@@ -55,6 +55,10 @@ std::size_t ThreadPool::PendingTasks() const {
     return m_tasks.size();
 }
 
+std::size_t ThreadPool::ProcessingTasks() const {
+    return processing_cnt.load(std::memory_order::memory_order_relaxed);
+}
+
 void ThreadPool::Spawn(int count) {
     if (m_joining || count < 1) return;
     auto expected_value = false;
@@ -85,7 +89,7 @@ std::size_t ThreadPool::Join() {
     {
         std::scoped_lock<std::mutex> locker(m_tasksMutex);
         m_condition.notify_all();
-        m_no_pending_cv.notify_all();
+        m_task_update_cv.notify_all();
     }
     std::size_t ret = 0;
     {
@@ -107,7 +111,8 @@ std::size_t ThreadPool::Join() {
 bool ThreadPool::WaitAllTaskFinished() const {
     std::unique_lock<std::mutex> lock(m_tasksMutex);
     while (!m_joining) {
-        if (m_no_pending_cv.wait_for(lock, std::chrono::milliseconds(20), [&]() -> bool { return m_tasks.empty(); }))
+        if (m_task_update_cv.wait_for(lock, std::chrono::milliseconds(20),
+                                      [&]() -> bool { return m_tasks.empty() && 0 == ProcessingTasks(); }))
             return true;
     }
     return false;
@@ -159,6 +164,13 @@ bool ThreadPool::RunOne(std::int64_t idle_wait_time_ms, bool& is_timeout) {
         // task maybe cancelled
         if (!task.status->status.compare_exchange_strong(expected, ThreadPoolTaskStatus::ThreadTaskRunning))
             return true;
+        Fundamental::ScopeGuard g(
+            [&]() {
+                processing_cnt.fetch_sub(1, std::memory_order::memory_order_relaxed);
+                std::scoped_lock<std::mutex> lock(m_tasksMutex);
+                m_task_update_cv.notify_all();
+            },
+            [&]() { processing_cnt.fetch_add(1, std::memory_order::memory_order_relaxed); });
         task.func->operator()();
         task.status->status.exchange(ThreadPoolTaskStatus::ThreadTaskDone);
         return true;
@@ -180,7 +192,7 @@ ThreadPool::Task ThreadPool::Dequeue(std::int64_t idle_wait_time_ms, bool& is_ti
 
             m_condition.wait_until(lock, m_tasks.top().time);
         } else {
-            m_no_pending_cv.notify_all();
+            m_task_update_cv.notify_all();
             if (m_joining) break;
             if (idle_wait_time_ms > 0) {
                 auto status = m_condition.wait_for(lock, std::chrono::milliseconds(idle_wait_time_ms));

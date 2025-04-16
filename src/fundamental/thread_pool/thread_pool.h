@@ -158,16 +158,17 @@ public:
     ThreadPool& operator=(const ThreadPool&) = delete;
     ThreadPool(ThreadPool&&)                 = delete;
     ThreadPool& operator=(ThreadPool&&)      = delete;
-
+    // return the current number of worker threads
     std::size_t Count() const;
     std::size_t PendingTasks() const;
+    // return the number of currently executing tasks
+    std::size_t ProcessingTasks() const;
     void Spawn(int count = 1);
     /// @brief  join all work threads
     /// @return joined thread nums
     std::size_t Join();
+    // wait for all tasks to complete execution
     bool WaitAllTaskFinished() const;
-
-    bool RunOne(std::int64_t idle_wait_time_ms, bool& is_timeout);
 
     template <typename _Callable, typename... _Args>
     auto Enqueue(_Callable&& f, _Args&&... args) -> ThreadPoolTaskToken<std::invoke_result_t<_Callable, _Args...>> {
@@ -231,6 +232,7 @@ protected:
     Task Dequeue(std::int64_t idle_wait_time_ms, bool& is_timeout); // returns null function if joining
     void Run(std::size_t index);
     void PrepareWorkers(std::size_t current_task_nums);
+    bool RunOne(std::int64_t idle_wait_time_ms, bool& is_timeout);
 
 private:
     std::atomic_bool has_alread_configed = false;
@@ -242,9 +244,10 @@ private:
     std::atomic<bool> m_joining { false };
 
     std::priority_queue<Task, std::deque<Task>, std::greater<Task>> m_tasks;
+    std::atomic<std::size_t> processing_cnt = 0;
 
     mutable std::mutex m_tasksMutex, m_workersMutex;
-    mutable std::condition_variable m_condition, m_no_pending_cv;
+    mutable std::condition_variable m_condition, m_task_update_cv;
 };
 
 } // namespace Fundamental
