@@ -4,12 +4,13 @@
 #include <cstddef>
 #include <functional>
 #include <string>
-#include <unordered_map>
 #include <string_view>
+#include <unordered_map>
 
 #define F_UNUSED(x) (void)x
 
-namespace Fundamental {
+namespace Fundamental
+{
 
 struct NonCopyable {
     NonCopyable()                              = default;
@@ -32,7 +33,20 @@ struct ScopeGuard final : NonCopyable {
     ~ScopeGuard() {
         if (f) f();
     }
-    const BasicTaskFunctionT f = nullptr;
+    ScopeGuard(ScopeGuard&& other) noexcept : f(std::move(other.f)) {
+    }
+
+    ScopeGuard& operator=(ScopeGuard&& other) noexcept {
+        reset(std::move(other.f));
+        return *this;
+    }
+    void reset(const BasicTaskFunctionT& _f) {
+        if (f) f();
+        f = _f;
+    }
+
+private:
+    BasicTaskFunctionT f = nullptr;
 };
 
 template <typename T>
@@ -54,7 +68,6 @@ protected:
     }
 };
 
-
 template <std::size_t N>
 struct PowerOfTwo {
     static constexpr std::size_t value = 2 * PowerOfTwo<N - 1>::value;
@@ -65,15 +78,16 @@ struct PowerOfTwo<0> {
     static constexpr std::size_t value = 1;
 };
 
-namespace Utils {
+namespace Utils
+{
 using fpid_t = std::uint32_t;
 fpid_t GetProcessId();
 void SetThreadName(const std::string& name);
-std::string BufferToHex(const void* buffer, std::size_t size,std::size_t group_size=0,std::int8_t spilt_char=0);
-template <typename T,typename=std::void_t<typename T::value_type>>
-inline std::string BufferToHex(const T& v,std::size_t group_size=0,std::int8_t spilt_char=0) {
+std::string BufferToHex(const void* buffer, std::size_t size, std::size_t group_size = 0, std::int8_t spilt_char = 0);
+template <typename T, typename = std::void_t<typename T::value_type>>
+inline std::string BufferToHex(const T& v, std::size_t group_size = 0, std::int8_t spilt_char = 0) {
     using ValueType = typename T::value_type;
-    return BufferToHex(v.data(), v.size() * sizeof(ValueType),group_size,spilt_char);
+    return BufferToHex(v.data(), v.size() * sizeof(ValueType), group_size, spilt_char);
 }
 
 std::string BufferDumpAscii(const void* buffer, std::size_t size);
@@ -86,7 +100,6 @@ struct NetworkInfo {
 std::unordered_map<std::string, NetworkInfo> GetLocalNetInformation();
 [[nodiscard]] std::string RemoveComments(std::string_view input);
 } // namespace Utils
-
 
 } // namespace Fundamental
 #endif // _HEAD_BASIC_UTILS_
