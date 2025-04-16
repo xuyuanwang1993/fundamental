@@ -7,7 +7,6 @@
 #include <memory>
 
 #include "fundamental/basic/allocator.hpp"
-#include "fundamental/basic/async_utils.hpp"
 
 namespace network
 {
