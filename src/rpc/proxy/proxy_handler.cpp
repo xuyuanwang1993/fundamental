@@ -15,7 +15,7 @@ proxy_handler::proxy_handler(const std::string& proxy_host,
 proxy_host(proxy_host), proxy_service(proxy_service), socket_(std::move(socket)), proxy_socket_(socket_.get_executor()),
 resolver(socket_.get_executor()), cachePool(Fundamental::MakePoolMemorySource()), client2server(cachePool),
 server2client(cachePool) {
-
+    enable_tcp_keep_alive(socket_);
 #ifdef RPC_VERBOSE
     client2server.tag_ = "client2server";
     server2client.tag_ = "server2client";
@@ -100,6 +100,8 @@ void proxy_handler::StartConnect(asio::ip::tcp::resolver::results_type&& result)
                             asio::error_code error_code;
                             asio::ip::tcp::no_delay option(true);
                             proxy_socket_.set_option(option, error_code);
+                            enable_tcp_keep_alive(proxy_socket_);
+
                             StartServerRead();
                             StartClient2ServerWrite();
                         });

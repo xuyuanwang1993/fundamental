@@ -586,6 +586,7 @@ private:
                                             return;
                                         }
                                         if (!error_handle_func(ec)) return;
+                                        enable_tcp_keep_alive(socket_);
                                         remote_ip   = socket_.remote_endpoint().address().to_string();
                                         remote_port = socket_.remote_endpoint().port();
 #ifdef RPC_VERBOSE

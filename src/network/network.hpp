@@ -3,6 +3,10 @@
 #include "io_context_pool.hpp"
 #include "use_asio.hpp"
 #include <functional>
+#if TARGET_PLATFORM_LINUX
+    #include <netinet/tcp.h>
+#endif
+
 namespace network
 {
 static constexpr std::size_t kSslPreReadSize = 3;
@@ -107,4 +111,20 @@ struct protocal_helper {
         acceptor.listen();
     }
 };
+//ss -to | grep -i keepalive 可以查看是否启用了选项
+inline void enable_tcp_keep_alive(asio::ip::tcp::socket& socket,
+                                  bool enable               = true,
+                                  std::int32_t idle_sec     = 30,
+                                  std::int32_t interval_sec = 5,
+                                  std::int32_t max_probes   = 3) {
+    asio::error_code ec;
+    socket.set_option(asio::socket_base::keep_alive(enable), ec);
+#if TARGET_PLATFORM_LINUX
+    if (enable) {
+        setsockopt(socket.native_handle(), SOL_TCP, TCP_KEEPIDLE, &idle_sec, sizeof(idle_sec));
+        setsockopt(socket.native_handle(), SOL_TCP, TCP_KEEPINTVL, &interval_sec, sizeof(interval_sec));
+        setsockopt(socket.native_handle(), SOL_TCP, TCP_KEEPCNT, &max_probes, sizeof(max_probes));
+    }
+#endif
+}
 } // namespace network
