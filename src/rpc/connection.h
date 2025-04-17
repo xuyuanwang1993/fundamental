@@ -127,6 +127,7 @@ public:
     connection(tcp::socket socket, std::size_t timeout_msec, router& router, std::weak_ptr<rpc_server> server_wref) :
     server_wref_(server_wref), socket_(std::move(socket)), body_(INIT_BUF_SIZE),
     timeout_check_timer_(socket_.get_executor()), timeout_msec_(timeout_msec), router_(router) {
+        enable_tcp_keep_alive(socket_);
     }
     ~connection() {
         FDEBUG("release connection {:p} -> {}", (void*)this, conn_id_);
