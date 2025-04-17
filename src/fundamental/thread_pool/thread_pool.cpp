@@ -118,6 +118,21 @@ bool ThreadPool::WaitAllTaskFinished() const {
     return false;
 }
 
+bool ThreadPool::WaitIdleThread(std::size_t need_num) const {
+    if (need_num == 0) return true;
+    std::unique_lock<std::mutex> lock(m_tasksMutex);
+    if (config_.max_threads_limit == 0) return true;
+    if (config_.max_threads_limit > 0 && need_num > config_.max_threads_limit) return false;
+    while (!m_joining) {
+        if (m_task_update_cv.wait_for(lock, std::chrono::milliseconds(20), [&]() -> bool {
+                auto current_task = ProcessingTasks();
+                return m_tasks.size() == 0 && (need_num + current_task <= config_.max_threads_limit);
+            }))
+            return true;
+    }
+    return false;
+}
+
 void ThreadPool::Run(std::size_t index) {
     std::string thread_name = "thp_" + std::to_string(type) + "_" + std::to_string(index);
     Fundamental::Utils::SetThreadName(thread_name);
