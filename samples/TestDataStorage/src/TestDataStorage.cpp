@@ -99,6 +99,76 @@ TEST(data_storage_test, shared_ptr_remove_test) {
     EXPECT_EQ(ref, 0);
 }
 
+TEST(data_storage_test, test_iterator) {
+
+    memory_storage<std::int32_t> storage(&queue);
+    std::string test_table = "table";
+    std::int32_t test_cnt  = 10;
+    std::set<std::int32_t> dic;
+    {
+        storage_config test_config;
+        for (std::int32_t i = 0; i < test_cnt; ++i) {
+            dic.insert(i);
+            test_config.expired_time_msec = 0;
+            EXPECT_TRUE(storage.persist_data(test_table, std::to_string(i), i, test_config));
+        }
+    }
+    {
+        auto copy = dic;
+        auto iter = storage.begin();
+        while (iter != storage.end()) {
+            if (iter->first == test_table) break;
+        }
+        EXPECT_TRUE(iter != storage.end());
+        auto& data_table = iter->second;
+        for (auto& data : data_table) {
+            EXPECT_TRUE(data.first == std::to_string(data.second.data));
+            EXPECT_TRUE(copy.erase(data.second.data) == 1);
+        }
+        EXPECT_TRUE(copy.empty());
+    }
+
+    {
+        auto copy = dic;
+        auto iter = storage.cbegin();
+        while (iter != storage.cend()) {
+            if (iter->first == test_table) break;
+        }
+        EXPECT_TRUE(iter != storage.cend());
+        auto& data_table = iter->second;
+        for (auto& data : data_table) {
+            EXPECT_TRUE(data.first == std::to_string(data.second.data));
+            EXPECT_TRUE(copy.erase(data.second.data) == 1);
+        }
+        EXPECT_TRUE(copy.empty());
+    }
+
+    {
+        auto copy = dic;
+        auto iter = storage.find(test_table);
+        EXPECT_TRUE(iter != storage.end());
+        auto& data_table = iter->second;
+        for (auto& data : data_table) {
+            EXPECT_TRUE(data.first == std::to_string(data.second.data));
+            EXPECT_TRUE(copy.erase(data.second.data) == 1);
+        }
+        EXPECT_TRUE(copy.empty());
+    }
+    {
+        const auto & ref=storage;
+        auto copy = dic;
+        auto iter = ref.find(test_table);
+        static_assert(std::is_same_v<decltype(iter),decltype(storage.cend())>);
+        EXPECT_TRUE(iter != storage.cend());
+        auto& data_table = iter->second;
+        for (auto& data : data_table) {
+            EXPECT_TRUE(data.first == std::to_string(data.second.data));
+            EXPECT_TRUE(copy.erase(data.second.data) == 1);
+        }
+        EXPECT_TRUE(copy.empty());
+    }
+}
+
 int main(int argc, char* argv[]) {
     queue.SetStateChangedCallback([]() { WakeUp(); });
     std::thread t([&]() {
