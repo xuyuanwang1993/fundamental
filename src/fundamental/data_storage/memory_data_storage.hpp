@@ -31,7 +31,9 @@ protected:
     using storage_tables_type = std::unordered_map<std::string, storage_table_type>;
 
 public:
-    using value_type = ValueType;
+    using value_type     = ValueType;
+    using iterator       = typename storage_tables_type::iterator;
+    using const_iterator = typename storage_tables_type::const_iterator;
 
 public:
     memory_storage_data(DelayQueue* delay_queue) : delay_queue(delay_queue) {
@@ -66,7 +68,7 @@ public:
 
         storage::memory_storage_item<ValueType> remove_item = std::move(data_iter->second);
         table_iter->second.erase(data_iter);
-        //remove empty table
+        // remove empty table
         if (table_iter->second.empty()) {
             storage.erase(table_iter);
         }
@@ -88,6 +90,29 @@ public:
 
     ExpiredSignalType& expired_signal() {
         return expired_signal_;
+    }
+    // not thread safe
+    decltype(auto) begin() {
+        return storage.begin();
+    }
+
+    decltype(auto) end() {
+        return storage.end();
+    }
+
+    decltype(auto) cbegin() const {
+        return storage.cbegin();
+    }
+    decltype(auto) cend() const {
+        return storage.cend();
+    }
+
+    decltype(auto) find(const std::string& table_name) const {
+        return storage.find(table_name);
+    }
+    
+    decltype(auto) find(const std::string& table_name) {
+        return storage.find(table_name);
     }
 
 protected:
@@ -120,8 +145,10 @@ template <typename ValueType = std::string>
 class memory_storage : public storage::memory_storage_data<ValueType>,
                        public data_storage_accessor<ValueType, memory_storage<ValueType>> {
 public:
-    using value_type = ValueType;
-    using super      = storage::memory_storage_data<ValueType>;
+    using value_type     = ValueType;
+    using super          = storage::memory_storage_data<ValueType>;
+    using iterator       = typename super::iterator;
+    using const_iterator = typename super::const_iterator;
 
 public:
     memory_storage(DelayQueue* delay_queue) : super(delay_queue) {
@@ -178,8 +205,10 @@ template <>
 class memory_storage<void> : public storage::memory_storage_data<void>,
                              public data_storage_accessor<void, memory_storage<void>> {
 public:
-    using value_type = void;
-    using super      = storage::memory_storage_data<void>;
+    using value_type     = void;
+    using super          = storage::memory_storage_data<void>;
+    using iterator       = typename super::iterator;
+    using const_iterator = typename super::const_iterator;
 
 public:
     memory_storage(DelayQueue* delay_queue) : super(delay_queue) {
