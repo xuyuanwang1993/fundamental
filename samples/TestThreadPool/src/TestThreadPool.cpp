@@ -143,7 +143,34 @@ TEST(thread_pool_test, test_wait_all_task_finished) {
         EXPECT_TRUE(pool.PendingTasks() == 0);
     }
 }
+TEST(thread_pool_test, test_wait_idle_thread) {
 
+    ThreadPoolConfig config;
+    config.max_threads_limit = 10;
+    // 0 means no limit
+    config.min_work_threads_num = 1;
+    config.enable_auto_scaling  = true;
+    config.ilde_wait_time_ms    = 2000;
+    std::size_t test_cnt        = 20;
+    {
+        ThreadPool pool;
+        pool.InitThreadPool(config);
+        std::size_t index                   = 0;
+        std::atomic<std::size_t> finish_cnt = 0;
+        while (index < test_cnt) {
+            ++index;
+            pool.Enqueue([&, index = index]() {
+                std::this_thread::sleep_for(std::chrono::milliseconds(2 + index * 2));
+                ++finish_cnt;
+            });
+        }
+        for (std::size_t i = 1; i < config.max_threads_limit; ++i) {
+            EXPECT_TRUE(pool.WaitIdleThread(i));
+            EXPECT_TRUE(pool.PendingTasks() == 0);
+            EXPECT_LE((pool.ProcessingTasks() + i), config.max_threads_limit);
+        }
+    }
+}
 
 TEST(thread_pool_test, test_finish_wait) {
 

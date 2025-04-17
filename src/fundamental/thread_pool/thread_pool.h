@@ -169,7 +169,8 @@ public:
     std::size_t Join();
     // wait for all tasks to complete execution
     bool WaitAllTaskFinished() const;
-
+    //
+    bool WaitIdleThread(std::size_t need_num) const;
     template <typename _Callable, typename... _Args>
     auto Enqueue(_Callable&& f, _Args&&... args) -> ThreadPoolTaskToken<std::invoke_result_t<_Callable, _Args...>> {
         return Schedule<true>(clock_t::now(), std::forward<_Callable>(f), std::forward<_Args>(args)...);
