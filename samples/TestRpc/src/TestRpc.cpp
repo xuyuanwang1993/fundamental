@@ -1041,6 +1041,27 @@ TEST(rpc_test, test_ssl_proxy_echo_stream_mutithread) {
 }
     #endif
 #endif
+
+TEST(rpc_test, test_void_stream) {
+    auto client             = network::make_guard<rpc_client>();
+    [[maybe_unused]] bool r = client->connect("127.0.0.1", "9000");
+    EXPECT_TRUE(r && client->has_connected());
+    auto stream = client->upgrade_to_stream("test_void_stream");
+    EXPECT_TRUE(stream != nullptr);
+    EXPECT_TRUE(stream->Write(1));
+    EXPECT_TRUE(stream->ReadEmpty());
+
+    std::size_t cnt = 10;
+    while (cnt != 0) {
+
+        --cnt;
+        EXPECT_TRUE(stream->WriteEmpty());
+        EXPECT_TRUE(stream->ReadEmpty());
+    }
+    EXPECT_TRUE(stream->WriteDone());
+    EXPECT_TRUE(!stream->Finish(0));
+}
+
 int main(int argc, char** argv) {
     int mode = 0;
     if (argc > 1) mode = std::stoi(argv[1]);

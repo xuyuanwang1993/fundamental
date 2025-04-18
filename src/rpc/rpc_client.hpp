@@ -128,6 +128,8 @@ public:
     bool Read(T& request, std::size_t max_wait_ms = 5000);
     template <typename U>
     bool Write(U&& response);
+    bool WriteEmpty();
+    bool ReadEmpty(std::size_t max_wait_ms = 5000);
     bool WriteDone();
     std::error_code Finish(std::size_t max_wait_ms = 5000);
     std::error_code GetLastError() const;
@@ -1215,8 +1217,7 @@ inline bool ClientStreamReadWriter::Write(U&& response) {
     if (last_data_status_ >= rpc_stream_data_status::rpc_stream_finish) return false;
     rpc_buffer_type data;
     try {
-        data      = msgpack_codec::pack(std::forward<U>(response));
-        auto test = msgpack_codec::unpack<std::decay_t<U>>(data.data(), data.size());
+        data = msgpack_codec::pack(std::forward<U>(response));
     } catch (const std::exception& e) {
         set_status(rpc_stream_data_status::rpc_stream_failed,
                    error::make_error_code(error::rpc_errors::rpc_pack_failed));
@@ -1231,6 +1232,36 @@ inline bool ClientStreamReadWriter::Write(U&& response) {
         new_item.data  = std::move(data);
         if (write_cache_.size() == 1) handle_write();
     });
+    return true;
+}
+
+inline bool ClientStreamReadWriter::WriteEmpty() {
+    if (last_data_status_ >= rpc_stream_data_status::rpc_stream_finish) return false;
+    asio::post(client_->socket_.get_executor(), [this, ref = shared_from_this()]() mutable {
+        if (!reference_.is_valid()) return;
+        auto& new_item = write_cache_.emplace_back();
+        new_item.size  = 0;
+        new_item.type  = static_cast<std::uint8_t>(rpc_stream_data_status::rpc_stream_data);
+        new_item.data.resize(0);
+        if (write_cache_.size() == 1) handle_write();
+    });
+    return true;
+}
+
+inline bool ClientStreamReadWriter::ReadEmpty(std::size_t max_wait_ms) {
+    auto check_func = [this]() -> bool {
+        return last_data_status_ >= rpc_stream_data_status::rpc_stream_write_done || !response_cache_.empty();
+    };
+    {
+        std::unique_lock<std::mutex> locker(mutex);
+        if (max_wait_ms > 0)
+            cv_.wait_for(locker, std::chrono::milliseconds(max_wait_ms), check_func);
+        else {
+            cv_.wait(locker, check_func);
+        }
+        if (response_cache_.empty() || last_data_status_ == rpc_stream_data_status::rpc_stream_failed) return false;
+        response_cache_.pop_front();
+    }
     return true;
 }
 
