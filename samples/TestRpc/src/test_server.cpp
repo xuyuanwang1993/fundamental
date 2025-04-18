@@ -58,8 +58,8 @@ std::string translate(rpc_conn conn, const std::string& orignal) {
 }
 
 void hello(rpc_conn conn, const std::string& str) {
-    auto ptr=conn.lock();
-    FINFO("hello from client [{}:{}]:{}",ptr->get_remote_peer_ip(),ptr->get_remote_peer_port(),str);
+    auto ptr = conn.lock();
+    FINFO("hello from client [{}:{}]:{}", ptr->get_remote_peer_ip(), ptr->get_remote_peer_port(), str);
 }
 
 std::string get_person_name(rpc_conn conn, const person& p) {
@@ -141,6 +141,28 @@ void test_stream(rpc_conn conn) {
                 FINFO("rpc failed {}", ec.message());
             } else {
                 FINFO("rpc done");
+            }
+        },
+        w);
+}
+
+void void_stream(rpc_conn conn) {
+    auto c = conn.lock();
+    auto w = c->InitRpcStream();
+
+    rpc_stream_pool.Enqueue(
+        [](decltype(w) stream) {
+            FWARN("void stream start");
+            person p;
+            while (stream->ReadEmpty(0)) {
+                if (!stream->WriteEmpty()) break;
+            };
+            stream->WriteDone();
+            auto ec = stream->Finish(0);
+            if (ec) {
+                FINFO("rpc void_stream failed {}", ec.message());
+            } else {
+                FINFO("rpc void_stream done");
             }
         },
         w);
@@ -246,7 +268,7 @@ void test_echo_stream(rpc_conn conn) {
     FWARN("try start test_echo_stream");
     rpc_stream_pool.Enqueue(
         [id](decltype(w) stream) {
-            FWARN("test_echo_stream start {} {}",stream->get_remote_peer_ip(),stream->get_remote_peer_port());
+            FWARN("test_echo_stream start {} {}", stream->get_remote_peer_ip(), stream->get_remote_peer_port());
             std::string msg;
             while (stream->Read(msg, 5000)) {
                 if (!stream->Write(msg.substr(0, msg.size() > 100 ? 100 : msg.size()) + " from server")) break;
@@ -318,7 +340,7 @@ void server_task(std::promise<void>& sync_p) {
     auto s_server = network::make_guard<rpc_server>(9000);
     auto p        = s_server.get();
     auto& server  = *s_server.get();
-    server.enable_ssl({ nullptr, "server.crt", "server.key", "dh2048.pem", "ca_root.crt"});
+    server.enable_ssl({ nullptr, "server.crt", "server.key", "dh2048.pem", "ca_root.crt" });
     dummy d;
     server.register_handler("add", &dummy::add, &d);
 
@@ -336,6 +358,7 @@ void server_task(std::promise<void>& sync_p) {
     server.register_handler("get_int", get_int);
     server.register_handler("auto_disconnect", auto_disconnect);
     server.register_handler("test_stream", test_stream);
+    server.register_handler("test_void_stream", void_stream);
     server.register_handler("test_read_stream", test_read_stream);
     server.register_handler("test_write_stream", test_write_stream);
     server.register_handler("test_broken_stream", test_broken_stream);
