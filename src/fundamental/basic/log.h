@@ -112,16 +112,12 @@ public:
     static void Release(Logger* logger = s_defaultLogger);
     static bool IsDebuggerAttached();
     static void PrintBackTrace();
-    static spdlog::pattern_formatter* GetStringFormatter();
     static void TestLogInstance();
 
 public:
     static Logger* s_defaultLogger;
 
 private:
-    // for raw string format
-    static spdlog::pattern_formatter* s_formatter;
-
     ErrorHandlerType errorHandler;
     // log output
     std::shared_ptr<details::NativeLogSink> nativeLogSink = nullptr;
@@ -148,7 +144,9 @@ inline std::string StringFormat(const char* fmt, const Arg1& arg1, const Args&..
     try {
         spdlog::details::log_msg msg;
         msg.raw.write(fmt, arg1, args...);
-        Logger::GetStringFormatter()->format(msg);
+        static spdlog::pattern_formatter* s_string_formatter =
+            new spdlog::pattern_formatter("%v", spdlog::pattern_time_type::local, "");
+        s_string_formatter->format(msg);
         return std::string(msg.formatted.data(), msg.formatted.size());
     } catch (const std::exception& e) {
         if (Logger::s_defaultLogger->errorHandler) Logger::s_defaultLogger->errorHandler(e.what());
@@ -322,7 +320,7 @@ inline constexpr std::array<char, N> __get_short_file_name__(const char (&file_n
                                                            "(" STR_HELPER(__LINE__) ")] [####check####:" #_check "] ", \
                                                            LOG_FILE_NAME, __func__);                                   \
             auto __debug_msg__ = __debugInfo__ + Fundamental::StringFormat(__VA_ARGS__);                               \
-            Fundamental::Logger::s_defaultLogger->LogOutput(Fundamental::LogLevel::critical, __debug_msg__);               \
+            Fundamental::Logger::s_defaultLogger->LogOutput(Fundamental::LogLevel::critical, __debug_msg__);           \
             throw std::runtime_error(__debug_msg__);                                                                   \
         }
 

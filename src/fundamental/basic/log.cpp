@@ -259,8 +259,6 @@ private:
 } // namespace details
 // init static resource
 Logger* Logger::s_defaultLogger = new Logger();
-spdlog::pattern_formatter* Logger::s_formatter =
-    new spdlog::pattern_formatter("%v", spdlog::pattern_time_type::local, "");
 static details::LogGuard s_guard;
 
 Logger::Logger(const std::string_view& format_str) :
@@ -390,10 +388,6 @@ void Logger::PrintBackTrace() {
 
     SymCleanup(process);
 #endif
-}
-
-spdlog::pattern_formatter* Logger::GetStringFormatter() {
-    return s_formatter;
 }
 
 void Logger::TestLogInstance() {
