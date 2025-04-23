@@ -2,7 +2,7 @@
 #include <endian.h>
 
 #ifdef __cplusplus
-#include <cstdint>
+    #include <cstdint>
 namespace Fundamental
 {
 // All currently supported platform types
@@ -14,22 +14,19 @@ enum class TargetPlatformType : std::uint8_t
 };
 
 // Current target platform
-static constexpr auto kTargetPlatform = []() constexpr -> TargetPlatformType
-{
-#if defined(linux) || defined(__linux) || defined(__linux__)
-    return TargetPlatformType::Linux;
-#  define TARGET_PLATFORM_LINUX 1
-#elif defined(WIN32) || defined(__WIN32__) || defined(_WIN32) || defined(_MSC_VER)
-#  define TARGET_PLATFORM_WINDOWS 1
-    return TargetPlatformType::Windows;
-#else
-    return TargetPlatformType::Unknow;
-#endif
-}
-();
-}
-#endif  // end __cplusplus
+inline constexpr auto kTargetPlatform =
+    #if defined(linux) || defined(__linux) || defined(__linux__)
+    TargetPlatformType::Linux;
+        #define TARGET_PLATFORM_LINUX 1
+    #elif defined(WIN32) || defined(__WIN32__) || defined(_WIN32) || defined(_MSC_VER)
+    TargetPlatformType::Windows;
+        #define TARGET_PLATFORM_WINDOWS 1
+    #else
+    TargetPlatformType::Unknow;
+    #endif
 
+} // namespace Fundamental
+#endif // end __cplusplus
 
 #ifdef _WIN32
     #ifdef F_BUILD_SHARED
@@ -43,9 +40,7 @@ static constexpr auto kTargetPlatform = []() constexpr -> TargetPlatformType
     #endif
 #else
     #define F_API
-#endif 
-
-
+#endif
 
 #ifdef _WIN32
     #ifdef PLUGIN_BUILD_SHARED
@@ -59,8 +54,7 @@ static constexpr auto kTargetPlatform = []() constexpr -> TargetPlatformType
     #endif
 #else
     #define F_PLUGIN_API
-#endif 
-
+#endif
 
 #define C_EXPORT                                  extern "C"
 #define COMBINE_PLUGIN_INIT_FUNCTION(plugin_name) __plugin_name##_init__
