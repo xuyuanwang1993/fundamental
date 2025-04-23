@@ -11,25 +11,29 @@
 #include <string>
 #include <type_traits>
 #include <vector>
-namespace Fundamental {
-enum class Endian : std::uint8_t {
+namespace Fundamental
+{
+enum class Endian : std::uint8_t
+{
     None = 0,
     LittleEndian,
     BigEndian
 };
-static constexpr auto kHostEndian = []() constexpr -> Endian {
-#if __BYTE_ORDER == __LITTLE_ENDIAN
-    return Endian::LittleEndian;
+inline constexpr auto kHostEndian =
+#if defined(_WIN32)
+    Endian::LittleEndian; 
+#elif __BYTE_ORDER == __LITTLE_ENDIAN
+    Endian::LittleEndian;
 #else
-    return Endian::BigEndian;
+    Endian::BigEndian;
 #endif
-}();
+
 template <Endian targetEndian>
 inline constexpr bool NeedConvertEndian() {
     return targetEndian != kHostEndian;
 }
 
-static constexpr auto kNeedConvertForTransfer = []() constexpr -> bool { return kHostEndian == Endian::BigEndian; }();
+inline constexpr auto kNeedConvertForTransfer = kHostEndian == Endian::BigEndian;
 
 // NOTE: This buffer owns the life time of a block of raw memory.
 template <typename _SizeType = std::size_t>
@@ -287,8 +291,9 @@ struct BufferHash {
     }
 };
 
-template <typename SizeType = std::size_t, Endian targetEndian = Endian::LittleEndian,
-          typename = std::enable_if_t<std::is_unsigned_v<SizeType>>>
+template <typename SizeType   = std::size_t,
+          Endian targetEndian = Endian::LittleEndian,
+          typename            = std::enable_if_t<std::is_unsigned_v<SizeType>>>
 struct BufferReader {
     using ConvertFlag = std::bool_constant<NeedConvertEndian<targetEndian>()>;
 
@@ -421,8 +426,9 @@ private:
 };
 
 // Fixed buffer writer
-template <typename SizeType = std::size_t, Endian targetEndian = Endian::LittleEndian,
-          typename = std::enable_if_t<std::is_unsigned_v<SizeType>>>
+template <typename SizeType   = std::size_t,
+          Endian targetEndian = Endian::LittleEndian,
+          typename            = std::enable_if_t<std::is_unsigned_v<SizeType>>>
 class BufferWriter {
     using ConvertFlag = std::bool_constant<NeedConvertEndian<targetEndian>()>;
 

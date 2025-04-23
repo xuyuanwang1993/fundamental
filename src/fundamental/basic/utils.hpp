@@ -12,6 +12,9 @@
 namespace Fundamental
 {
 
+template <auto>  
+inline constexpr bool always_false = false;  
+
 struct NonCopyable {
     NonCopyable()                              = default;
     NonCopyable(const NonCopyable&)            = delete;
