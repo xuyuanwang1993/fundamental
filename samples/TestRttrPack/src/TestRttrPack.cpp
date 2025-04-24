@@ -6,7 +6,9 @@
 #include "fundamental/basic/utils.hpp"
 #include "fundamental/rttr_handler/binary_packer.h"
 
+#include "fundamental/rttr_handler/deserializer.h"
 #include "fundamental/rttr_handler/serializer.h"
+
 #include <iostream>
 #include <list>
 #include <map>
@@ -297,18 +299,23 @@ RTTR_REGISTRATION {
         using register_type = TestContainer;
         rttr::registration::class_<register_type>("TestContainer")
             .constructor()(rttr::policy::ctor::as_object)
-            .property("1", &register_type::objects_set)
-            .property("2", &register_type::objects_v)
-            .property("3", &register_type::no_empty_map)
-            .property("4", &register_type::no_empty_v)
-            .property("5", &register_type::obj)
-            .property("6", &register_type::empty_map)
-            .property("7", &register_type::empty_set)
-            .property("8", &register_type::empty_v)
+            .property("1", &register_type::obj)
+            .property("2", &register_type::empty_v)
+            .property("3", &register_type::no_empty_v)
+
+            .property("4", &register_type::objects_v)
+
+            .property("5", &register_type::empty_set)
+            .property("6", &register_type::objects_set)
+            .property("7", &register_type::empty_map)
+            .property("8", &register_type::no_empty_map)
             .property("9", &register_type::no_empty_map2);
     }
 }
+
+void test_normal_packer();
 int main(int argc, char* argv[]) {
+    test_normal_packer();
     using namespace Fundamental::io;
     auto type = rttr::type::get<std::set<TestContainerEle>>();
 
@@ -695,4 +702,49 @@ int main(int argc, char* argv[]) {
     }
 
     return 0;
+}
+
+void test_normal_packer() {
+    {
+        std::vector<TestContainerEle> v;
+        {
+            auto& item = v.emplace_back();
+            item.x     = 1;
+            item.y     = 2;
+        }
+        {
+            auto& item = v.emplace_back();
+            item.x     = 3;
+            item.y     = 4;
+        }
+        auto data = Fundamental::io::to_json(v);
+        decltype(v) tmp;
+        Fundamental::io::from_json(data, tmp);
+        FINFO("raw:{}", data);
+        FINFO("gen:{}", Fundamental::io::to_json(tmp));
+        FASSERT(tmp == v);
+    }
+
+    {
+        int cnt = 0;
+
+        TestContainer obj;
+        while (cnt < 1) {
+            obj.update();
+            auto data = Fundamental::io::to_json(obj);
+            TestContainer tmp;
+            auto type        = rttr::type::get(tmp.obj);
+            rttr::variant v1 = tmp.obj.x;
+            rttr::variant v2 = 123L;
+            v2.convert(v1.get_type());
+            type.set_property_value("x", tmp.obj, v2);
+            FASSERT(tmp.obj.x == 123, "{}", tmp.obj.x);
+            auto ret = Fundamental::io::from_json(data, tmp);
+            FASSERT(ret);
+            FINFO("raw:{}", data);
+            FINFO("gen:{}", Fundamental::io::to_json(tmp));
+            FASSERT(tmp == obj);
+            ++cnt;
+        }
+    }
 }
