@@ -11,7 +11,8 @@
 #include <string>
 #include <string_view>
 
-namespace Fundamental {
+namespace Fundamental
+{
 
 class file_mutex {
     static constexpr const char* kLckFileExt = ".lck";
@@ -30,6 +31,24 @@ public:
     }
 
     bool Lock() {
+        if (IsLocked()) return true;
+        fd = open(_lock_filename.c_str(), O_RDWR | O_CREAT | __O_CLOEXEC, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+        if (fd < 0) {
+            return false;
+        }
+
+        while (flock(fd, LOCK_EX) != 0) {
+            // maybe permission denied
+            if (errno != EINTR) {
+                close(fd);
+                return false;
+            }
+        }
+
+        return true;
+    }
+    bool TryLock() {
+        if (IsLocked()) return true;
         fd = open(_lock_filename.c_str(), O_RDWR | O_CREAT | __O_CLOEXEC, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
         if (fd < 0) {
             return false;
@@ -42,7 +61,6 @@ public:
         }
         return true;
     }
-
     bool Unlock() {
         if (fd >= 0) {
             // Release the lock and close the file descriptor
