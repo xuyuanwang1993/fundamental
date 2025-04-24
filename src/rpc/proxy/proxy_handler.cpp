@@ -45,14 +45,18 @@ void proxy_handler::HandleDisconnect(asio::error_code ec, const std::string& cal
             status &= (~ClientProxying);
             asio::error_code code;
             socket_.close(code);
+#ifdef RPC_VERBOSE
             if (!callTag.empty()) FDEBUG("{} close proxy remote endpoint", callTag);
+#endif
         }
     }
     if (closeMask & ProxyDnsResolving) {
         if (status & ProxyDnsResolving) {
             status &= (~ProxyDnsResolving);
             resolver.cancel();
+#ifdef RPC_VERBOSE
             if (!callTag.empty()) FDEBUG("{} stop proxy dns resolving", callTag);
+#endif
         }
     }
     if ((closeMask & ServerProxying) || (closeMask & ServerConnecting)) {
@@ -60,7 +64,9 @@ void proxy_handler::HandleDisconnect(asio::error_code ec, const std::string& cal
             status &= ~(ServerProxying | ServerConnecting);
             asio::error_code code;
             proxy_socket_.close(code);
+#ifdef RPC_VERBOSE
             if (!callTag.empty()) FDEBUG("{} close proxy local endpoint", callTag);
+#endif
         }
     }
 }
@@ -117,7 +123,9 @@ void proxy_handler::HandShake() {
                               HandleDisconnect(ec, "HandShake");
                               return;
                           }
+#ifdef RPC_VERBOSE
                           FDEBUG("proxy handshake sucess");
+#endif
                       });
     StartClientRead();
 }
