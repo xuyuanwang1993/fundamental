@@ -14,6 +14,8 @@ int main(int argc, char* argv[]) {
         FINFO("lock {} success", argv[1]);
     }
     FASSERT(mutex.IsLocked());
+    mutex.Unlock();
+    mutex.TryLock();
     getchar();
     mutex.Unlock();
     FINFO("unlock {} success", argv[1]);
