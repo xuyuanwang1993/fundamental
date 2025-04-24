@@ -132,7 +132,9 @@ public:
         enable_tcp_keep_alive(socket_);
     }
     ~connection() {
+#ifdef RPC_VERBOSE
         FDEBUG("release connection {:p} -> {}", (void*)this, conn_id_);
+#endif
     }
 
     void start() {
@@ -278,7 +280,9 @@ private:
                                      }
                                      do_ssl_handshake(head_, kSslPreReadSize);
                                  } else {
+#ifdef RPC_VERBOSE
                                      FDEBUG("[rpc] WARNNING!!! falling  down to no ssl socket");
+#endif
                                      ssl_context_ref = nullptr;
                                      read_head(kSslPreReadSize);
                                  }
@@ -349,7 +353,9 @@ private:
                 return;
             }
             if (ec) {
+#ifdef RPC_VERBOSE
                 FDEBUG("{:p} rpc read head failed {}", (void*)this, ec.message());
+#endif
                 on_net_err_(self, ec.message());
                 release_obj();
                 return;
@@ -671,7 +677,9 @@ private:
 
 inline ServerStreamReadWriter::ServerStreamReadWriter(std::shared_ptr<connection> conn) :
 conn_(conn), timeout_check_timer_(conn_->socket_.get_executor()) {
+#ifdef RPC_VERBOSE
     FDEBUG("build stream writer {:p} with connection:{:p}", (void*)this, (void*)conn_.get());
+#endif
 }
 inline void ServerStreamReadWriter::release_obj() {
     reference_.release();
@@ -691,7 +699,9 @@ inline std::uint16_t ServerStreamReadWriter::get_remote_peer_port() const {
     return conn_->get_remote_peer_port();
 }
 inline ServerStreamReadWriter::~ServerStreamReadWriter() {
+#ifdef RPC_VERBOSE
     FDEBUG("release stream writer {:p} with connection:{:p}", (void*)this, (void*)conn_.get());
+#endif
 }
 template <typename T>
 inline bool ServerStreamReadWriter::Read(T& request, std::size_t max_wait_ms) {

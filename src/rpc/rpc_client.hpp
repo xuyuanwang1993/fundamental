@@ -217,10 +217,14 @@ public:
     rpc_client(std::string host, const std::string& service) :
     ios_(s_io_context_cb()), resolver_(ios_), socket_(ios_), host_(std::move(host)), service_name_(service),
     reconnect_delay_timer_(ios_), deadline_(ios_), body_(INIT_BUF_SIZE) {
+#ifdef RPC_VERBOSE
         FDEBUG(" client construct {:p}", (void*)this);
+#endif
     }
     ~rpc_client() {
+#ifdef RPC_VERBOSE
         FDEBUG(" client deconstruct {:p}", (void*)this);
+#endif
         if (proxy_interface) proxy_interface->release_obj();
     }
     void config_tcp_no_delay(bool flag = true) {
@@ -983,7 +987,9 @@ private:
             if (!cert) break;
             auto org_name = read_org_name(cert);
             if (!org_name.empty()) {
+#ifdef RPC_VERBOSE
                 FDEBUG("rpc client {:p} ssl Verifying org:{}", (void*)this, org_name);
+#endif
                 return trusted_orgs.find(org_name) != trusted_orgs.end();
             }
         } while (0);
@@ -1179,10 +1185,14 @@ private:
 
 inline ClientStreamReadWriter::ClientStreamReadWriter(std::shared_ptr<rpc_client> client) :
 client_(client), deadline_(client_->socket_.get_executor()) {
+#ifdef RPC_VERBOSE
     FDEBUG("build stream writer {:p} with client:{:p}", (void*)this, (void*)&client_);
+#endif
 }
 inline ClientStreamReadWriter::~ClientStreamReadWriter() {
+#ifdef RPC_VERBOSE
     FDEBUG("release stream writer {:p} with client:{:p}", (void*)this, (void*)&client_);
+#endif
 }
 template <typename T>
 inline bool ClientStreamReadWriter::Read(T& request, std::size_t max_wait_ms) {
@@ -1437,8 +1447,10 @@ inline void ClientStreamReadWriter::set_status(rpc_stream_data_status status, st
     last_data_status_ = status;
     cv_.notify_all();
     if (last_data_status_.load() >= rpc_stream_data_status::rpc_stream_finish) {
+#ifdef RPC_VERBOSE
         FDEBUG("rpc stream client {:p} finish success:{} {}", (void*)this,
                last_data_status_.load() == rpc_stream_data_status::rpc_stream_finish, last_err_.message());
+#endif
         release_obj();
     }
 }

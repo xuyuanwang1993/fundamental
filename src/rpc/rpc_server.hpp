@@ -125,8 +125,10 @@ public:
             ssl_context->use_certificate_chain_file(ssl_config_.certificate_path);
             ssl_context->use_private_key_file(ssl_config_.private_key_path, asio::ssl::context::pem);
             if (!ssl_config_.tmp_dh_path.empty()) ssl_context->use_tmp_dh_file(ssl_config_.tmp_dh_path);
+    #ifdef RPC_VERBOSE
             FDEBUG("load ssl config ca:{} key:{} crt:{} dh:{}", ssl_config_.ca_certificate_path,
                    ssl_config_.private_key_path, ssl_config_.certificate_path, ssl_config_.tmp_dh_path);
+    #endif
         } catch (const std::exception& e) {
             throw std::invalid_argument(std::string("load ssl config failed ") + e.what());
         }
@@ -208,7 +210,9 @@ private:
                     new_conn->set_conn_id(id);
                     new_conn->config_proxy_manager(proxy_manager);
                     new_conn->start();
+#ifdef RPC_VERBOSE
                     FDEBUG("start connection {:p} -> {}", (void*)(new_conn.get()), id);
+#endif
                 }
 
                 do_accept();
