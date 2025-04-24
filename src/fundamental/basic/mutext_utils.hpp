@@ -41,6 +41,7 @@ public:
             // maybe permission denied
             if (errno != EINTR) {
                 close(fd);
+                fd = -1;
                 return false;
             }
         }
@@ -79,7 +80,7 @@ public:
 
 private:
     std::string _lock_filename;
-    std::int32_t fd;
+    std::int32_t fd = -1;
 };
 
 }; // namespace Fundamental

@@ -52,6 +52,7 @@ template <typename T,
               std::disjunction_v<std::is_same<T, std::vector<std::uint8_t>>, std::is_same<T, std::string>>>>
 inline bool ReadFile(std::string_view path,
                      T& output,
+                     std::uint64_t offset        = 0,
                      std::uint64_t max_read_size = std::numeric_limits<std::uint64_t>::max()) {
     // Always read as binary.
     std::ifstream file(std::string(path), std::ios::binary);
@@ -59,7 +60,10 @@ inline bool ReadFile(std::string_view path,
         // Get the lengthInBytes in bytes
         file.seekg(0, file.end);
         auto lengthInBytes = static_cast<decltype(max_read_size)>(file.tellg());
-        file.seekg(0, file.beg);
+        if (offset >= lengthInBytes) {
+            return false;
+        }
+        file.seekg(offset);
         if (lengthInBytes > max_read_size) lengthInBytes = max_read_size;
         output.resize(lengthInBytes);
         file.read(reinterpret_cast<char*>(output.data()), lengthInBytes);
