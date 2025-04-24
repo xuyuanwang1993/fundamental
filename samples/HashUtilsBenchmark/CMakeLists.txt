@@ -43,15 +43,3 @@ target_compile_definitions(${app_target_name}
 
 declare_benchmark_exe(${app_target_name})
 
-install(FILES ${FUNDAMENTAL_ASSETS_PATH}/dh2048.pem
-    ${FUNDAMENTAL_ASSETS_PATH}/server.crt
-    ${FUNDAMENTAL_ASSETS_PATH}/server.key
-    COMPONENT ssl-crt
-    DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
-
-add_custom_command(TARGET ${app_target_name}
-    POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E echo "ssl pem installing"
-    COMMAND ${CMAKE_COMMAND} --install . --component ssl-crt
-    COMMENT "post-build ssl pem install"
-    VERBATIM)

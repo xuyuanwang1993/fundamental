@@ -119,14 +119,14 @@ static Fundamental::json write_associative_container(const variant_associative_v
 
     if (view.is_key_only_type()) {
         for (auto& item : view) {
-            Fundamental::json child = write_variant(item.first, option);
+            Fundamental::json child = write_variant(item.first.extract_wrapped_value(), option);
             json_array.push_back(child);
         }
     } else {
         for (auto& item : view) {
             Fundamental::json child = Fundamental::json::object();
-            child[key_name]         = write_variant(item.first, option);
-            child[value_name]       = write_variant(item.second, option);
+            child[key_name]         = write_variant(item.first.extract_wrapped_value(), option);
+            child[value_name]       = write_variant(item.second.extract_wrapped_value(), option);
 
             json_array.push_back(child);
         }
@@ -312,7 +312,6 @@ std::string write_variant_with_comment(const variant& var,
                         if (std::strncmp(comment.data(), "/*", 2) != 0) break;
                         if (std::strncmp(comment.data() + comment.size() - 2, "*/", 2) != 0) break;
                     }
-
                     for (auto& c : comment) {
                         if (!ret.empty() && *ret.rbegin() == '\n') {
                             ret.insert(ret.size(), indent_string.data(), new_indent);
