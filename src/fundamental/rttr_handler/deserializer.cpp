@@ -55,8 +55,11 @@ void fromjson_recursively(const json& json_object,
             }
         } else { // basic type
             variant extracted_value = extract_basic_types(json_object);
-            if (extracted_value.convert(var.get_type())) // REMARK: CONVERSION WORKS ONLY WITH "const type", check
-                                                         // whether this is correct or not!
+            auto target_type        = var.get_type();
+            if (target_type.is_wrapper()) target_type = target_type.get_wrapped_type();
+            const auto& ref_type = target_type;
+            if (extracted_value.convert(ref_type)) // REMARK: CONVERSION WORKS ONLY WITH "const type", check
+                                                   // whether this is correct or not!
                 var = extracted_value;
             else { // maybe unsupported
             }
