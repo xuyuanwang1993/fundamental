@@ -214,6 +214,16 @@ struct TestVarObject2 {
     }
 };
 
+struct TestExtraObject {
+    std::vector<std::string> ss;
+    std::vector<color> cc;
+    std::set<std::string> sss;
+    std::map<std::string, std::string> mm;
+    bool operator==(const TestExtraObject& other) const noexcept {
+        return ss == other.ss && cc == other.cc && sss == other.sss && mm == other.mm;
+    }
+};
+
 RTTR_REGISTRATION {
     rttr::registration::class_<point2d>("point2d")
         .constructor()(rttr::policy::ctor::as_object)
@@ -310,6 +320,15 @@ RTTR_REGISTRATION {
             .property("7", &register_type::empty_map)
             .property("8", &register_type::no_empty_map)
             .property("9", &register_type::no_empty_map2);
+    }
+    {
+        using register_type = TestExtraObject;
+        rttr::registration::class_<register_type>("TestExtraObject")
+            .constructor()(rttr::policy::ctor::as_object)
+            .property("ss", &register_type::ss)
+            .property("cc", &register_type::cc)
+            .property("mm", &register_type::mm)
+            .property("sss", &register_type::sss);
     }
 }
 
@@ -705,6 +724,23 @@ int main(int argc, char* argv[]) {
 }
 
 void test_normal_packer() {
+    {
+        TestExtraObject obj;
+        obj.ss.emplace_back("123");
+        obj.ss.emplace_back("1234");
+        obj.cc.emplace_back(color::blue);
+        obj.sss.insert("456");
+        obj.sss.insert("4567");
+        obj.mm.emplace("123","123");
+        obj.mm.emplace("1234","1233");
+        auto data = Fundamental::io::to_json(obj);
+        TestExtraObject tmp;
+        auto ret = Fundamental::io::from_json(data, tmp);
+        FASSERT(ret);
+        FINFO("raw:{}", data);
+        FINFO("gen:{}", Fundamental::io::to_json(tmp));
+        FASSERT(tmp == obj);
+    }
     {
         std::vector<TestContainerEle> v;
         {
