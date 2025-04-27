@@ -120,30 +120,23 @@ void delay_echo(rpc_conn conn, const std::string& src, std::int64_t delay_msec) 
     s_delay_queue.StartDelayTask(h);
 }
 
-void test_stream(rpc_conn conn) {
-    auto c = conn.lock();
-    auto w = c->InitRpcStream();
-
-    rpc_stream_pool.Enqueue(
-        [](decltype(w) stream) {
-            FWARN("stream start");
-            person p;
-            while (stream->Read(p, 0)) {
-                FDEBUG("id:{},age:{},name:{}", p.id, p.age, p.name);
-                p.name += " from server";
-                p.age += 10;
-                p.id += 10;
-                if (!stream->Write(p)) break;
-            };
-            stream->WriteDone();
-            auto ec = stream->Finish(0);
-            if (ec) {
-                FINFO("rpc failed {}", ec.message());
-            } else {
-                FINFO("rpc done");
-            }
-        },
-        w);
+void test_stream(std::shared_ptr<ServerStreamReadWriter> stream) {
+    FWARN("stream start");
+    person p;
+    while (stream->Read(p, 0)) {
+        FDEBUG("id:{},age:{},name:{}", p.id, p.age, p.name);
+        p.name += " from server";
+        p.age += 10;
+        p.id += 10;
+        if (!stream->Write(p)) break;
+    };
+    stream->WriteDone();
+    auto ec = stream->Finish(0);
+    if (ec) {
+        FINFO("rpc failed {}", ec.message());
+    } else {
+        FINFO("rpc done");
+    }
 }
 
 void void_stream(rpc_conn conn) {
@@ -321,10 +314,6 @@ std::string echo(rpc_conn conn, const std::string& src) {
     return src;
 }
 
-int get_int(rpc_conn conn, int val) {
-    return val;
-}
-
 dummy1 get_dummy(rpc_conn conn, dummy1 d) {
     return d;
 }
@@ -342,22 +331,21 @@ void server_task(std::promise<void>& sync_p) {
     auto& server  = *s_server.get();
     server.enable_ssl({ nullptr, "server.crt", "server.key", "dh2048.pem", "ca_root.crt" });
     dummy d;
-    server.register_handler("add", &dummy::add, &d);
+    server.register_delay_handler("add", [&d](rpc_conn conn, int x, int y) -> int { return d.add(conn, x, y); });
 
-    server.register_handler("get_dummy", get_dummy);
+    server.register_delay_handler("get_dummy", get_dummy);
 
-    server.register_handler("translate", translate);
-    server.register_handler("hello", hello);
-    server.register_handler("get_person_name", get_person_name);
-    server.register_handler("get_person", get_person);
-    server.register_handler("upload", upload);
-    server.register_handler("download", download);
-    server.register_handler("get_name", get_name);
+    server.register_delay_handler("translate", translate);
+    server.register_delay_handler("hello", hello);
+    server.register_delay_handler("get_person_name", get_person_name);
+    server.register_delay_handler("get_person", get_person);
+    server.register_delay_handler("upload", upload);
+    server.register_delay_handler("download", download);
+    server.register_delay_handler("get_name", get_name);
     server.register_handler("delay_echo", delay_echo);
-    server.register_handler("echo", echo);
-    server.register_handler("get_int", get_int);
+    server.register_delay_handler("echo", echo);
     server.register_handler("auto_disconnect", auto_disconnect);
-    server.register_handler("test_stream", test_stream);
+    server.register_stream_handler("test_stream", test_stream);
     server.register_handler("test_void_stream", void_stream);
     server.register_handler("test_read_stream", test_read_stream);
     server.register_handler("test_write_stream", test_write_stream);

@@ -12,6 +12,8 @@
 #include <unordered_set>
 
 #include "fundamental/events/event_system.h"
+#include "fundamental/thread_pool/thread_pool.h"
+
 #include "network/network.hpp"
 
 using asio::ip::tcp;
@@ -20,8 +22,8 @@ namespace network
 {
 namespace rpc_service
 {
+class ServerStreamReadWriter;
 using rpc_conn = std::weak_ptr<connection>;
-
 class rpc_server : private asio::noncopyable, public std::enable_shared_from_this<rpc_server> {
     friend class connection;
 
@@ -53,6 +55,70 @@ public:
     void stop() {
         release_obj();
     }
+    
+    void register_stream_handler(std::string const& name,
+                                 const std::function<void(std::shared_ptr<ServerStreamReadWriter>)>& f) {
+        auto proxy_func = [f](network::rpc_service::rpc_conn conn) {
+            auto c = conn.lock();
+            if (!c) return;
+            auto w = c->InitRpcStream();
+            if (!w) return;
+            auto& pool     = Fundamental::ThreadPool::LongTimePool();
+            auto task_func = [f](std::shared_ptr<ServerStreamReadWriter> read_writer) mutable {
+                try {
+                    f(read_writer);
+                } catch (...) {
+                    read_writer->release_obj();
+                }
+            };
+            pool.Enqueue(task_func, std::move(w));
+        };
+        router_.register_handler<false>(name, proxy_func);
+    }
+
+    template <typename Function>
+    void register_delay_handler(std::string const& name, Function f) {
+        auto proxy_func = [f, name](std::weak_ptr<connection> conn, std::string_view str,
+                                    std::string& /*result*/) mutable -> void {
+            auto c = conn.lock();
+            if (!c) return;
+            c->set_delay(true);
+            auto req_id    = c->request_id();
+            auto& pool     = Fundamental::ThreadPool::LongTimePool();
+            auto task_func = [name](const Function& f, std::weak_ptr<connection> conn, std::string data,
+                                    decltype(req_id) req_id) mutable {
+                auto c = conn.lock();
+                if (!c) return;
+
+                try {
+                    msgpack_codec codec;
+                    using args_tuple = typename function_traits<Function>::bare_tuple_type;
+                    auto tp          = codec.unpack_tuple<args_tuple>(data.data(), data.size());
+                    helper_t<args_tuple, false> { tp }();
+
+                    std::string process_result;
+                    router::call(f, conn, process_result, std::move(tp));
+                    c->response_interal(req_id, std::move(process_result));
+
+                } catch (std::invalid_argument& e) {
+                    auto err_msg = Fundamental::StringFormat("rpc:{} invalid argument exception {}", name, e.what());
+                    FERR(err_msg);
+                    c->response_errmsg(req_id, network::rpc_service::request_type::rpc_res, err_msg);
+                } catch (const std::exception& e) {
+                    auto err_msg = Fundamental::StringFormat("rpc:{} has unexpected exception {}", name, e.what());
+                    FERR(err_msg);
+                    c->response_errmsg(req_id, network::rpc_service::request_type::rpc_res, err_msg);
+                } catch (...) {
+                    auto err_msg = Fundamental::StringFormat("rpc:{} has unexpected unknown exception", name);
+                    FERR(err_msg);
+                    c->response_errmsg(req_id, network::rpc_service::request_type::rpc_res, err_msg);
+                }
+            };
+            pool.Enqueue(task_func, f, conn, std::string(str), req_id);
+        };
+        router_.register_wrapper_handler(name, proxy_func);
+    }
+
     template <bool is_pub = false, typename Function>
     void register_handler(std::string const& name, const Function& f) {
         router_.register_handler<is_pub>(name, f);
