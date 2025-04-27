@@ -121,9 +121,9 @@ public:
     static ThreadPool& Instance() {
         // Init handles joining on cleanup
         if constexpr (Index == ShortTimeThreadPool) {
-            static ThreadPool* instance = new ThreadPool(1, ThreadPoolConfig::normal_thread_num_limit(), Index);
+            static ThreadPool* instance = new ThreadPool(1, 0, Index);
             return *instance;
-        } else if constexpr (Index == BlockTimeThreadPool) {
+        } else if constexpr (Index == BlockTimeThreadPool || Index == LongTimeThreadPool) {
             static ThreadPool* instance = new ThreadPool(0, 0, Index);
             return *instance;
         } else if constexpr (Index == PrallelThreadPool) {

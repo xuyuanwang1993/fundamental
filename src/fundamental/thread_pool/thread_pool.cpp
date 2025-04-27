@@ -93,11 +93,16 @@ std::size_t ThreadPool::Join() {
     }
     std::size_t ret = 0;
     {
-        std::scoped_lock<std::mutex> lock(m_workersMutex);
-        ret = m_workers.size();
-        for (auto& w : m_workers)
+        decltype(m_workers) tmp;
+        {
+            std::scoped_lock<std::mutex> lock(m_workersMutex);
+            ret = m_workers.size();
+            std::swap(tmp, m_workers);
+        }
+
+        for (auto& w : tmp)
             if (w.second->joinable()) w.second->join();
-        m_workers.clear();
+        tmp.clear();
     }
     { // clear all tasks
         std::scoped_lock<std::mutex> locker(m_tasksMutex);
@@ -149,7 +154,7 @@ void ThreadPool::Run(std::size_t index) {
                 if (iter != m_workers.end()) op_thread = std::move(iter->second);
                 m_workers.erase(iter);
             }
-            FASSERT(op_thread);
+            if (!op_thread) return;
             // let default pool excute join operation
             DefaultPool().Schedule<false>(clock_t::now(), [op_thread = std::move(op_thread)]() mutable {
                 if (op_thread && op_thread->joinable()) op_thread->join();
