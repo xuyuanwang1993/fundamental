@@ -167,6 +167,19 @@ public:
                    });
     }
 
+    template <typename... Args>
+    void response_errmsg(uint64_t req_id, request_type req_type, Args&&... args) {
+        auto data   = msgpack_codec::pack(static_cast<int32_t>(result_code::FAIL), std::forward<Args>(args)...);
+        auto s_data = std::string(data.data(), data.data() + data.size());
+        asio::post(socket_.get_executor(),
+                   [this, data = std::move(s_data), req_id, req_type, ref = shared_from_this()]() mutable {
+                       if (!reference_.is_valid()) {
+                           return;
+                       }
+                       response_interal(req_id, std::move(data), req_type);
+                   });
+    }
+
     void set_conn_id(int64_t id) {
         conn_id_ = id;
     }
