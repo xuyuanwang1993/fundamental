@@ -35,6 +35,26 @@ if(FUNDAMENTAL_ENABLE_SQLITE3_SUPPORT)
     endif()
 endif()
 
+if(FUNDAMENTAL_ENABLE_ROCKSDB_SUPPORT)
+    file(GLOB rocksdb_src
+        rocksdb/*.h
+        rocksdb/*.cpp
+        rocksdb/*.hpp
+    )
+    list(APPEND lib_source ${rocksdb_src})
+    # librocksdb-dev should be installed firstly 
+    ## find_package(rocksdb REQUIRED)
+    ##if(rocksdb_FOUND)
+        target_link_libraries(${lib_name}_property INTERFACE
+            rocksdb
+        )
+
+    ##else()
+    ##    message(FATAL_ERROR "you should install librocksdb-dev package")
+    ##endif()
+endif()
+
+
 # Add to source group, TREE will enable cmake to config the folder layout automatically
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${lib_source})
 
