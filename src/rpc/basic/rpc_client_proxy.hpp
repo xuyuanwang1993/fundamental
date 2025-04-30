@@ -103,10 +103,12 @@ private:
 
     void release_obj() {
         reference_.release();
-        asio::post(ref_socket_->get_executor(), [this, ref = shared_from_this()] {
-            std::error_code ec;
-            ref_socket_->close(ec);
-        });
+        if (ref_socket_) {
+            asio::post(ref_socket_->get_executor(), [this, ref = shared_from_this()] {
+                std::error_code ec;
+                ref_socket_->close(ec);
+            });
+        }
     }
 
 protected:
