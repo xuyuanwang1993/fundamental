@@ -127,8 +127,8 @@ public:
         return std::make_shared<connection>(std::forward<Args>(args)...);
     }
     connection(tcp::socket socket, std::size_t timeout_msec, router& router, std::weak_ptr<rpc_server> server_wref) :
-    server_wref_(server_wref), socket_(std::move(socket)), body_(INIT_BUF_SIZE),
-    timeout_check_timer_(socket_.get_executor()), timeout_msec_(timeout_msec), router_(router) {
+    server_wref_(server_wref), socket_(std::move(socket)),executor_(socket_.get_executor()), body_(INIT_BUF_SIZE),
+    timeout_check_timer_(executor_), timeout_msec_(timeout_msec), router_(router) {
         enable_tcp_keep_alive(socket_);
     }
     ~connection() {
@@ -158,7 +158,7 @@ public:
     void response(uint64_t req_id, request_type req_type, Args&&... args) {
         auto data   = msgpack_codec::pack(static_cast<int32_t>(result_code::OK), std::forward<Args>(args)...);
         auto s_data = std::string(data.data(), data.data() + data.size());
-        asio::post(socket_.get_executor(),
+        asio::post(executor_,
                    [this, data = std::move(s_data), req_id, req_type, ref = shared_from_this()]() mutable {
                        if (!reference_.is_valid()) {
                            return;
@@ -171,7 +171,7 @@ public:
     void response_errmsg(uint64_t req_id, request_type req_type, Args&&... args) {
         auto data   = msgpack_codec::pack(static_cast<int32_t>(result_code::FAIL), std::forward<Args>(args)...);
         auto s_data = std::string(data.data(), data.data() + data.size());
-        asio::post(socket_.get_executor(),
+        asio::post(executor_,
                    [this, data = std::move(s_data), req_id, req_type, ref = shared_from_this()]() mutable {
                        if (!reference_.is_valid()) {
                            return;
@@ -216,7 +216,7 @@ public:
 #endif
     void release_obj() {
         reference_.release();
-        asio::post(socket_.get_executor(), [this, ref = shared_from_this()] { close(); });
+        asio::post(executor_, [this, ref = shared_from_this()] { close(); });
     }
     std::shared_ptr<ServerStreamReadWriter> InitRpcStream();
 
@@ -656,6 +656,7 @@ private:
     network_data_reference reference_;
     std::weak_ptr<rpc_server> server_wref_;
     tcp::socket socket_;
+    const asio::any_io_executor& executor_;
     char head_[kRpcHeadLen];
     std::vector<char> body_;
     std::uint64_t req_id_;
@@ -689,14 +690,14 @@ private:
 };
 
 inline ServerStreamReadWriter::ServerStreamReadWriter(std::shared_ptr<connection> conn) :
-conn_(conn), timeout_check_timer_(conn_->socket_.get_executor()) {
+conn_(conn), timeout_check_timer_(conn_->executor_) {
 #ifdef RPC_VERBOSE
     FDEBUG("build stream writer {:p} with connection:{:p}", (void*)this, (void*)conn_.get());
 #endif
 }
 inline void ServerStreamReadWriter::release_obj() {
     reference_.release();
-    asio::post(conn_->socket_.get_executor(), [this, ref = shared_from_this()] {
+    asio::post(conn_->executor_, [this, ref = shared_from_this()] {
         cancel_timer();
         if (last_data_status_ < rpc_stream_data_status::rpc_stream_finish) {
             set_status(rpc_stream_data_status::rpc_stream_finish,
@@ -756,7 +757,7 @@ inline bool ServerStreamReadWriter::Write(U&& response) {
 
         return false;
     }
-    asio::post(conn_->socket_.get_executor(), [this, data = std::move(data), ref = shared_from_this()]() mutable {
+    asio::post(conn_->executor_, [this, data = std::move(data), ref = shared_from_this()]() mutable {
         if (!reference_.is_valid()) return;
         auto& new_item = write_cache_.emplace_back();
         new_item.size  = htole32(static_cast<std::uint32_t>(data.size()));
@@ -771,7 +772,7 @@ inline bool ServerStreamReadWriter::WriteEmpty() {
     if (last_data_status_ >= rpc_stream_data_status::rpc_stream_finish) return false;
     rpc_buffer_type data;
 
-    asio::post(conn_->socket_.get_executor(), [this, ref = shared_from_this()]() mutable {
+    asio::post(conn_->executor_, [this, ref = shared_from_this()]() mutable {
         if (!reference_.is_valid()) return;
         auto& new_item = write_cache_.emplace_back();
         new_item.size  = 0;
@@ -801,7 +802,7 @@ inline bool ServerStreamReadWriter::ReadEmpty(std::size_t max_wait_ms) {
 
 inline bool ServerStreamReadWriter::WriteDone() {
     if (last_data_status_ >= rpc_stream_data_status::rpc_stream_finish) return false;
-    asio::post(conn_->socket_.get_executor(), [this, ref = shared_from_this()]() mutable {
+    asio::post(conn_->executor_, [this, ref = shared_from_this()]() mutable {
         if (!reference_.is_valid()) return;
         auto& new_item = write_cache_.emplace_back();
         new_item.size  = 0;
