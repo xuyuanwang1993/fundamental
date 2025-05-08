@@ -21,11 +21,13 @@ struct network_data_reference {
     bool operator!() const {
         return !is_valid();
     }
-    void release() {
+    bool release() {
         auto expected_value = false;
         if (__has_released.compare_exchange_strong(expected_value, true)) {
             notify_release.Emit();
+            return true;
         }
+        return false;
     }
     std::atomic_bool __has_released = false;
 };
@@ -111,7 +113,7 @@ struct protocal_helper {
         acceptor.listen();
     }
 };
-//ss -to | grep -i keepalive 可以查看是否启用了选项
+// ss -to | grep -i keepalive 可以查看是否启用了选项
 inline void enable_tcp_keep_alive(asio::ip::tcp::socket& socket,
                                   bool enable               = true,
                                   std::int32_t idle_sec     = 30,

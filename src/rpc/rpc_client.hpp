@@ -215,8 +215,8 @@ public:
     }
 
     rpc_client(std::string host, const std::string& service) :
-    ios_(s_io_context_cb()), resolver_(ios_), socket_(ios_), host_(std::move(host)), service_name_(service),
-    reconnect_delay_timer_(ios_), deadline_(ios_), body_(INIT_BUF_SIZE) {
+    ios_(s_io_context_cb()), resolver_(ios_), socket_(ios_), executor_(socket_.get_executor()), host_(std::move(host)),
+    service_name_(service), reconnect_delay_timer_(ios_), deadline_(ios_), body_(INIT_BUF_SIZE) {
 #ifdef RPC_VERBOSE
         FDEBUG(" client construct {:p}", (void*)this);
 #endif
@@ -695,7 +695,7 @@ private:
 
     void write(std::uint64_t req_id, request_type type, rpc_service::rpc_buffer_type&& message, uint32_t func_id) {
         FASSERT(message.size() < MAX_BUF_LEN);
-        asio::post(socket_.get_executor(),
+        asio::post(executor_,
                    [this, req_id, type, func_id, message = std::move(message), ptr = shared_from_this()]() mutable {
                        if (!reference_.is_valid()) {
                            return;
@@ -1128,6 +1128,7 @@ private:
     asio::io_context& ios_;
     asio::ip::tcp::resolver resolver_;
     asio::ip::tcp::socket socket_;
+    const asio::any_io_executor& executor_;
 
     std::string host_;
     std::string service_name_;
@@ -1184,7 +1185,7 @@ private:
 };
 
 inline ClientStreamReadWriter::ClientStreamReadWriter(std::shared_ptr<rpc_client> client) :
-client_(client), deadline_(client_->socket_.get_executor()) {
+client_(client), deadline_(client_->executor_) {
 #ifdef RPC_VERBOSE
     FDEBUG("build stream writer {:p} with client:{:p}", (void*)this, (void*)&client_);
 #endif
@@ -1234,7 +1235,7 @@ inline bool ClientStreamReadWriter::Write(U&& response) {
 
         return false;
     }
-    asio::post(client_->socket_.get_executor(), [this, data = std::move(data), ref = shared_from_this()]() mutable {
+    asio::post(client_->executor_, [this, data = std::move(data), ref = shared_from_this()]() mutable {
         if (!reference_.is_valid()) return;
         auto& new_item = write_cache_.emplace_back();
         new_item.size  = htole32(static_cast<std::uint32_t>(data.size()));
@@ -1247,7 +1248,7 @@ inline bool ClientStreamReadWriter::Write(U&& response) {
 
 inline bool ClientStreamReadWriter::WriteEmpty() {
     if (last_data_status_ >= rpc_stream_data_status::rpc_stream_finish) return false;
-    asio::post(client_->socket_.get_executor(), [this, ref = shared_from_this()]() mutable {
+    asio::post(client_->executor_, [this, ref = shared_from_this()]() mutable {
         if (!reference_.is_valid()) return;
         auto& new_item = write_cache_.emplace_back();
         new_item.size  = 0;
@@ -1277,7 +1278,7 @@ inline bool ClientStreamReadWriter::ReadEmpty(std::size_t max_wait_ms) {
 
 inline bool ClientStreamReadWriter::WriteDone() {
     if (last_data_status_ >= rpc_stream_data_status::rpc_stream_finish) return false;
-    asio::post(client_->socket_.get_executor(), [this, ref = shared_from_this()]() mutable {
+    asio::post(client_->executor_, [this, ref = shared_from_this()]() mutable {
         if (!reference_.is_valid()) return;
         auto& new_item = write_cache_.emplace_back();
         new_item.size  = 0;
@@ -1291,7 +1292,7 @@ inline bool ClientStreamReadWriter::WriteDone() {
 inline std::error_code ClientStreamReadWriter::Finish(std::size_t max_wait_ms) {
     do {
         if (last_data_status_ >= rpc_stream_data_status::rpc_stream_finish) break;
-        asio::post(client_->socket_.get_executor(), [this, ref = shared_from_this()]() mutable {
+        asio::post(client_->executor_, [this, ref = shared_from_this()]() mutable {
             if (!reference_.is_valid()) return;
             auto& new_item = write_cache_.emplace_back();
             new_item.size  = 0;
@@ -1325,7 +1326,7 @@ inline void ClientStreamReadWriter::EnableAutoHeartBeat(bool enable, std::size_t
 }
 inline void ClientStreamReadWriter::release_obj() {
     reference_.release();
-    asio::post(client_->socket_.get_executor(), [this, ref = shared_from_this()] {
+    asio::post(client_->executor_, [this, ref = shared_from_this()] {
         if (last_data_status_ < rpc_stream_data_status::rpc_stream_finish) {
             set_status(rpc_stream_data_status::rpc_stream_failed,
                        error::make_error_code(error::rpc_errors::rpc_internal_error));
