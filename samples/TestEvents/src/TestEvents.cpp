@@ -124,7 +124,7 @@ void TestAutoDisconnect() {
     std::size_t cnt = 0;
     Fundamental::Signal<void()> s1;
     std::shared_ptr<bool> token = std::make_shared<bool>();
-    s1.Connect(token, [&, s_token=token]() mutable {
+    s1.Connect(token, [&, s_token = token]() mutable {
         ++cnt;
         if (cnt < 3) {
             FINFO("auto disconnect normal");
@@ -138,7 +138,11 @@ void TestAutoDisconnect() {
         }
     });
     token.reset();
-    s1.Emit();
+    {
+        auto signal_guard = s1.GuardConnect([]() { FINFO("from guard"); });
+        s1.Emit();
+    }
+
     s1.Emit();
     s1.Emit();
     s1.Emit();

@@ -119,7 +119,7 @@ public:
     class SignalHandle {
     public:
         SignalHandle() = default;
-        SignalHandle(HandleType Handle, const std::shared_ptr<ConnectionType>& connections) noexcept :
+        SignalHandle(HandleType handle, const std::shared_ptr<ConnectionType>& connections) noexcept :
         w_connections_(connections), handle_(handle) {
         }
         ~SignalHandle() {
