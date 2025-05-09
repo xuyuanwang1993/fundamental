@@ -65,6 +65,9 @@ public:
             WakeUp();
         }
     }
+    [[nodiscard]] bool IsRunning() const noexcept {
+        return bRunning.load(std::memory_order::memory_order_relaxed);
+    }
 
 protected:
     std::shared_ptr<ApplicationInterface> imp;
