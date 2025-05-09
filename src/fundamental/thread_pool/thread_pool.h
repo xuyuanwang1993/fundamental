@@ -221,7 +221,7 @@ public:
     ThreadPool(std::int32_t type = ThreadPoolType::ShortTimeThreadPool) : type(type) {
     }
     ~ThreadPool();
-
+    static void JoinAll();
 protected:
     ThreadPool(std::size_t min_tread_num,
                std::size_t max_thread_num,

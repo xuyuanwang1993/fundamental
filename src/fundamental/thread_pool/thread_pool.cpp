@@ -45,6 +45,15 @@ ThreadPool::~ThreadPool() {
     Join();
 }
 
+void ThreadPool::JoinAll() {
+    ProducerPool().Join();
+    ConsumerPool().Join();
+    BlockTimePool().Join();
+    LongTimePool().Join();
+    PrallelTaskPool().Join();
+    DefaultPool().Join();
+}
+
 std::size_t ThreadPool::Count() const {
     std::scoped_lock<std::mutex> lock(m_workersMutex);
     return m_workers.size();

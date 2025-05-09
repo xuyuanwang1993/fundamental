@@ -110,11 +110,51 @@ class SignalBase;
 template <typename PoliciesType, typename ReturnType, typename... Args>
 class SignalBase<ReturnType(Args...), PoliciesType> {
 public:
+    using ConnectionType = eventpp::CallbackList<ReturnType(Args...), PoliciesType>;
     using Callback_ =
         typename eventpp::internal_::SelectCallback<PoliciesType,
                                                     eventpp::internal_::HasTypeCallback<PoliciesType>::value,
                                                     std::function<ReturnType(Args...)>>::Type;
     using HandleType = typename eventpp::CallbackList<ReturnType(Args...), PoliciesType>::Handle;
+    class SignalHandle {
+    public:
+        SignalHandle() = default;
+        SignalHandle(HandleType Handle, const std::shared_ptr<ConnectionType>& connections) noexcept :
+        w_connections_(connections), handle_(handle) {
+        }
+        ~SignalHandle() {
+            auto c = w_connections_.lock();
+            if (c) c->remove(handle_);
+        }
+
+        SignalHandle(SignalHandle&& other) noexcept :
+        w_connections_(std::move(other.w_connections_)), handle_(std::move(other.handle_)) {
+        }
+        SignalHandle& operator=(SignalHandle&& other) noexcept {
+            release();
+            w_connections_ = std::move(other.w_connections_);
+            handle_        = std::move(other.handle_);
+            return *this;
+        }
+
+        SignalHandle(const SignalHandle&)            = delete;
+        SignalHandle& operator=(const SignalHandle&) = delete;
+
+    private:
+        void release() {
+            if (!handle_) return;
+            auto c = w_connections_.lock();
+            if (c) c->remove(handle_);
+            w_connections_.reset();
+            handle_.reset();
+        }
+
+    private:
+        std::weak_ptr<ConnectionType> w_connections_;
+        HandleType handle_;
+    };
+    using GuardType = SignalHandle;
+
     struct SignalFuture {
         HandleType handle;
         std::promise<void> p;
@@ -153,6 +193,11 @@ public:
     HandleType Connect(std::shared_ptr<T> token, const Callback_& callback, bool append_mode = true) {
         return Connect(std::weak_ptr<T>(token), callback, append_mode);
     }
+
+    GuardType GuardConnect(const Callback_& callback, bool append_mode = true) {
+        return GuardType(Connect(callback, append_mode), _connections);
+    }
+
     std::shared_ptr<SignalFuture> MakeSignalFuture() {
         auto ret    = std::make_shared<SignalFuture>();
         ret->handle = Connect([ret, this](Args...) -> void {
@@ -165,14 +210,14 @@ public:
     void Emit(Args... args);
     void operator()(Args... args);
     bool operator!() const {
-        return _connections.empty();
+        return _connections->empty();
     }
     operator bool() const {
-        return !_connections.empty();
+        return !_connections->empty();
     }
 
 private:
-    eventpp::CallbackList<ReturnType(Args...), PoliciesType> _connections;
+    std::shared_ptr<ConnectionType> _connections = std::make_shared<ConnectionType>();
 };
 
 template <typename PoliciesType, typename ReturnType, typename... Args>
@@ -180,15 +225,15 @@ inline typename SignalBase<ReturnType(Args...), PoliciesType>::HandleType Signal
     ReturnType(Args...),
     PoliciesType>::Connect(const Callback_& callback, bool append_mode) {
     if (append_mode) {
-        return _connections.append(callback);
+        return _connections->append(callback);
     } else {
-        return _connections.prepend(callback);
+        return _connections->prepend(callback);
     }
 }
 
 template <typename PoliciesType, typename ReturnType, typename... Args>
 inline bool SignalBase<ReturnType(Args...), PoliciesType>::DisConnect(HandleType handle) {
-    return _connections.remove(handle);
+    return _connections->remove(handle);
 }
 
 template <typename PoliciesType, typename ReturnType, typename... Args>
@@ -198,7 +243,7 @@ inline void SignalBase<ReturnType(Args...), PoliciesType>::Emit(Args... args) {
 
 template <typename PoliciesType, typename ReturnType, typename... Args>
 inline void SignalBase<ReturnType(Args...), PoliciesType>::operator()(Args... args) {
-    _connections.broken_call(std::forward<Args>(args)...);
+    _connections->broken_call(std::forward<Args>(args)...);
 }
 
 template <typename Prototype_, typename Policies_ = eventpp::DefaultPolicies>
