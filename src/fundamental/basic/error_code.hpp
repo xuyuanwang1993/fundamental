@@ -59,6 +59,17 @@ public:
         return details__;
     }
 
+    std::string full_message() const noexcept {
+        auto msg = message();
+        if (msg.empty()) {
+            return details();
+        }
+        if (details__.empty()) {
+            return msg;
+        }
+        return msg + ":" + details__;
+    }
+
 private:
     std::string details__;
 };
