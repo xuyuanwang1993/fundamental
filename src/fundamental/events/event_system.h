@@ -166,9 +166,9 @@ public:
     /// @param append_mode true means the excutor will be append to the process deque tail,false means the excutor
     /// will be add to the process deque top
     /// @return the handle which can be used to cancel the excutor binding
-    HandleType Connect(const Callback_& callback, bool append_mode = true);
+    HandleType Connect(const Callback_& callback, bool append_mode = true) const;
     template <typename T>
-    HandleType Connect(std::weak_ptr<T> token, const Callback_& callback, bool append_mode = true) {
+    HandleType Connect(std::weak_ptr<T> token, const Callback_& callback, bool append_mode = true) const {
         std::shared_ptr<HandleType> reserve_handle = std::make_shared<HandleType>();
         auto auto_disconnect_cb = [callback, token, this, reserve_handle](Args... args) -> ReturnType {
             auto ptr = token.lock();
@@ -190,15 +190,15 @@ public:
         return *reserve_handle;
     }
     template <typename T>
-    HandleType Connect(std::shared_ptr<T> token, const Callback_& callback, bool append_mode = true) {
+    HandleType Connect(std::shared_ptr<T> token, const Callback_& callback, bool append_mode = true) const {
         return Connect(std::weak_ptr<T>(token), callback, append_mode);
     }
 
-    GuardType GuardConnect(const Callback_& callback, bool append_mode = true) {
+    GuardType GuardConnect(const Callback_& callback, bool append_mode = true) const {
         return GuardType(Connect(callback, append_mode), _connections);
     }
 
-    std::shared_ptr<SignalFuture> MakeSignalFuture() {
+    std::shared_ptr<SignalFuture> MakeSignalFuture() const {
         auto ret    = std::make_shared<SignalFuture>();
         ret->handle = Connect([ret, this](Args...) -> void {
             DisConnect(ret->handle);
@@ -206,9 +206,9 @@ public:
         });
         return ret;
     }
-    bool DisConnect(HandleType handle);
-    void Emit(Args... args);
-    void operator()(Args... args);
+    bool DisConnect(HandleType handle) const;
+    void Emit(Args... args) const;
+    void operator()(Args... args) const;
     bool operator!() const {
         return _connections->empty();
     }
@@ -223,7 +223,7 @@ private:
 template <typename PoliciesType, typename ReturnType, typename... Args>
 inline typename SignalBase<ReturnType(Args...), PoliciesType>::HandleType SignalBase<
     ReturnType(Args...),
-    PoliciesType>::Connect(const Callback_& callback, bool append_mode) {
+    PoliciesType>::Connect(const Callback_& callback, bool append_mode) const {
     if (append_mode) {
         return _connections->append(callback);
     } else {
@@ -232,17 +232,17 @@ inline typename SignalBase<ReturnType(Args...), PoliciesType>::HandleType Signal
 }
 
 template <typename PoliciesType, typename ReturnType, typename... Args>
-inline bool SignalBase<ReturnType(Args...), PoliciesType>::DisConnect(HandleType handle) {
+inline bool SignalBase<ReturnType(Args...), PoliciesType>::DisConnect(HandleType handle) const {
     return _connections->remove(handle);
 }
 
 template <typename PoliciesType, typename ReturnType, typename... Args>
-inline void SignalBase<ReturnType(Args...), PoliciesType>::Emit(Args... args) {
+inline void SignalBase<ReturnType(Args...), PoliciesType>::Emit(Args... args) const {
     operator()(std::forward<Args>(args)...);
 }
 
 template <typename PoliciesType, typename ReturnType, typename... Args>
-inline void SignalBase<ReturnType(Args...), PoliciesType>::operator()(Args... args) {
+inline void SignalBase<ReturnType(Args...), PoliciesType>::operator()(Args... args) const {
     _connections->broken_call(std::forward<Args>(args)...);
 }
 
