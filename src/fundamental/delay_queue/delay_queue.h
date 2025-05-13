@@ -4,6 +4,8 @@
 #include <functional>
 #include <limits>
 #include <mutex>
+#include <memory>
+
 namespace Fundamental
 {
 class Timer {
@@ -42,14 +44,27 @@ private:
     std::chrono::steady_clock::time_point m_previousTime;
     mutable std::mutex m_timePointMutex;
 };
-
+namespace details
+{
+struct DelayTaskSession;
+}
 class DelayQueue {
     struct Imp;
 
 public:
-    using HandleType                           = std::intptr_t;
+    class Handle_ : public std::weak_ptr<details::DelayTaskSession> {
+    private:
+        using super = std::weak_ptr<details::DelayTaskSession>;
+
+    public:
+        using super::super;
+
+        operator bool() const noexcept {
+            return !this->expired();
+        }
+    };
+    using HandleType                           = Handle_;
     using TaskType                             = std::function<void()>;
-    static constexpr HandleType kInvalidHandle = 0;
 
 public:
     /*

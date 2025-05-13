@@ -53,7 +53,7 @@ void NativeLoop()
 
 void TestApi()
 {
-    Fundamental::DelayQueue::HandleType cycleHandle = Fundamental::DelayQueue::kInvalidHandle;
+    Fundamental::DelayQueue::HandleType cycleHandle;
     std::atomic<int> joinCnt                           = 0;
     std::size_t cycleCnt                               = 0;
     std::size_t cycleCnt2                              = 0;
