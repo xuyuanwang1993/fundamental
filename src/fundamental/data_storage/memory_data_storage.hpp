@@ -12,8 +12,8 @@ namespace Fundamental
 namespace storage
 {
 struct memory_storage_item_common {
-    Fundamental::DelayQueue::HandleType handle = Fundamental::DelayQueue::kInvalidHandle;
-    std::function<void()> remove_cb            = nullptr;
+    Fundamental::DelayQueue::HandleType handle;
+    std::function<void()> remove_cb = nullptr;
 };
 template <typename DataType, typename = std::void_t<>>
 struct memory_storage_item : memory_storage_item_common {
@@ -73,8 +73,7 @@ public:
             storage.erase(table_iter);
         }
         locker.unlock();
-        if (remove_item.handle != Fundamental::DelayQueue::kInvalidHandle)
-            delay_queue->RemoveDelayTask(remove_item.handle);
+        if (remove_item.handle) delay_queue->RemoveDelayTask(remove_item.handle);
         if (remove_item.remove_cb) remove_item.remove_cb();
         return true;
     }
@@ -110,7 +109,7 @@ public:
     decltype(auto) find(const std::string& table_name) const {
         return storage.find(table_name);
     }
-    
+
     decltype(auto) find(const std::string& table_name) {
         return storage.find(table_name);
     }
@@ -125,8 +124,7 @@ protected:
 
         for (auto& table : copy) {
             for (auto& item : table.second) {
-                if (item.second.handle != Fundamental::DelayQueue::kInvalidHandle)
-                    delay_queue->RemoveDelayTask(item.second.handle);
+                if (item.second.handle) delay_queue->RemoveDelayTask(item.second.handle);
                 if (item.second.remove_cb) item.second.remove_cb();
             }
         }
@@ -167,7 +165,7 @@ public:
             }
             // clear status
             super::delay_queue->RemoveDelayTask(item.handle);
-            item.handle = Fundamental::DelayQueue::kInvalidHandle;
+            item.handle.reset();
         }
         item.data      = std::move(data);
         item.remove_cb = config.remove_cb;
@@ -227,7 +225,7 @@ public:
             }
             // clear status
             super::delay_queue->RemoveDelayTask(item.handle);
-            item.handle = Fundamental::DelayQueue::kInvalidHandle;
+            item.handle.reset();
         }
         item.remove_cb = config.remove_cb;
         if (config.expired_time_msec > 0) {

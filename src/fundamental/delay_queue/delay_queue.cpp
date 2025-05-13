@@ -2,6 +2,7 @@
 
 #include <list>
 #include <set>
+#include <unordered_map>
 namespace Fundamental
 {
 
@@ -79,7 +80,6 @@ struct DelayTaskSession {
     bool bWorking            = false;
     bool bAutoRleased        = true;
 };
-
 } // namespace details
 
 struct DelayQueue::Imp {
@@ -87,12 +87,13 @@ struct DelayQueue::Imp {
                                    const TaskType& task,
                                    bool isSingle    = false,
                                    bool autoManager = true) {
-        if (intervalMs < 0 || !task) return DelayQueue::kInvalidHandle;
+        if (intervalMs < 0 || !task) return {};
         if (stateCb) stateCb();
         std::scoped_lock<std::mutex> locker(dataMutex);
-        auto* session = new details::DelayTaskSession { Owner(), task, intervalMs, 0, isSingle, false, autoManager };
-        taskStorage.emplace(session);
-        return reinterpret_cast<HandleType>(session);
+        auto session = std::shared_ptr<details::DelayTaskSession>(
+            new details::DelayTaskSession { Owner(), task, intervalMs, 0, isSingle, false, autoManager });
+        taskStorage.emplace(session.get(), session);
+        return session;
     }
 
     inline bool StartDelayTask(HandleType handle) {
@@ -132,7 +133,7 @@ struct DelayQueue::Imp {
     }
 
     inline void RemoveDelayTask(HandleType handle) {
-        if (handle == DelayQueue::kInvalidHandle) return;
+        if (!handle) return;
         if (stateCb) stateCb();
         std::scoped_lock<std::mutex> locker(dataMutex);
         if (!ValidateInternal(handle)) return;
@@ -225,11 +226,11 @@ struct DelayQueue::Imp {
     }
 
     inline details::DelayTaskSession* Cast(HandleType handle) {
-        return reinterpret_cast<details::DelayTaskSession*>(handle);
+        return handle.lock().get();
     }
 
     inline bool ValidateInternal(HandleType handle) {
-        if (handle == DelayQueue::kInvalidHandle) return false;
+        if (!handle) return false;
         auto* s = Cast(handle);
         if (s->owner != Owner() || taskStorage.find(s) == taskStorage.end()) return false;
         return true;
@@ -243,12 +244,13 @@ struct DelayQueue::Imp {
 
     inline void ReleaseSessionStorageInternal(details::DelayTaskSession* session) {
         taskStorage.erase(session);
-        delete session;
     }
     std::function<void()> stateCb = nullptr;
     // data field
     std::mutex dataMutex;
-    std::set<details::DelayTaskSession*> taskStorage;
+    std::unordered_map<details::DelayTaskSession*,
+                       std::shared_ptr<details::DelayTaskSession>>
+        taskStorage;
     std::set<std::pair<std::int64_t, HandleType>> processingTasks;
 };
 
