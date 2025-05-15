@@ -81,6 +81,7 @@ void connection::process_proxy_request() {
                         FERR("server maybe post stop, cancel proxy");
                         break;
                     }
+                    hostInfo.update();
                     FDEBUG("start proxy {} {} {} -> {}:{}", request.service_name_, request.token_, request.field_,
                            hostInfo.host, hostInfo.service);
                     auto ret =
