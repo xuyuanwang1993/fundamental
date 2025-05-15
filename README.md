@@ -124,9 +124,15 @@ cd ./build-linux-debug && make -j8
 ## 内存泄漏排查
 ```
 cmake配置参数增加 -DDISABLE_DEBUG_SANITIZE_ADDRESS_CHECK=ON -DENABLE_JEMALLOC_MEMORY_PROFILING=ON
-运行时增加环境变量 export MALLOC_CONF="prof:true,prof_active:true,lg_prof_sample:0,prof_leak:true"
+运行时增加环境变量 export MALLOC_CONF="prof:true,prof_active:true,lg_prof_sample:0,prof_leak:true,prof_accum:true"
 
 执行程序后生成 heap文件，这里使用TestBasic生成的两个文件来比较，比较命令如下
 jeprof --text --show_bytes --lines --base=1.out samples/TestBasic/TestBasic 2.out
-
+示例输出:
+Total: 448 B
+     448 100.0% 100.0%      448 100.0% main /home/lightning/work/fh-fundamental/samples/TestBasic/src/TestBasic.cpp:112 (discriminator 4)
+       0   0.0% 100.0%      448 100.0% __libc_start_call_main ./csu/../sysdeps/nptl/libc_start_call_main.h:58
+       0   0.0% 100.0%      448 100.0% __libc_start_main_impl ./csu/../csu/libc-start.c:392
+       0   0.0% 100.0%      448 100.0% _start ??:?
+第112行
 ```

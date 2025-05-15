@@ -216,7 +216,7 @@ function(config_enable_sanitize_address_check target_name)
 endfunction()
 
 # enable memory profiling check for debug mode
-# export MALLOC_CONF="prof:true,lg_prof_sample:0,prof_final:true,prof_leak:true"
+# export MALLOC_CONF="prof:true,prof_active:true,lg_prof_sample:0,prof_leak:true,prof_accum:true"
 function(config_enable_jemalloc_memory_profiling target_name)
     if(NOT ENABLE_JEMALLOC_MEMORY_PROFILING)
         return()
