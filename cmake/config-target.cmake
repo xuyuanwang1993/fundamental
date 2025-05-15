@@ -215,6 +215,23 @@ function(config_enable_sanitize_address_check target_name)
     )
 endfunction()
 
+# enable memory profiling check for debug mode
+# export MALLOC_CONF="prof:true,lg_prof_sample:0,prof_final:true,prof_leak:true"
+function(config_enable_jemalloc_memory_profiling target_name)
+    if(NOT ENABLE_JEMALLOC_MEMORY_PROFILING)
+        return()
+    endif()
+    target_compile_definitions(${target_name} PRIVATE
+        "$<$<CONFIG:Debug>:ENABLE_JEMALLOC_MEMORY_PROFILING=1>"
+    )
+
+    #you shoulde install libjemalloc-dev in ubuntu
+    target_link_libraries(
+        ${target_name} PRIVATE
+        "$<$<CONFIG:Debug>:jemalloc>"
+    )
+endfunction()
+
 
 # disable rtti for no debug mode
 function(config_disable_rtti target_name)

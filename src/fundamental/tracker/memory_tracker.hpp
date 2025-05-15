@@ -4,6 +4,9 @@
 #include <mutex>
 #include <string>
 #include <unordered_map>
+
+
+
 namespace Fundamental {
 // a base class for type check
 struct MemoryTrackerBase {};
@@ -88,4 +91,7 @@ inline void ReportMemoryTracker(std::string& outStr) {
     outStr += " reserve blocks:" + std::to_string(T::_records.size());
 #endif
 }
+
+void EnableMemoryProfiling();
+void DumpMemorySnapShot(const std::string &out_path);
 } // namespace Fundamental
