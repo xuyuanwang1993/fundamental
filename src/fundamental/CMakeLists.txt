@@ -80,6 +80,7 @@ target_link_libraries(${lib_name}_property INTERFACE
 if(F_BUILD_STATIC)
     # Create the static library
     add_library(${lib_name}${STATIC_LIB_SUFFIX} STATIC ${lib_source})
+    config_enable_jemalloc_memory_profiling(${lib_name}${STATIC_LIB_SUFFIX})
     config_disable_rtti(${lib_name}${STATIC_LIB_SUFFIX})
     config_enable_sanitize_address_check(${lib_name}${STATIC_LIB_SUFFIX})
     # Config link dependencies
@@ -93,6 +94,7 @@ endif()
 if(F_BUILD_SHARED)
     # Create the shared library
     add_library(${lib_name} SHARED ${lib_source})
+    config_enable_jemalloc_memory_profiling(${lib_name})
     config_disable_rtti(${lib_name})
     config_enable_sanitize_address_check(${lib_name})
     # Config link dependencies

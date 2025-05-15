@@ -2,6 +2,8 @@
 #include "fundamental/basic/error_code.hpp"
 #include "fundamental/basic/log.h"
 #include "fundamental/basic/utils.hpp"
+#include "fundamental/tracker/memory_tracker.hpp"
+
 #include <chrono>
 #include <iostream>
 #include <memory>
@@ -96,6 +98,7 @@ void test_errorcode() {
           default_ec.details_c_str(), default_ec.details_view());
 }
 int main(int argc, char** argv) {
+    Fundamental::EnableMemoryProfiling();
     test_errorcode();
     auto& a = t1;
     a->SetX();
@@ -105,5 +108,7 @@ int main(int argc, char** argv) {
     F_UNUSED(b);
     auto& n = s_normal;
     F_UNUSED(n);
+    Fundamental::DumpMemorySnapShot("1.out");
+    Fundamental::DumpMemorySnapShot("2.out");
     return 0;
 }
