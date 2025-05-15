@@ -119,3 +119,14 @@ cd ./build-linux && make -j8
 cd ./build-linux-debug && make -j8
 
 ```
+
+# 其它
+## 内存泄漏排查
+```
+cmake配置参数增加 -DDISABLE_DEBUG_SANITIZE_ADDRESS_CHECK=ON -DENABLE_JEMALLOC_MEMORY_PROFILING=ON
+运行时增加环境变量 export MALLOC_CONF="prof:true,prof_active:true,lg_prof_sample:0,prof_leak:true"
+
+执行程序后生成 heap文件，这里使用TestBasic生成的两个文件来比较，比较命令如下
+jeprof --text --show_bytes --lines --base=1.out samples/TestBasic/TestBasic 2.out
+
+```
