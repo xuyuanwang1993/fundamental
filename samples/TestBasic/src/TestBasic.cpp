@@ -109,6 +109,7 @@ int main(int argc, char** argv) {
     auto& n = s_normal;
     F_UNUSED(n);
     Fundamental::DumpMemorySnapShot("1.out");
+    [[maybe_unused]] auto ptr=new int[100];
     Fundamental::DumpMemorySnapShot("2.out");
     return 0;
 }
