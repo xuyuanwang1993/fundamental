@@ -195,6 +195,9 @@ target_enable_clang_tidy(BuildSettings)
 
 # enable memory access check for debug mode
 function(config_enable_sanitize_address_check target_name)
+    if(DISABLE_DEBUG_SANITIZE_ADDRESS_CHECK)
+        return()
+    endif()
     target_compile_options(${target_name} PRIVATE
         "$<$<CONFIG:Debug>:-fstack-protector>"
     )
