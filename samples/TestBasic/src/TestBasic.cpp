@@ -5,8 +5,10 @@
 #include "fundamental/tracker/memory_tracker.hpp"
 
 #include <chrono>
+#include <future>
 #include <iostream>
 #include <memory>
+#include <thread>
 // set USE_RAW_PTR to  0 will cause memory segmentation
 #define USE_RAW_PTR 1
 namespace
@@ -109,7 +111,15 @@ int main(int argc, char** argv) {
     auto& n = s_normal;
     F_UNUSED(n);
     Fundamental::DumpMemorySnapShot("1.out");
-    [[maybe_unused]] auto ptr=new int[100];
+    [[maybe_unused]] auto ptr = new int[100];
+    std::promise<void> p;
+    std::thread t([&p]() {
+        [[maybe_unused]] auto ptr = new int[1000];
+        p.set_value();
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    });
+    p.get_future().get();
     Fundamental::DumpMemorySnapShot("2.out");
+    t.join();
     return 0;
 }
