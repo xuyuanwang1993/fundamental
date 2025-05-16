@@ -267,6 +267,13 @@ function(config_strip_debug_info target_name)
     )
 endfunction()
 
+#static linker 启用完全静态链接
+function(config_static_link target_name)
+    target_link_options(${target_name} PRIVATE -static)
+endfunction()
+
+
+
 
 function(add_plugin plugin_name)
     if(PLUGIN_USE_STATIC)
