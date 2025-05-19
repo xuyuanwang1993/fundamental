@@ -222,6 +222,7 @@ public:
     }
     ~ThreadPool();
     static void JoinAll();
+
 protected:
     ThreadPool(std::size_t min_tread_num,
                std::size_t max_thread_num,
@@ -229,6 +230,8 @@ protected:
         has_alread_configed.exchange(true);
         config_.max_threads_limit    = max_thread_num;
         config_.min_work_threads_num = min_tread_num;
+        // reserve minimal work threads
+        if (config_.min_work_threads_num > 0) Spawn(config_.min_work_threads_num);
     }
     Task Dequeue(std::int64_t idle_wait_time_ms, bool& is_timeout); // returns null function if joining
     void Run(std::size_t index);

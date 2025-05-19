@@ -20,6 +20,9 @@ file(GLOB lib_source
     algorithm/*.h
     algorithm/*.cpp
     algorithm/*.hpp
+    process/*.h
+    process/*.cc
+    process/*.cpp
 )
 set(extra_libs)
 #prepare rttr
