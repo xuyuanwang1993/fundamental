@@ -12,8 +12,8 @@
 namespace Fundamental
 {
 
-template <auto>  
-inline constexpr bool always_false = false;  
+template <auto>
+inline constexpr bool always_false = false;
 
 struct NonCopyable {
     NonCopyable()                              = default;
@@ -34,8 +34,9 @@ struct ScopeGuard final : NonCopyable {
     }
 
     ~ScopeGuard() {
-        if (f) f();
+        execute();
     }
+
     ScopeGuard(ScopeGuard&& other) noexcept : f(std::move(other.f)) {
     }
 
@@ -43,9 +44,24 @@ struct ScopeGuard final : NonCopyable {
         reset(std::move(other.f));
         return *this;
     }
+
+    template <typename... Args>
+    static decltype(auto) make_shared(Args&&... args) {
+        return std::make_shared<ScopeGuard>(std::forward<Args>(args)...);
+    }
+
     void reset(const BasicTaskFunctionT& _f) {
-        if (f) f();
+        execute();
         f = _f;
+    }
+
+    void dismiss() {
+        f = nullptr;
+    }
+
+    void execute() {
+        if (f) f();
+        f = nullptr;
     }
 
 private:
