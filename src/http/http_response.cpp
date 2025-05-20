@@ -181,13 +181,13 @@ void http_response::prepare() {
 
 bool http_response::can_set_header() const {
     FASSERT_ACTION(!(response_pack_status.load() & http_response_status_mask::http_response_all_headeres_set),
-                return false, "all http headeres has already set,check your code");
+                   return false, "all http headeres has already set,check your code");
     return true;
 }
 
 bool http_response::can_set_body() const {
     FASSERT_ACTION(!(response_pack_status.load() & http_response_status_mask::http_response_body_set), return false,
-                "body has set finished ,check your code");
+                   "body has set finished ,check your code");
     return true;
 }
 
@@ -373,35 +373,49 @@ http_response::response_type http_response::get_status() const {
 void http_response::perform_response(bool from_async_cb) {
     auto current_status = response_pack_status.load();
     if (!(current_status & http_response_status_mask::http_response_all_headeres_set)) {
+        FDEBUG("http_connection {:p} ignore when response headeres has not set up", (void*)this);
         return;
     }
 
     if (current_status & http_response_status_mask::http_response_body_send_finished) {
+        FDEBUG("http_connection {:p} ignore when response has finished send", (void*)this);
         return;
     }
     asio::post(http_con_ref.socket_.get_executor(), [this, from_async_cb, ref = http_con_ref.shared_from_this()]() {
         auto current_status = response_pack_status.load();
         if (!(current_status & http_response_status_mask::http_response_all_headeres_set)) {
+            FDEBUG("post http_connection {:p} ignore when response headeres has not set up", (void*)this);
             return;
         }
         if (current_status & http_response_status_mask::http_response_body_send_finished) {
+            FDEBUG("post http_connection {:p} ignore when response has finished send", (void*)this);
             return;
         }
         if (!(current_status & http_response_status_mask::http_response_headeres_packed)) {
+            FDEBUG("post http_connection {:p} write all headeres", (void*)this);
             write_headeres();
             return;
         }
         // wait headeres send finished
         if (!(current_status & http_response_status_mask::http_response_headeres_send_finished)) {
+            FDEBUG("post http_connection {:p} waiting headeres sent finished", (void*)this);
             return;
         }
         // handle body data
-        if (data_storage_.empty()) return;
-        if (!(current_status & http_response_status_mask::http_response_body_size_set) ||
-            (current_status & http_response_status_mask::http_response_body_send_finished))
+        if (data_storage_.empty()) {
+            FDEBUG("post http_connection {:p} waiting data", (void*)this);
             return;
+        }
+        if (!(current_status & http_response_status_mask::http_response_body_size_set) ||
+            (current_status & http_response_status_mask::http_response_body_send_finished)) {
+            FDEBUG("post http_connection {:p} waiting body", (void*)this);
+            return;
+        }
+
         // a write body request is progressing
-        if (data_storage_.size() > 1 && !from_async_cb) return;
+        if (data_storage_.size() > 1 && !from_async_cb) {
+            return;
+        }
         if (write_buffers_.empty()) {
 
             auto& item = data_storage_.front();
@@ -414,9 +428,10 @@ void http_response::perform_response(bool from_async_cb) {
             } break;
             case data_type::ref_data: write_buffers_.emplace_back(asio::const_buffer(item.p_ref, item.ref_size)); break;
             default: {
+                FWARN("invalid data item type");
                 http_con_ref.release_obj();
-            }
                 return;
+            }
             }
         }
         http_con_ref.async_write_buffers_some(
@@ -434,7 +449,6 @@ void http_response::perform_response(bool from_async_cb) {
                 data_pending_size -= length;
                 notify_pending_size.Emit(data_pending_size);
                 {
-
                     while (length != 0) {
                         if (write_buffers_.empty()) break;
                         auto current_size = write_buffers_.front().size();
@@ -448,20 +462,23 @@ void http_response::perform_response(bool from_async_cb) {
                         break;
                     }
                     if (!write_buffers_.empty()) { // write
-                        perform_response();
+                        perform_response(true);
                         return;
                     }
                     auto& front = data_storage_.front();
+                   
                     if (front.finish_cb) front.finish_cb();
                     bool last_chunk = front.is_last_chunk;
                     data_storage_.pop_front();
                     // write finished
                     if (last_chunk) {
+                        FDEBUG("http_connection {:p} has sent all data,disconnect", (void*)this);
                         response_pack_status |= http_response_status_mask::http_response_body_send_finished;
                         ptr->release_obj();
                         return;
                     }
                 }
+                //try next chunk
                 perform_response(true);
             });
     });
