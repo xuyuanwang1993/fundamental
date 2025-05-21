@@ -31,7 +31,6 @@ PRIVATE
 target_link_libraries(${app_target_name} 
 PRIVATE
     BuildSettings
-    stdc++
     ${GLOB_NAMESPACE}fundamental${STATIC_LIB_SUFFIX}
 )
 
@@ -41,5 +40,3 @@ target_compile_definitions(${app_target_name}
     PRIVATE
         APP_NAME="${app_target_name}"
 )
-
-config_enable_sanitize_address_check(${app_target_name})

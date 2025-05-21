@@ -12,7 +12,7 @@ option(NETWORK_DISABLE_SSL "disable network ssl support." OFF)
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${lib_source})
 
 add_library(${lib_name} STATIC ${lib_source})
-config_enable_sanitize_address_check(${lib_name})
+
 
 target_include_directories(${lib_name} PUBLIC
     ${src_root_dir}
@@ -20,6 +20,19 @@ target_include_directories(${lib_name} PUBLIC
 
 set_target_properties(${lib_name} PROPERTIES
     FOLDER ${src_root_dir}
+)
+
+
+target_compile_definitions(${lib_name}
+    PUBLIC
+    ASIO_NO_TYPEID=1
+)
+
+# Config link dependencies
+target_link_libraries(${lib_name} PUBLIC
+    BuildSettings
+    ${GLOB_NAMESPACE}fundamental${STATIC_LIB_SUFFIX}
+    asio
 )
 if(NETWORK_DISABLE_SSL)
     target_compile_definitions(${lib_name}
@@ -34,18 +47,6 @@ else()
         OpenSSL::Crypto
     )
 endif()
-
-target_compile_definitions(${lib_name}
-    PUBLIC
-    ASIO_NO_TYPEID=1
-)
-
-# Config link dependencies
-target_link_libraries(${lib_name} PUBLIC
-    BuildSettings
-    asio
-    ${GLOB_NAMESPACE}fundamental${STATIC_LIB_SUFFIX}
-)
-
+config_enable_sanitize_address_check(${lib_name})
 add_library(${GLOB_NAMESPACE}${lib_name} ALIAS ${lib_name})
 config_disable_rtti(${lib_name})
