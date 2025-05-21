@@ -25,6 +25,5 @@ target_link_libraries(${lib_name} PUBLIC
     BuildSettings
     ${GLOB_NAMESPACE}network
 )
-config_enable_sanitize_address_check(${lib_name})
 add_library(${GLOB_NAMESPACE}${lib_name} ALIAS ${lib_name})
 config_disable_rtti(${lib_name})
