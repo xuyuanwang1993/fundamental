@@ -33,5 +33,5 @@ target_link_libraries(${lib_name} PUBLIC
     ${GLOB_NAMESPACE}network
 )
 
-config_enable_sanitize_address_check(${lib_name})
+
 add_library(${GLOB_NAMESPACE}${lib_name} ALIAS ${lib_name})
