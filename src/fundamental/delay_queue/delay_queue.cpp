@@ -1,8 +1,10 @@
 #include "delay_queue.h"
 
 #include <list>
+#include <map>
 #include <set>
 #include <unordered_map>
+
 namespace Fundamental
 {
 
@@ -72,6 +74,9 @@ struct DelayTaskSession {
     void ModifyNextTimeout(std::int64_t modify_value) {
         nextTimeout += modify_value;
     }
+    std::intptr_t token() const {
+        return reinterpret_cast<std::intptr_t>(this);
+    }
     std::intptr_t owner = 0;
     DelayQueue::TaskType task;
     std::int64_t interval    = 0;
@@ -104,7 +109,7 @@ struct DelayQueue::Imp {
         if (session->bWorking) return true;
         session->bWorking = true;
         session->SetNextTimeout(Timer::GetTimeNow<std::chrono::milliseconds, std::chrono::steady_clock>());
-        processingTasks.insert(std::make_pair(session->nextTimeout, handle));
+        processingTasks.emplace(std::make_pair(session->nextTimeout, session->token()), handle);
         return true;
     }
 
@@ -115,7 +120,7 @@ struct DelayQueue::Imp {
         auto* session = Cast(handle);
         if (!session->bWorking) return true;
         session->bWorking = false;
-        processingTasks.erase(std::make_pair(session->nextTimeout, handle));
+        processingTasks.erase(std::make_pair(session->nextTimeout, session->token()));
         if (session->bAutoRleased) DoRemoveHandleInternal(handle);
         return true;
     }
@@ -125,10 +130,10 @@ struct DelayQueue::Imp {
         std::scoped_lock<std::mutex> locker(dataMutex);
         if (!ValidateInternal(handle)) return false;
         auto* session = Cast(handle);
-        processingTasks.erase(std::make_pair(session->nextTimeout, handle));
+        processingTasks.erase(std::make_pair(session->nextTimeout, session->token()));
         session->bWorking = true;
         session->SetNextTimeout(Timer::GetTimeNow<std::chrono::milliseconds, std::chrono::steady_clock>());
-        processingTasks.insert(std::make_pair(session->nextTimeout, handle));
+        processingTasks.emplace(std::make_pair(session->nextTimeout, session->token()), handle);
         return true;
     }
 
@@ -157,7 +162,7 @@ struct DelayQueue::Imp {
         if (processingTasks.empty()) {
             return static_cast<std::int64_t>(~0);
         }
-        return processingTasks.begin()->first -
+        return processingTasks.begin()->first.first -
                Timer::GetTimeNow<std::chrono::milliseconds, std::chrono::steady_clock>();
     }
 
@@ -174,10 +179,10 @@ struct DelayQueue::Imp {
         if (!ValidateInternal(handle)) return false;
         auto* session = Cast(handle);
         if (!session->bWorking) return false;
-        processingTasks.erase(std::make_pair(session->nextTimeout, handle));
+        processingTasks.erase(std::make_pair(session->nextTimeout, session->token()));
         session->bWorking = true;
         session->ModifyNextTimeout(modify_value_ms);
-        processingTasks.insert(std::make_pair(session->nextTimeout, handle));
+        processingTasks.emplace(std::make_pair(session->nextTimeout, session->token()), handle);
         return true;
     }
     inline void HandleEvent() {
@@ -190,7 +195,7 @@ struct DelayQueue::Imp {
             std::lock_guard<std::mutex> locker(dataMutex);
             auto iter = processingTasks.begin();
             while (iter != processingTasks.end()) {
-                if (iter->first <= now) {
+                if (iter->first.first <= now) {
                     // copy all expired handles
                     auto handle = iter->second;
                     expiredHandles.emplace_back(handle);
@@ -208,7 +213,7 @@ struct DelayQueue::Imp {
                 if (session->bSingle) session->bWorking = false;
                 if (session->bWorking) { // push back task for next cycle
                     session->SetNextTimeout(Timer::GetTimeNow<std::chrono::milliseconds, std::chrono::steady_clock>());
-                    processingTasks.insert(std::make_pair(session->nextTimeout, handle));
+                    processingTasks.emplace(std::make_pair(session->nextTimeout, session->token()), handle);
                 } else {
                     // release session
                     if (session->bAutoRleased) ReleaseSessionStorageInternal(session);
@@ -238,7 +243,7 @@ struct DelayQueue::Imp {
 
     inline void DoRemoveHandleInternal(HandleType handle) {
         auto* session = Cast(handle);
-        processingTasks.erase(std::make_pair(session->nextTimeout, handle));
+        processingTasks.erase(std::make_pair(session->nextTimeout, session->token()));
         ReleaseSessionStorageInternal(session);
     }
 
@@ -248,10 +253,8 @@ struct DelayQueue::Imp {
     std::function<void()> stateCb = nullptr;
     // data field
     std::mutex dataMutex;
-    std::unordered_map<details::DelayTaskSession*,
-                       std::shared_ptr<details::DelayTaskSession>>
-        taskStorage;
-    std::set<std::pair<std::int64_t, HandleType>> processingTasks;
+    std::unordered_map<details::DelayTaskSession*, std::shared_ptr<details::DelayTaskSession>> taskStorage;
+    std::map<std::pair<std::int64_t, std::intptr_t>, HandleType> processingTasks;
 };
 
 HandleType DelayQueue::AddDelayTask(std::int64_t intervalMs, const TaskType& task, bool isSingle, bool autoManager) {

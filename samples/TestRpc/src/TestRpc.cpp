@@ -283,22 +283,24 @@ TEST(rpc_test, test_callback) {
     Fundamental::Timer check_timer;
     Fundamental::ScopeGuard check_guard(
         [&]() { EXPECT_LE(check_timer.GetDuration<Fundamental::Timer::TimeScale::Millisecond>(), 200); });
-    auto client = network::make_guard<rpc_client>();
+    std::atomic<std::size_t> count = 200;
+    std::atomic_bool is_failed = false;
+    auto client                    = network::make_guard<rpc_client>();
     client->enable_auto_reconnect();
     client->enable_timeout_check();
     [[maybe_unused]] bool r = client->connect("127.0.0.1", "9000");
     EXPECT_TRUE(r);
-    std::atomic<std::size_t> count    = 200;
-    static std::atomic_bool is_failed = false;
+
+    
     Fundamental::Application::Instance().exitStarted.Connect([&]() { is_failed.exchange(true); });
     for (size_t i = 0; i < 100; i++) {
-        std::string test = "test" + std::to_string(i + 1);
+        std::string test = "test_callback " + std::to_string(i + 1);
         // set timeout 100ms
-        FDEBUGS << "post echo:" << test;
-        client->async_call("delay_echo", test, 50).async_wait([&](const asio::error_code& ec, string_view data) {
+        FDEBUGS << "post delay_echo:" << test;
+        client->async_call("delay_echo", test, 50).async_wait([&, i](const asio::error_code& ec, string_view data) {
             Fundamental::ScopeGuard g([&]() { --count; });
             if (ec) {
-                FINFOS << "delay_echo timeout:" << ec.value() << " " << ec.message();
+                FINFOS << i << " delay_echo timeout:" << ec.value() << " " << ec.message();
                 is_failed.exchange(true);
                 return;
             }
@@ -312,8 +314,8 @@ TEST(rpc_test, test_callback) {
             }
         });
 
-        std::string test1 = "test" + std::to_string(i + 2);
-        FDEBUGS << "post delay_echo:" << test1;
+        std::string test1 = "test_callback " + std::to_string(i + 2);
+        FDEBUGS << "post echo:" << test1;
         // zero means no timeout check, no param means using default timeout(5s)
         client->async_call("echo", test1).async_wait([&](const asio::error_code& ec, string_view data) {
             Fundamental::ScopeGuard g([&]() { --count; });
@@ -332,7 +334,7 @@ TEST(rpc_test, test_callback) {
             }
         });
     }
-    while (count.load() != 0 && !is_failed) {
+    while (count.load() != 0) {
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
     EXPECT_TRUE(!is_failed);
