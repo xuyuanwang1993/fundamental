@@ -42,7 +42,6 @@ target_compile_definitions(${app_target_name}
 
 
 config_enable_sanitize_address_check(${app_target_name})
-
 install(FILES ${FUNDAMENTAL_ASSETS_PATH}/dh2048.pem
     ${FUNDAMENTAL_ASSETS_PATH}/server.crt
     ${FUNDAMENTAL_ASSETS_PATH}/server.key
