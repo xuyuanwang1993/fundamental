@@ -113,6 +113,7 @@ void delay_echo(rpc_conn conn, const std::string& src, std::int64_t delay_msec) 
         [conn, req_id, src] {
             auto conn_sp = conn.lock();
             if (conn_sp) {
+                FINFO("delay echo response {} ",  src.substr(0, src.size() > 100 ? 100 : src.size()));
                 conn_sp->response(req_id, network::rpc_service::request_type::rpc_res, std::move(src));
             }
         },
