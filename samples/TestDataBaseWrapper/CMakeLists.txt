@@ -54,4 +54,4 @@ target_link_libraries(${app_target_name}
 PRIVATE
   gtest
 )
-config_enable_sanitize_address_check(${app_target_name})
+

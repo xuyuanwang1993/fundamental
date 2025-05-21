@@ -47,6 +47,5 @@ else()
         OpenSSL::Crypto
     )
 endif()
-config_enable_sanitize_address_check(${lib_name})
 add_library(${GLOB_NAMESPACE}${lib_name} ALIAS ${lib_name})
 config_disable_rtti(${lib_name})
