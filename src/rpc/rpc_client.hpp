@@ -1057,16 +1057,23 @@ private:
         });
 #ifndef NETWORK_DISABLE_SSL
         asio::ssl::context ssl_context(asio::ssl::context::tlsv13);
+        auto* actual_context = &ssl_context;
         try {
-            if (!ssl_config_.ca_certificate_path.empty()) {
-                ssl_context.load_verify_file(ssl_config_.ca_certificate_path);
+            if (ssl_config_.load_exception) std::rethrow_exception(ssl_config_.load_exception);
+            if (!ssl_config_.ssl_context) {
+                if (!ssl_config_.ca_certificate_path.empty()) {
+                    ssl_context.load_verify_file(ssl_config_.ca_certificate_path);
+                }
+                if (!ssl_config_.private_key_path.empty()) {
+                    ssl_context.use_private_key_file(ssl_config_.private_key_path, asio::ssl::context::pem);
+                }
+                if (!ssl_config_.certificate_path.empty()) {
+                    ssl_context.use_certificate_chain_file(ssl_config_.certificate_path);
+                }
+            } else {
+                actual_context = ssl_config_.ssl_context.get();
             }
-            if (!ssl_config_.private_key_path.empty()) {
-                ssl_context.use_private_key_file(ssl_config_.private_key_path, asio::ssl::context::pem);
-            }
-            if (!ssl_config_.certificate_path.empty()) {
-                ssl_context.use_certificate_chain_file(ssl_config_.certificate_path);
-            }
+
             ssl_level = rpc_client_ssl_level_required;
             FDEBUG("load client ssl config success  ca:{} crt:{} key:{}", ssl_config_.ca_certificate_path,
                    ssl_config_.certificate_path, ssl_config_.private_key_path);
@@ -1080,7 +1087,7 @@ private:
             }
         }
 
-        ssl_stream_ = std::make_unique<asio::ssl::stream<asio::ip::tcp::socket&>>(socket_, ssl_context);
+        ssl_stream_ = std::make_unique<asio::ssl::stream<asio::ip::tcp::socket&>>(socket_, *actual_context);
         if (ssl_level == rpc_client_ssl_level_required) {
             ssl_stream_->set_verify_mode(asio::ssl::verify_peer);
             ssl_stream_->set_verify_callback(

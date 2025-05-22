@@ -284,14 +284,13 @@ TEST(rpc_test, test_callback) {
     Fundamental::ScopeGuard check_guard(
         [&]() { EXPECT_LE(check_timer.GetDuration<Fundamental::Timer::TimeScale::Millisecond>(), 200); });
     std::atomic<std::size_t> count = 200;
-    std::atomic_bool is_failed = false;
+    std::atomic_bool is_failed     = false;
     auto client                    = network::make_guard<rpc_client>();
     client->enable_auto_reconnect();
     client->enable_timeout_check();
     [[maybe_unused]] bool r = client->connect("127.0.0.1", "9000");
     EXPECT_TRUE(r);
 
-    
     Fundamental::Application::Instance().exitStarted.Connect([&]() { is_failed.exchange(true); });
     for (size_t i = 0; i < 100; i++) {
         std::string test = "test_callback " + std::to_string(i + 1);
@@ -859,8 +858,9 @@ TEST(rpc_test, test_control_stream) {
 TEST(rpc_test, test_ssl) {
     std::string ssl_token                              = "ssl";
     std::string proxy_token                            = "proxy";
+    std::string preload_token                          = "preload";
     std::vector<std::unordered_set<std::string>> tasks = {
-        {}, { ssl_token }, { proxy_token }, { ssl_token, proxy_token }
+        {}, { ssl_token }, { proxy_token }, { ssl_token, proxy_token, preload_token }
     };
     auto enable_no_ssl = ::getenv("disable_no_ssl") == nullptr;
     for (auto& test_tokens : tasks) {
@@ -870,7 +870,9 @@ TEST(rpc_test, test_ssl) {
         auto test_tag   = Fundamental::StringFormat("{}[{}] {}[{}]", ssl_token, ssl_iter != test_tokens.end(),
                                                     proxy_token, proxy_iter != test_tokens.end());
         if (ssl_iter != test_tokens.end()) {
-            client->enable_ssl(network_client_ssl_config { "client.crt", "client.key", "ca_root.crt" });
+            network_client_ssl_config config { "client.crt", "client.key", "ca_root.crt" };
+            if (test_tokens.count(preload_token)) config.preload();
+            client->enable_ssl(config);
         }
         if (proxy_iter != test_tokens.end()) {
             client->set_proxy(network::rpc_service::CustomRpcProxy::make_shared(kProxyServiceName, kProxyServiceField,
@@ -898,7 +900,7 @@ TEST(rpc_test, test_ssl) {
     do {
         auto client = network::make_guard<rpc_client>("127.0.0.1", "9000");
 
-        client->enable_ssl(network_client_ssl_config { "", "" , "ca_root.crt"});
+        client->enable_ssl(network_client_ssl_config { "", "", "ca_root.crt" });
         auto test_tag = Fundamental::StringFormat("verify:{}", verify_client);
         try {
 
@@ -1013,7 +1015,7 @@ TEST(rpc_test, test_ssl_proxy_echo_stream_mutithread) {
         EXPECT_NO_THROW(f.resultFuture.get());
 }
     #endif
-    
+
 TEST(rpc_test, test_void_stream) {
     auto client             = network::make_guard<rpc_client>();
     [[maybe_unused]] bool r = client->connect("127.0.0.1", "9000");
@@ -1034,8 +1036,6 @@ TEST(rpc_test, test_void_stream) {
     EXPECT_TRUE(!stream->Finish(0));
 }
 #endif
-
-
 
 int main(int argc, char** argv) {
     int mode = 0;
