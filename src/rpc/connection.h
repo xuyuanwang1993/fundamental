@@ -127,7 +127,7 @@ public:
         return std::make_shared<connection>(std::forward<Args>(args)...);
     }
     connection(tcp::socket socket, std::size_t timeout_msec, router& router, std::weak_ptr<rpc_server> server_wref) :
-    server_wref_(server_wref), socket_(std::move(socket)),executor_(socket_.get_executor()), body_(INIT_BUF_SIZE),
+    server_wref_(server_wref), socket_(std::move(socket)), executor_(socket_.get_executor()), body_(INIT_BUF_SIZE),
     timeout_check_timer_(executor_), timeout_msec_(timeout_msec), router_(router) {
         enable_tcp_keep_alive(socket_);
     }
@@ -158,26 +158,24 @@ public:
     void response(uint64_t req_id, request_type req_type, Args&&... args) {
         auto data   = msgpack_codec::pack(static_cast<int32_t>(result_code::OK), std::forward<Args>(args)...);
         auto s_data = std::string(data.data(), data.data() + data.size());
-        asio::post(executor_,
-                   [this, data = std::move(s_data), req_id, req_type, ref = shared_from_this()]() mutable {
-                       if (!reference_.is_valid()) {
-                           return;
-                       }
-                       response_interal(req_id, std::move(data), req_type);
-                   });
+        asio::post(executor_, [this, data = std::move(s_data), req_id, req_type, ref = shared_from_this()]() mutable {
+            if (!reference_.is_valid()) {
+                return;
+            }
+            response_interal(req_id, std::move(data), req_type);
+        });
     }
 
     template <typename... Args>
     void response_errmsg(uint64_t req_id, request_type req_type, Args&&... args) {
         auto data   = msgpack_codec::pack(static_cast<int32_t>(result_code::FAIL), std::forward<Args>(args)...);
         auto s_data = std::string(data.data(), data.data() + data.size());
-        asio::post(executor_,
-                   [this, data = std::move(s_data), req_id, req_type, ref = shared_from_this()]() mutable {
-                       if (!reference_.is_valid()) {
-                           return;
-                       }
-                       response_interal(req_id, std::move(data), req_type);
-                   });
+        asio::post(executor_, [this, data = std::move(s_data), req_id, req_type, ref = shared_from_this()]() mutable {
+            if (!reference_.is_valid()) {
+                return;
+            }
+            response_interal(req_id, std::move(data), req_type);
+        });
     }
 
     void set_conn_id(int64_t id) {
@@ -210,8 +208,9 @@ public:
     }
 
 #ifndef NETWORK_DISABLE_SSL
-    void enable_ssl(asio::ssl::context& ssl_context) {
+    void enable_ssl(asio::ssl::context& ssl_context, bool enable_no_ssl) {
         ssl_context_ref = &ssl_context;
+        enable_no_ssl_  = enable_no_ssl;
     }
 #endif
     void release_obj() {
@@ -293,6 +292,12 @@ private:
                                      }
                                      do_ssl_handshake(head_, kSslPreReadSize);
                                  } else {
+                                     if (!enable_no_ssl_) {
+                                         if (p_data[0] != network::proxy::ProxyRequest::kMagicNum) {
+                                             on_net_err_(self, "only tls connection is supported");
+                                             break;
+                                         }
+                                     }
 #ifdef RPC_VERBOSE
                                      FDEBUG("[rpc] WARNNING!!! falling  down to no ssl socket");
 #endif
@@ -681,6 +686,7 @@ private:
 #ifndef NETWORK_DISABLE_SSL
     std::unique_ptr<asio::ssl::stream<asio::ip::tcp::socket&>> ssl_stream_ = nullptr;
     asio::ssl::context* ssl_context_ref                                    = nullptr;
+    bool enable_no_ssl_                                                    = true;
 #endif
     // proxy
     network::proxy::ProxyManager* proxy_manager_ = nullptr;

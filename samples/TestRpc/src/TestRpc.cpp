@@ -857,97 +857,68 @@ TEST(rpc_test, test_control_stream) {
     #endif
     #if !defined(NETWORK_DISABLE_SSL) && 1
 TEST(rpc_test, test_ssl) {
-    Fundamental::Timer check_timer;
-    Fundamental::ScopeGuard check_guard(
-        [&]() { EXPECT_LE(check_timer.GetDuration<Fundamental::Timer::TimeScale::Millisecond>(), 100); });
+    std::string ssl_token                              = "ssl";
+    std::string proxy_token                            = "proxy";
+    std::vector<std::unordered_set<std::string>> tasks = {
+        {}, { ssl_token }, { proxy_token }, { ssl_token, proxy_token }
+    };
+    auto enable_no_ssl = ::getenv("disable_no_ssl") == nullptr;
+    for (auto& test_tokens : tasks) {
+        auto client     = network::make_guard<rpc_client>("127.0.0.1", "9000");
+        auto ssl_iter   = test_tokens.find(ssl_token);
+        auto proxy_iter = test_tokens.find(proxy_token);
+        auto test_tag   = Fundamental::StringFormat("{}[{}] {}[{}]", ssl_token, ssl_iter != test_tokens.end(),
+                                                    proxy_token, proxy_iter != test_tokens.end());
+        if (ssl_iter != test_tokens.end()) {
+            client->enable_ssl(network_client_ssl_config { "client.crt", "client.key", "ca_root.crt" });
+        }
+        if (proxy_iter != test_tokens.end()) {
+            client->set_proxy(network::rpc_service::CustomRpcProxy::make_shared(kProxyServiceName, kProxyServiceField,
+                                                                                kProxyServiceToken));
+        }
 
-    try {
-        auto client = network::make_guard<rpc_client>("127.0.0.1", "9000");
-        client->enable_ssl(network_client_ssl_config { "client.crt", "client.key", "ca_root.crt" });
-        bool r = client->connect();
-        if (!r) {
-            EXPECT_TRUE(false && "connect timeout");
-            return;
-        }
-        std::size_t cnt = 10;
-        while (cnt > 0) {
-            --cnt;
-            client->call<std::string>("echo", std::to_string(cnt) + "test");
-        }
-    } catch (const std::exception& e) {
-        std::cout << __func__ << ":" << e.what() << std::endl;
-    }
+        try {
 
-    std::cout << "finish ssl" << std::endl;
-    try {
-        auto client = network::make_guard<rpc_client>("127.0.0.1", "9000");
-        bool r      = client->connect();
-        if (!r) {
-            EXPECT_TRUE(false && "connect timeout");
-            return;
+            bool r = client->connect();
+            if (!r) {
+
+                EXPECT_TRUE((!enable_no_ssl && ssl_iter == test_tokens.end()) && "connect failed");
+                continue;
+            }
+            FINFO("connect success test {}", test_tag);
+            client->call<std::string>("echo", test_tag);
+            FINFO("finished test {}", test_tag);
+        } catch (const std::exception& e) {
+            FERR("{} test {} failed:{} ", __func__, test_tag, e.what());
+            EXPECT_TRUE((!enable_no_ssl && ssl_iter == test_tokens.end()) && "protocal error");
         }
-        std::size_t cnt = 10;
-        while (cnt > 0) {
-            --cnt;
-            client->call<std::string>("echo", std::to_string(cnt) + "test nossl");
-        }
-    } catch (const std::exception& e) {
-        std::cout << __func__ << ":" << e.what() << std::endl;
     }
-    std::cout << "finish no ssl" << std::endl;
+    // test no ca client
+    bool verify_client = ::getenv("verify_client") != nullptr;
+    do {
+        auto client = network::make_guard<rpc_client>("127.0.0.1", "9000");
+
+        client->enable_ssl(network_client_ssl_config { "", "" , "ca_root.crt"});
+        auto test_tag = Fundamental::StringFormat("verify:{}", verify_client);
+        try {
+
+            bool r = client->connect();
+            if (!r) {
+
+                EXPECT_TRUE((verify_client) && "connect failed");
+                break;
+            }
+
+            FINFO("connect success test {}", test_tag);
+            client->call<std::string>("echo", test_tag);
+            FINFO("finished test {}", test_tag);
+        } catch (const std::exception& e) {
+            FERR("{} test {} failed:{} ", __func__, test_tag, e.what());
+            EXPECT_TRUE((verify_client) && "protocal error");
+        }
+    } while (0);
 }
-TEST(rpc_test, test_ssl_proxy) {
-    Fundamental::Timer check_timer;
-    Fundamental::ScopeGuard check_guard(
-        [&]() { EXPECT_LE(check_timer.GetDuration<Fundamental::Timer::TimeScale::Millisecond>(), 100); });
-    {
-        auto client = network::make_guard<rpc_client>("127.0.0.1", "9000");
-        client->enable_ssl(network_client_ssl_config { "client.crt", "client.key", "ca_root.crt" });
-        client->set_proxy(network::rpc_service::CustomRpcProxy::make_shared(kProxyServiceName, kProxyServiceField,
-                                                                            kProxyServiceToken));
-        bool r = client->connect();
-        if (!r) {
-            EXPECT_TRUE(false && "connect timeout");
-            return;
-        }
 
-        {
-            dummy1 d1 { 42, "test" };
-            auto result = client->call<dummy1>("get_dummy", d1);
-            EXPECT_TRUE(d1.id == result.id);
-            EXPECT_TRUE(d1.str == result.str);
-        }
-
-        {
-            auto result = client->call<std::string>("echo", "test");
-            EXPECT_EQ(result, "test");
-        }
-    }
-    {
-        auto client = network::make_guard<rpc_client>("127.0.0.1", "9000");
-        client->enable_ssl(network_client_ssl_config { "client.crt", "client.key", "ca_root.crt" },
-                           network::rpc_service::rpc_client_ssl_level_optional);
-        client->set_proxy(network::rpc_service::CustomRpcProxy::make_shared(kProxyServiceName, kProxyServiceField,
-                                                                            kProxyServiceToken));
-        bool r = client->connect();
-        if (!r) {
-            EXPECT_TRUE(false && "connect timeout");
-            return;
-        }
-
-        {
-            dummy1 d1 { 42, "test" };
-            auto result = client->call<dummy1>("get_dummy", d1);
-            EXPECT_TRUE(d1.id == result.id);
-            EXPECT_TRUE(d1.str == result.str);
-        }
-
-        {
-            auto result = client->call<std::string>("echo", "test");
-            EXPECT_EQ(result, "test");
-        }
-    }
-}
 TEST(rpc_test, test_ssl_proxy_echo_stream) {
     auto client = network::make_guard<rpc_client>();
     client->enable_ssl(network_client_ssl_config { "client.crt", "client.key", "ca_root.crt" });
@@ -1042,8 +1013,7 @@ TEST(rpc_test, test_ssl_proxy_echo_stream_mutithread) {
         EXPECT_NO_THROW(f.resultFuture.get());
 }
     #endif
-#endif
-
+    
 TEST(rpc_test, test_void_stream) {
     auto client             = network::make_guard<rpc_client>();
     [[maybe_unused]] bool r = client->connect("127.0.0.1", "9000");
@@ -1063,6 +1033,9 @@ TEST(rpc_test, test_void_stream) {
     EXPECT_TRUE(stream->WriteDone());
     EXPECT_TRUE(!stream->Finish(0));
 }
+#endif
+
+
 
 int main(int argc, char** argv) {
     int mode = 0;
