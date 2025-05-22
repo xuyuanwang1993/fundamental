@@ -3,10 +3,10 @@
 #include "io_context_pool.hpp"
 #include "use_asio.hpp"
 #include <functional>
+#include <memory>
 #if TARGET_PLATFORM_LINUX
     #include <netinet/tcp.h>
 #endif
-
 namespace network
 {
 static constexpr std::size_t kSslPreReadSize = 3;
@@ -49,6 +49,30 @@ struct network_client_ssl_config {
     std::string ca_certificate_path;
     bool verify_org  = true;
     bool disable_ssl = false;
+
+#ifndef NETWORK_DISABLE_SSL
+
+    std::shared_ptr<asio::ssl::context> ssl_context;
+    std::exception_ptr load_exception;
+#endif
+    void preload() {
+#ifndef NETWORK_DISABLE_SSL
+        ssl_context = std::make_shared<asio::ssl::context>(asio::ssl::context::tlsv13);
+        try {
+            if (!ca_certificate_path.empty()) {
+                ssl_context->load_verify_file(ca_certificate_path);
+            }
+            if (!private_key_path.empty()) {
+                ssl_context->use_private_key_file(private_key_path, asio::ssl::context::pem);
+            }
+            if (!certificate_path.empty()) {
+                ssl_context->use_certificate_chain_file(certificate_path);
+            }
+        } catch (...) {
+            load_exception = std::current_exception();
+        }
+#endif
+    }
 };
 
 template <typename T>
