@@ -106,7 +106,6 @@ public:
             if (!ssl_config_.ca_certificate_path.empty()) {
                 ssl_context->load_verify_file(ssl_config_.ca_certificate_path);
                 if (ssl_config_.verify_client) verify_flag |= ::asio::ssl::verify_fail_if_no_peer_cert;
-                ;
             }
             ssl_context->set_verify_mode(verify_flag);
 

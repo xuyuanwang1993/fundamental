@@ -40,6 +40,7 @@ struct network_server_ssl_config {
     std::string ca_certificate_path;
     bool verify_client = true;
     bool disable_ssl   = false;
+    bool enable_no_ssl = true;
 };
 
 struct network_client_ssl_config {

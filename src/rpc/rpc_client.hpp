@@ -197,14 +197,22 @@ private:
 
 class rpc_client : private asio::noncopyable, public std::enable_shared_from_this<rpc_client> {
     friend class ClientStreamReadWriter;
+    enum rpc_connection_status : std::size_t
+    {
+        rpc_connection_wait_connecting,
+        rpc_connection_dns_resolving,
+        rpc_connection_tcp_handshaking,
+        rpc_connection_proxy_handshaking,
+        rpc_connection_ssl_handshaking,
+        rpc_connection_closing,
+        rpc_connection_ready,
+        rpc_connection_closed,
+    };
 
 public:
     inline static std::function<asio::io_context&()> s_io_context_cb = []() -> decltype(auto) {
         return network::io_context_pool::Instance().get_io_context();
     };
-
-private:
-    Fundamental::Signal<void()> notify_rpc_connect_success;
 
 public:
     template <typename... Args>
@@ -239,7 +247,7 @@ public:
     }
 
     bool connect(size_t timeout_msec = 3000) {
-        if (has_connected_) return true;
+        if (has_connected()) return true;
         FASSERT(!service_name_.empty());
         do_async_connect();
         return wait_conn(timeout_msec);
@@ -264,12 +272,12 @@ public:
     }
 
     bool wait_conn(size_t timeout_msec) {
-        if (has_connected_) {
-            return true;
+        {
+            std::unique_lock<std::mutex> locker(status_mutex_);
+            status_cv.wait_for(locker, std::chrono::milliseconds(timeout_msec),
+                               [&]() { return has_connected() || has_closed(); });
         }
-        auto ret = notify_rpc_connect_success.MakeSignalFuture();
-        ret->p.get_future().wait_for(std::chrono::milliseconds(timeout_msec));
-        return has_connected_;
+        return has_connected();
     }
 
     void enable_auto_reconnect(bool enable = true) {
@@ -299,9 +307,11 @@ public:
     }
 
     bool has_connected() const {
-        return has_connected_;
+        return connection_status.load() == rpc_connection_ready;
     }
-
+    bool has_closed() const {
+        return connection_status.load() == rpc_connection_closed;
+    }
     // sync call
     template <typename T = void, typename... Args>
     typename std::enable_if<std::is_void<T>::value>::type timeout_call(const std::string& rpc_name,
@@ -497,8 +507,8 @@ public:
 private:
     void close(bool forced_close = false) {
 
-        if (!has_connected_ && !forced_close) return;
-        has_connected_ = false;
+        if (!has_connected() && !forced_close) return;
+        change_connection_status(rpc_connection_closed);
         asio::error_code ec;
 #ifndef NETWORK_DISABLE_SSL
         if (ssl_stream_) {
@@ -560,13 +570,13 @@ private:
     }
     void do_async_connect() {
         auto error_handle_func = [this](const asio::error_code& ec) -> bool {
-            if (has_connected_ || !reference_.is_valid()) {
+            if (has_connected() || !reference_.is_valid()) {
                 return false;
             }
             if (!ec) return true;
-            has_connected_ = false;
-
+            change_connection_status(rpc_connection_closing);
             if (reconnect_cnt_ <= 0) {
+                change_connection_status(rpc_connection_closed);
                 return false;
             }
 
@@ -576,6 +586,7 @@ private:
             async_reconnect();
             return false;
         };
+        change_connection_status(rpc_connection_dns_resolving);
         resolver_.async_resolve(
             host_, service_name_,
             [this, error_handle_func, ptr = shared_from_this()](const std::error_code& ec,
@@ -585,6 +596,7 @@ private:
                 }
                 if (!error_handle_func(ec)) return;
                 // connect endpoint using resolver results
+                change_connection_status(rpc_connection_tcp_handshaking);
                 asio::async_connect(socket_, endpoints,
                                     [this, error_handle_func, ptr = shared_from_this()](
                                         const asio::error_code& ec, const asio::ip::tcp::endpoint& endpoint) {
@@ -604,6 +616,7 @@ private:
             });
     }
     void perform_proxy() {
+        change_connection_status(rpc_connection_proxy_handshaking);
         proxy_interface->init(
             [this, ptr = shared_from_this()]() {
                 if (!reference_.is_valid()) {
@@ -615,6 +628,11 @@ private:
                 if (!reference_.is_valid()) {
                     return;
                 }
+                change_connection_status(rpc_connection_closing);
+                Fundamental::ScopeGuard g([&]() {
+                    if (connection_status.load() == rpc_connection_closing)
+                        change_connection_status(rpc_connection_closed);
+                });
                 error_callback(ec);
             },
             &socket_);
@@ -635,11 +653,10 @@ private:
         }
     }
     void rpc_protocal_ready() {
-        has_connected_ = true;
+        change_connection_status(rpc_connection_ready);
         socket_.set_option(asio::ip::tcp::no_delay(tcp_no_delay_flag));
         do_read();
         resend_subscribe();
-        notify_rpc_connect_success.Emit();
         // process write cache
         do_write();
     }
@@ -648,6 +665,7 @@ private:
             return;
         }
         reset_socket();
+        change_connection_status(rpc_connection_wait_connecting);
         reconnect_delay_timer_.expires_after(std::chrono::milliseconds(reconnect_delay_ms));
         reconnect_delay_timer_.async_wait([this, ptr = shared_from_this()](const asio::error_code& ec) {
             if (!reference_.is_valid()) {
@@ -674,7 +692,7 @@ private:
             }
             if (has_upgrade) return;
             if (!ec) {
-                if (has_connected_) {
+                if (has_connected()) {
                     if (b_wait_any_data) {
                         b_wait_any_data.exchange(false);
                         FWARN("disconnect for timeout {} msec,we has not recv any data", timeout_msec);
@@ -970,9 +988,6 @@ private:
         }
     }
 
-    void set_default_error_cb() {
-        err_cb_ = [this](asio::error_code) { do_async_connect(); };
-    }
     bool verify_certificate(bool preverified, asio::ssl::verify_context& ctx) {
         // The verify callback can be used to check whether the certificate that is
         // being presented is valid for the peer. For example, RFC 2818 describes
@@ -990,7 +1005,8 @@ private:
 #ifdef RPC_VERBOSE
                 FDEBUG("rpc client {:p} ssl Verifying org:{}", (void*)this, org_name);
 #endif
-                return trusted_orgs.find(org_name) != trusted_orgs.end();
+                has_any_trusted_orgs |= trusted_orgs.find(org_name) != trusted_orgs.end();
+                return has_any_trusted_orgs;
             }
         } while (0);
         return preverified;
@@ -1015,7 +1031,8 @@ private:
     void prepare_ssl_config() {
 #ifndef NETWORK_DISABLE_SSL
         trusted_orgs.clear();
-        auto load_func = [this](const std::string& path) {
+        has_any_trusted_orgs = false;
+        auto load_func       = [this](const std::string& path) {
             if (path.empty()) return;
             FILE* fp = fopen(path.c_str(), "r");
             if (!fp) {
@@ -1033,6 +1050,11 @@ private:
 #endif
     }
     void ssl_handshake() {
+        change_connection_status(rpc_connection_closing);
+        Fundamental::ScopeGuard g([&]() {
+            // status not changed
+            if (connection_status.load() == rpc_connection_closing) change_connection_status(rpc_connection_closed);
+        });
 #ifndef NETWORK_DISABLE_SSL
         asio::ssl::context ssl_context(asio::ssl::context::tlsv13);
         try {
@@ -1067,6 +1089,7 @@ private:
             ssl_stream_->set_verify_mode(asio::ssl::verify_none);
         }
         SSL_set_tlsext_host_name(ssl_stream_->native_handle(), host_.c_str());
+        change_connection_status(rpc_connection_ssl_handshaking);
         ssl_stream_->async_handshake(
             asio::ssl::stream_base::client, [this, ptr = shared_from_this()](const asio::error_code& ec) {
                 if (!reference_.is_valid()) {
@@ -1075,6 +1098,12 @@ private:
                 if (!ec) {
                     rpc_protocal_ready();
                 } else {
+                    change_connection_status(rpc_connection_closing);
+                    Fundamental::ScopeGuard g([&]() {
+                        // status not changed
+                        if (connection_status.load() == rpc_connection_closing)
+                            change_connection_status(rpc_connection_closed);
+                    });
                     FDEBUG("perform client {:p} ssl handshake failed {}", (void*)this, ec.message());
                     close();
                     error_callback(ec);
@@ -1124,6 +1153,16 @@ private:
             socket_.async_write_some(std::move(buffers), std::move(handler));
         }
     }
+    void change_connection_status(rpc_connection_status next_status) {
+        auto old_status = connection_status.load();
+        while (old_status != next_status) {
+            if (connection_status.compare_exchange_strong(old_status, next_status)) {
+                std::scoped_lock<std::mutex> locker(status_mutex_);
+                status_cv.notify_all();
+                break;
+            }
+        }
+    }
     network_data_reference reference_;
     asio::io_context& ios_;
     asio::ip::tcp::resolver resolver_;
@@ -1133,10 +1172,13 @@ private:
     std::string host_;
     std::string service_name_;
     asio::steady_timer reconnect_delay_timer_;
-    size_t reconnect_delay_ms       = 1000; // s
-    bool tcp_no_delay_flag          = false;
-    int reconnect_cnt_              = -1;
-    std::atomic_bool has_connected_ = { false };
+    size_t reconnect_delay_ms = 1000; // s
+    bool tcp_no_delay_flag    = false;
+    int reconnect_cnt_        = -1;
+
+    std::mutex status_mutex_;
+    std::condition_variable status_cv;
+    std::atomic<rpc_connection_status> connection_status = rpc_connection_closed;
 
     std::atomic_bool b_wait_any_data = false;
     asio::steady_timer deadline_;
@@ -1176,6 +1218,7 @@ private:
     std::unique_ptr<asio::ssl::stream<asio::ip::tcp::socket&>> ssl_stream_ = nullptr;
     network_client_ssl_config ssl_config_;
     std::unordered_set<std::string> trusted_orgs;
+    bool has_any_trusted_orgs = false;
 #endif
     // rpc handler
     std::atomic_bool has_upgrade = false;

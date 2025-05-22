@@ -113,7 +113,7 @@ void delay_echo(rpc_conn conn, const std::string& src, std::int64_t delay_msec) 
         [conn, req_id, src] {
             auto conn_sp = conn.lock();
             if (conn_sp) {
-                FINFO("delay echo response {} ",  src.substr(0, src.size() > 100 ? 100 : src.size()));
+                FINFO("delay echo response {} ", src.substr(0, src.size() > 100 ? 100 : src.size()));
                 conn_sp->response(req_id, network::rpc_service::request_type::rpc_res, std::move(src));
             }
         },
@@ -330,7 +330,14 @@ void server_task(std::promise<void>& sync_p) {
     auto s_server = network::make_guard<rpc_server>(9000);
     auto p        = s_server.get();
     auto& server  = *s_server.get();
-    server.enable_ssl({ nullptr, "server.crt", "server.key", "dh2048.pem", "ca_root.crt" });
+    network::network_server_ssl_config ssl_config;
+    ssl_config.ca_certificate_path = "ca_root.crt";
+    ssl_config.disable_ssl         = false;
+    ssl_config.private_key_path    = "server.key";
+    ssl_config.certificate_path    = "server.crt";
+    ssl_config.verify_client       = ::getenv("verify_client") != nullptr;
+    ssl_config.enable_no_ssl       = ::getenv("disable_no_ssl") == nullptr;
+    server.enable_ssl(ssl_config);
     dummy d;
     server.register_delay_handler("add", [&d](rpc_conn conn, int x, int y) -> int { return d.add(conn, x, y); });
 

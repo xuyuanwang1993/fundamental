@@ -55,7 +55,7 @@ public:
     void stop() {
         release_obj();
     }
-    
+
     void register_stream_handler(std::string const& name,
                                  const std::function<void(std::shared_ptr<ServerStreamReadWriter>)>& f) {
         auto proxy_func = [f](network::rpc_service::rpc_conn conn) {
@@ -184,7 +184,6 @@ public:
             if (!ssl_config_.ca_certificate_path.empty()) {
                 ssl_context->load_verify_file(ssl_config_.ca_certificate_path);
                 if (ssl_config_.verify_client) verify_flag |= ::asio::ssl::verify_fail_if_no_peer_cert;
-                ;
             }
             ssl_context->set_verify_mode(verify_flag);
 
@@ -264,7 +263,7 @@ private:
                         });
 #ifndef NETWORK_DISABLE_SSL
                     if (ssl_context) {
-                        new_conn->enable_ssl(*ssl_context);
+                        new_conn->enable_ssl(*ssl_context, ssl_config_.enable_no_ssl);
                     }
 #endif
                     std::int64_t id = 0;
