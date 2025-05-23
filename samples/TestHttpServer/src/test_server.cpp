@@ -9,6 +9,7 @@
 #include <thread>
 
 #include "fundamental/application/application.hpp"
+#include "fundamental/basic/filesystem_utils.hpp"
 #include "fundamental/basic/log.h"
 #include "fundamental/basic/random_generator.hpp"
 #include "fundamental/delay_queue/delay_queue.h"
@@ -29,8 +30,29 @@ void OnHttpBinary(std::shared_ptr<http_connection> conn, http_response& response
     }
 }
 
+void OnUploadFile(std::shared_ptr<http_connection> conn, http_response& response, http_request& request) {
+
+    auto& pool = Fundamental::ThreadPool::LongTimePool();
+    pool.Enqueue([conn]() mutable {
+        auto& request    = conn->get_request();
+        auto& response   = conn->get_response();
+        auto output_path = request.get_query_param("path");
+        if (output_path.empty()) output_path = "default.binary";
+        FINFO("upload to path:{}", output_path);
+        response.set_content_type(".data");
+
+        auto& file_data = request.get_body();
+        auto ret        = Fundamental::fs::WriteFile(output_path, file_data.data(), file_data.size());
+        auto response_str =
+            Fundamental::StringFormat("write {} bytes to {} result:{}", file_data.size(), output_path, ret);
+        response.set_body_size(response_str.size());
+        response.append_body(response_str.data(), response_str.size());
+        response.perform_response();
+    });
+}
+
 std::unique_ptr<std::thread> s_thread;
-void server_task(std::promise<void>& sync_p,const std::string &root_path,std::uint16_t port) {
+void server_task(std::promise<void>& sync_p, const std::string& root_path, std::uint16_t port) {
     http_server_config config;
     config.port                = port;
     config.head_case_sensitive = false;
@@ -46,7 +68,7 @@ void server_task(std::promise<void>& sync_p,const std::string &root_path,std::ui
     ssl_config.verify_client       = false;
     s_server->enable_ssl(std::move(ssl_config));
     s_server->register_handler("/binary", OnHttpBinary, http::MethodFilter::HttpAll);
-
+    s_server->register_handler("/upload", OnUploadFile, http::MethodFilter::HttpAll);
     network::init_io_context_pool(10);
 
     s_server->start();
@@ -56,9 +78,9 @@ void server_task(std::promise<void>& sync_p,const std::string &root_path,std::ui
     sync_p.set_value();
 }
 
-void run_server(const std::string &root_path,std::uint16_t port) {
+void run_server(const std::string& root_path, std::uint16_t port) {
     std::promise<void> sync_p;
-    s_thread = std::make_unique<std::thread>([&]() { server_task(sync_p,root_path,port); });
+    s_thread = std::make_unique<std::thread>([&]() { server_task(sync_p, root_path, port); });
     sync_p.get_future().get();
 }
 

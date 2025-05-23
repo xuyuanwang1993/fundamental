@@ -21,34 +21,31 @@ using TrackerType        = Fundamental::STimeTracker<std::chrono::milliseconds>;
 
 const http_handler http_server::s_default_file_handler =
     [](std::shared_ptr<http_connection> conn, http_response& response, http_request& request) {
-        do {
-            auto root_path = conn->get_root_path();
-            if (root_path.empty()) {
-                response.stock_response(http_response::response_type::forbidden);
+        auto root_path = conn->get_root_path();
+        if (root_path.empty()) {
+            response.stock_response(http_response::response_type::forbidden);
+            return;
+        }
+        //     // Decode url to path.
+        std::string requestPath = Fundamental::UrlDecode(request.get_uri());
+        if (requestPath.empty()) {
+            requestPath = "/";
+        } else {
+            // Request path must be absolute and not contain "..".
+            if (requestPath[0] != '/' || requestPath.find("..") != std::string::npos) {
+                response.stock_response(http_response::response_type::bad_request);
                 return;
             }
-            auto method = request.get_method();
-            if (method != MethodFilter::HttpGet) {
-                response.stock_response(http_response::response_type::not_implemented);
-                break;
-            }
-            //     // Decode url to path.
-            std::string requestPath = Fundamental::UrlDecode(request.get_uri());
-            if (requestPath.empty()) {
-                requestPath = "/";
-            } else {
-                // Request path must be absolute and not contain "..".
-                if (requestPath[0] != '/' || requestPath.find("..") != std::string::npos) {
-                    response.stock_response(http_response::response_type::bad_request);
-                    return;
-                }
-            }
-
-            // If path ends in slash (i.e. is a directory) then add "index.html".
-            if (requestPath[requestPath.size() - 1] == '/') {
-                requestPath += "index.html";
-            }
-
+        }
+        // If path ends in slash (i.e. is a directory) then add "index.html".
+        if (requestPath[requestPath.size() - 1] == '/') {
+            requestPath += "index.html";
+        }
+        std::string full_path = root_path + requestPath;
+        auto method           = request.get_method();
+        auto& pool            = Fundamental::ThreadPool::LongTimePool();
+        switch (method) {
+        case MethodFilter::HttpGet: {
             // Determine the file extension.
             std::size_t last_slash_pos = requestPath.find_last_of("/");
             std::size_t last_dot_pos   = requestPath.find_last_of(".");
@@ -57,20 +54,18 @@ const http_handler http_server::s_default_file_handler =
                 extension = requestPath.substr(last_dot_pos + 1);
             }
 
-            // Open the file to send back.
-            std::string full_path = root_path + requestPath;
-            if (!std::filesystem::is_regular_file(full_path)) {
-                FDEBUG("{} is not existed", full_path);
-                response.stock_response(http_response::response_type::not_found);
-                break;
-            }
-            response.set_raw_content_type(ExtensionToType(extension));
-            auto& pool = Fundamental::ThreadPool::DefaultPool();
-            if (pool.Count() < 4) pool.Spawn(4 - pool.Count());
-            pool.Enqueue([conn, full_path]() {
+            pool.Enqueue([conn, full_path, extension]() {
+                // Open the file to send back.
                 auto& response = conn->get_response();
-                Fundamental::ScopeGuard g([&]() { response.perform_response(); });
+                // maybe we shoudle probe file type by it's content
+                response.set_raw_content_type(ExtensionToType(extension));
 
+                Fundamental::ScopeGuard g([&]() { response.perform_response(); });
+                if (!std::filesystem::is_regular_file(full_path)) {
+                    FDEBUG("{} is not existed", full_path);
+                    response.stock_response(http_response::response_type::not_found);
+                    return;
+                }
                 std::ifstream is(full_path.c_str(), std::ios::in | std::ios::binary);
                 if (!is) {
                     response.stock_response(http_response::not_found);
@@ -118,8 +113,30 @@ const http_handler http_server::s_default_file_handler =
                     }
                 }
             });
+            break;
+        }
+        case MethodFilter::HttpPut: {
+            pool.Enqueue([conn, full_path]() {
+                auto& response = conn->get_response();
+                auto& request  = conn->get_request();
 
-        } while (0);
+                Fundamental::ScopeGuard g([&]() { response.perform_response(); });
+                if (std::filesystem::is_regular_file(full_path)) {
+                    response.stock_response(http_response::response_type::forbidden);
+                    return;
+                }
+                auto& body        = request.get_body();
+                auto write_ret    = Fundamental::fs::WriteFile(full_path, body.data(), body.size());
+                auto response_str = Fundamental::StringFormat("write {} bytes result:{}", body.size(), write_ret);
+                response.set_content_type(".txt");
+                response.set_body_size(response_str.size());
+                FINFO("{}",response_str);
+                response.append_body(std::move(response_str));
+            });
+            break;
+        }
+        default: response.stock_response(http_response::response_type::not_implemented); break;
+        }
     };
 
 void http_server::enable_default_handler(http_handler handler, std::uint32_t methodMask) {
