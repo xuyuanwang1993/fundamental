@@ -238,13 +238,6 @@ void http_response::add_header(const std::string& name, const std::string& value
 }
 
 void http_response::set_body_size(std::size_t max_content_length) {
-
-    if (!can_set_body()) return;
-    headers[0].value = std::to_string(max_content_length);
-    max_body_size    = max_content_length;
-    response_pack_status |= http_response_status_mask::http_response_body_size_set;
-    response_pack_status |= http_response_status_mask::http_response_all_headeres_set;
-
     asio::post(http_con_ref.socket_.get_executor(),
                [this, max_content_length = max_content_length, ref = http_con_ref.shared_from_this()]() mutable {
                    if (!ref->reference_.is_valid()) return;
@@ -310,11 +303,12 @@ void http_response::append_body(const void* ref_data, std::size_t size, std::fun
 void http_response::append_body(std::string&& body) {
     if (!can_set_body()) return;
     data_item new_item;
+    auto size=body.size();
     if (body.size() > 0) {
         new_item.type = data_type::str_data;
         new_item.str  = std::move(body);
     }
-    asio::post(http_con_ref.socket_.get_executor(), [this, new_item = std::move(new_item), size = new_item.str.size(),
+    asio::post(http_con_ref.socket_.get_executor(), [this, new_item = std::move(new_item), size = size,
                                                      ref = http_con_ref.shared_from_this()]() mutable {
         if (!ref->reference_.is_valid()) return;
         if (!can_set_body()) return;
@@ -335,11 +329,12 @@ void http_response::append_body(std::string&& body) {
 void http_response::append_body(std::vector<std::uint8_t>&& body) {
     if (!can_set_body()) return;
     data_item new_item;
+    auto size=body.size();
     if (body.size() > 0) {
         new_item.type = data_type::vec_data;
         new_item.vec  = std::move(body);
     }
-    asio::post(http_con_ref.socket_.get_executor(), [this, new_item = std::move(new_item), size = new_item.vec.size(),
+    asio::post(http_con_ref.socket_.get_executor(), [this, new_item = std::move(new_item), size = size,
                                                      ref = http_con_ref.shared_from_this()]() mutable {
         if (!ref->reference_.is_valid()) return;
         if (!can_set_body()) return;
@@ -371,16 +366,6 @@ http_response::response_type http_response::get_status() const {
 }
 
 void http_response::perform_response(bool from_async_cb) {
-    auto current_status = response_pack_status.load();
-    if (!(current_status & http_response_status_mask::http_response_all_headeres_set)) {
-        FDEBUG("http_connection {:p} ignore when response headeres has not set up", (void*)this);
-        return;
-    }
-
-    if (current_status & http_response_status_mask::http_response_body_send_finished) {
-        FDEBUG("http_connection {:p} ignore when response has finished send", (void*)this);
-        return;
-    }
     asio::post(http_con_ref.socket_.get_executor(), [this, from_async_cb, ref = http_con_ref.shared_from_this()]() {
         auto current_status = response_pack_status.load();
         if (!(current_status & http_response_status_mask::http_response_all_headeres_set)) {
@@ -399,6 +384,11 @@ void http_response::perform_response(bool from_async_cb) {
         // wait headeres send finished
         if (!(current_status & http_response_status_mask::http_response_headeres_send_finished)) {
             FDEBUG("post http_connection {:p} waiting headeres sent finished", (void*)this);
+            return;
+        }
+        // empty response
+        if (max_body_size == 0) {
+            ref->release_obj();
             return;
         }
         // handle body data
@@ -466,7 +456,7 @@ void http_response::perform_response(bool from_async_cb) {
                         return;
                     }
                     auto& front = data_storage_.front();
-                   
+
                     if (front.finish_cb) front.finish_cb();
                     bool last_chunk = front.is_last_chunk;
                     data_storage_.pop_front();
@@ -478,7 +468,7 @@ void http_response::perform_response(bool from_async_cb) {
                         return;
                     }
                 }
-                //try next chunk
+                // try next chunk
                 perform_response(true);
             });
     });
