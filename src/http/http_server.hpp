@@ -151,7 +151,7 @@ private:
                     });
 #ifndef NETWORK_DISABLE_SSL
                     if (ssl_context) {
-                        new_conn->enable_ssl(*ssl_context);
+                        new_conn->enable_ssl(*ssl_context, ssl_config_.enable_no_ssl);
                     }
 #endif
                     new_conn->start();

@@ -509,17 +509,21 @@ private:
 
         if (!has_connected() && !forced_close) return;
         change_connection_status(rpc_connection_closed);
-        asio::error_code ec;
+        auto final_clear_function = [this, ptr = shared_from_this()]() {
+            asio::error_code ec;
+            socket_.shutdown(asio::ip::tcp::socket::shutdown_both, ec);
+            socket_.close(ec);
+            clear_cache();
+        };
+
 #ifndef NETWORK_DISABLE_SSL
         if (ssl_stream_) {
-            ssl_stream_->shutdown(ec);
-            ssl_stream_->lowest_layer().cancel(ec);
-            ssl_stream_->lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both, ec);
+            ssl_stream_->async_shutdown([this, ptr = shared_from_this(),
+                                         final_clear_function](const asio::error_code&) { final_clear_function(); });
+            return;
         }
 #endif
-        socket_.shutdown(asio::ip::tcp::socket::shutdown_both, ec);
-        socket_.close(ec);
-        clear_cache();
+        final_clear_function();
     }
 
     std::shared_ptr<rpc_request_context> EmplaceNewCall(std::size_t timeout_msec = 15000) {
@@ -967,14 +971,23 @@ private:
     }
 
     void reset_socket() {
-        asio::error_code igored_ec;
+        do {
+
 #ifndef NETWORK_DISABLE_SSL
-        if (ssl_stream_) {
-            ssl_stream_->shutdown(igored_ec);
-            ssl_stream_ = nullptr;
-        }
+            if (ssl_stream_) {
+                ssl_stream_->async_shutdown(
+                    [ssl_stream = std::move(ssl_stream_), sock = std::move(socket_)](const asio::error_code&) mutable {
+                        asio::error_code igored_ec;
+                        sock.close(igored_ec);
+                    });
+                ssl_stream_ = nullptr;
+                break;
+            }
 #endif
-        socket_.close(igored_ec);
+            asio::error_code igored_ec;
+            socket_.close(igored_ec);
+        } while (0);
+
         socket_ = decltype(socket_)(ios_);
     }
 

@@ -58,8 +58,9 @@ public:
     }
 
 #ifndef NETWORK_DISABLE_SSL
-    void enable_ssl(asio::ssl::context& ssl_context) {
+    void enable_ssl(asio::ssl::context& ssl_context, bool enable_no_ssl) {
         ssl_context_ref = &ssl_context;
+        enable_no_ssl_  = enable_no_ssl;
     }
 #endif
     void release_obj() {
@@ -126,6 +127,8 @@ private:
                                      }
                                      do_ssl_handshake(request_.buffer_.data(), kSslPreReadSize);
                                  } else {
+                                     if (!enable_no_ssl_) {
+                                     }
                                      FDEBUG("[http] WARNNING!!! falling  down to no ssl socket");
                                      ssl_context_ref = nullptr;
                                      handle_read(kSslPreReadSize);
@@ -256,19 +259,22 @@ private:
     }
 
     void close() {
+        cancel_timer();
 #ifndef NETWORK_DISABLE_SSL
         if (ssl_stream_) {
-            asio::error_code ec;
-            ssl_stream_->shutdown(ec);
-            ssl_stream_->lowest_layer().cancel(ec);
-            ssl_stream_->lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both, ec);
+            ssl_stream_->async_shutdown([this, ref = shared_from_this()](const asio::error_code& ec) {
+                asio::error_code ignored_ec;
+                ssl_stream_->lowest_layer().shutdown(tcp::socket::shutdown_both, ignored_ec);
+                ssl_stream_->lowest_layer().close(ignored_ec);
+            });
+            return;
         }
 #endif
-        cancel_timer();
         asio::error_code ignored_ec;
         socket_.shutdown(tcp::socket::shutdown_both, ignored_ec);
         socket_.close(ignored_ec);
     }
+
     http_router& router_;
     network_data_reference reference_;
     std::weak_ptr<http_server> server_wref_;
@@ -282,6 +288,7 @@ private:
 #ifndef NETWORK_DISABLE_SSL
     std::unique_ptr<asio::ssl::stream<asio::ip::tcp::socket&>> ssl_stream_ = nullptr;
     asio::ssl::context* ssl_context_ref                                    = nullptr;
+    bool enable_no_ssl_                                                    = true;
 #endif
     // http data
     http_request request_;
