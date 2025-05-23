@@ -158,24 +158,14 @@ public:
     void response(uint64_t req_id, request_type req_type, Args&&... args) {
         auto data   = msgpack_codec::pack(static_cast<int32_t>(result_code::OK), std::forward<Args>(args)...);
         auto s_data = std::string(data.data(), data.data() + data.size());
-        asio::post(executor_, [this, data = std::move(s_data), req_id, req_type, ref = shared_from_this()]() mutable {
-            if (!reference_.is_valid()) {
-                return;
-            }
-            response_interal(req_id, std::move(data), req_type);
-        });
+        response_interal(req_id, std::move(s_data), req_type);
     }
 
     template <typename... Args>
     void response_errmsg(uint64_t req_id, request_type req_type, Args&&... args) {
         auto data   = msgpack_codec::pack(static_cast<int32_t>(result_code::FAIL), std::forward<Args>(args)...);
         auto s_data = std::string(data.data(), data.data() + data.size());
-        asio::post(executor_, [this, data = std::move(s_data), req_id, req_type, ref = shared_from_this()]() mutable {
-            if (!reference_.is_valid()) {
-                return;
-            }
-            response_interal(req_id, std::move(data), req_type);
-        });
+        response_interal(req_id, std::move(s_data), req_type);
     }
 
     void set_conn_id(int64_t id) {
@@ -499,14 +489,18 @@ private:
     }
 
     void response_interal(uint64_t req_id, std::string data, request_type req_type = request_type::rpc_res) {
+
         assert(data.size() < MAX_BUF_LEN);
-
-        write_queue_.emplace_back(message_type { req_id, req_type, std::move(data) });
-        if (write_queue_.size() > 1) {
-            return;
-        }
-
-        write();
+        asio::post(executor_, [this, data = std::move(data), req_id, req_type, ref = shared_from_this()]() mutable {
+            if (!reference_.is_valid()) {
+                return;
+            }
+            write_queue_.emplace_back(message_type { req_id, req_type, std::move(data) });
+            if (write_queue_.size() > 1) {
+                return;
+            }
+            write();
+        });
     }
 
     void write() {
@@ -644,16 +638,18 @@ private:
             std::swap(subscribers_, tmp);
             on_subscribers_removed(tmp, weak_from_this());
         }
-
+        cancel_timer();
 #ifndef NETWORK_DISABLE_SSL
         if (ssl_stream_) {
-            asio::error_code ec;
-            ssl_stream_->shutdown(ec);
-            ssl_stream_->lowest_layer().cancel(ec);
-            ssl_stream_->lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both, ec);
+            ssl_stream_->async_shutdown([this, ref = shared_from_this()](const asio::error_code& ec) {
+                asio::error_code ignored_ec;
+                ssl_stream_->lowest_layer().shutdown(tcp::socket::shutdown_both, ignored_ec);
+                ssl_stream_->lowest_layer().close(ignored_ec);
+            });
+            return;
         }
 #endif
-        cancel_timer();
+
         asio::error_code ignored_ec;
         socket_.shutdown(tcp::socket::shutdown_both, ignored_ec);
         socket_.close(ignored_ec);
