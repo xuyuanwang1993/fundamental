@@ -79,7 +79,6 @@ if(F_ENABLE_COMPILE_OPTIMIZE)
         $<$<CONFIG:Release>:
         # GCC/Clang
         $<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>>:
-        -fomit-frame-pointer # 省略帧指针
         -fno-strict-aliasing # 宽松别名规则(某些代码需要)
         -funroll-loops # 循环展开
         -ffast-math # 快速数学计算
@@ -259,12 +258,21 @@ function(config_strip_debug_info target_name)
     if(NOT (target_type STREQUAL "EXECUTABLE" OR target_type STREQUAL "SHARED_LIBRARY" OR target_type STREQUAL "MODULE_LIBRARY"))
         return()
     endif()
-    target_link_options(${target_name} PRIVATE
-        $<$<NOT:$<CONFIG:Debug>>:
-        $<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>:-Wl,--strip-all>
-        $<$<CXX_COMPILER_ID:MSVC>:/link /RELEASE>
-        >
-    )
+    # target_link_options(${target_name} PRIVATE
+    #     $<$<NOT:$<CONFIG:Debug>>:
+    #     $<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>:-Wl,--strip-debug>
+    #     $<$<CXX_COMPILER_ID:MSVC>:/link /RELEASE>
+    #     >
+    # )
+    if(NOT (CMAKE_BUILD_TYPE STREQUAL "Debug"))
+        add_custom_command(TARGET ${target_name} POST_BUILD
+            COMMAND ${CMAKE_OBJCOPY} --only-keep-debug $<TARGET_FILE:${target_name}> $<TARGET_FILE:${target_name}>.sym
+            COMMAND ${CMAKE_OBJCOPY} --strip-debug $<TARGET_FILE:${target_name}>
+            COMMAND ${CMAKE_OBJCOPY} --add-gnu-debuglink=${target_name}.sym $<TARGET_FILE:${target_name}>
+            WORKING_DIRECTORY $<TARGET_FILE_DIR:${target_name}>
+            COMMENT "Extracting ${target_name} debug symbols..."
+        )
+    endif()
 endfunction()
 
 #static linker 启用完全静态链接
