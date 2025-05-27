@@ -1,6 +1,6 @@
 #pragma once
+#include "cxx_config_include.hpp"
 #include <chrono>
-#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <regex>
@@ -17,24 +17,24 @@ inline void RemoveExpiredFiles(std::string_view dir_path,
                                bool recursive = false) {
     std::regex filePattern(pattern.data(), pattern.length());
     auto now = std::chrono::system_clock::now();
-    std::filesystem::path directory(dir_path);
+    std_fs::path directory(dir_path);
     std::vector<std::string> subdirPaths;
     try {
-        for (const auto& entry : std::filesystem::directory_iterator(directory)) {
-            if (entry.is_regular_file()) {
+        for (const auto& entry : std_fs::directory_iterator(directory)) {
+            if (std_fs::is_regular_file(entry.status())) {
                 const auto& path     = entry.path();
                 const auto& filename = path.filename().string();
                 if (std::regex_match(filename, filePattern)) {
-                    auto ftime    = std::filesystem::last_write_time(path);
+                    auto ftime    = std_fs::last_write_time(path);
                     auto fileTime = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
-                        ftime - std::filesystem::file_time_type::clock::now() + std::chrono::system_clock::now());
+                        ftime - std_fs::file_time_type::clock::now() + std::chrono::system_clock::now());
                     auto fileAge = std::chrono::duration_cast<std::chrono::seconds>(now - fileTime).count();
                     if (fileAge > expiredSec) {
-                        std::filesystem::remove(path);
+                        std_fs::remove(path);
                     }
                 }
             }
-            if (recursive && entry.is_directory()) {
+            if (recursive && std_fs::is_directory(entry.status())) {
                 subdirPaths.push_back(entry.path().string());
             }
         }
@@ -101,7 +101,7 @@ inline bool WriteFile(std::string_view path, const void* data, std::size_t len, 
 
 inline bool SwitchToProgramDir(const std::string& argv0) {
     try {
-        std::filesystem::current_path(std::filesystem::path(argv0).parent_path());
+        std_fs::current_path(std_fs::path(argv0).parent_path());
         return true;
     } catch (const std::exception& e) {
         return false;

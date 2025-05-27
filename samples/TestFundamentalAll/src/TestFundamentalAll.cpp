@@ -11,7 +11,7 @@ TEST(TestFundamentalAll, basic_filesystem_utils) {
     auto test_file_name = "test.file";
     Fundamental::ScopeGuard g([&]() {
         try {
-            std::filesystem::remove(test_file_name);
+            std_fs::remove(test_file_name);
         } catch (const std::exception& e) {
             std::cerr << e.what() << '\n';
         }

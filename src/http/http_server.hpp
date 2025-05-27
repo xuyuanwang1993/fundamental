@@ -5,7 +5,7 @@
 #include "http_router.hpp"
 
 #include <condition_variable>
-#include <filesystem>
+#include "fundamental/basic/cxx_config_include.hpp"
 #include <mutex>
 #include <set>
 #include <thread>
@@ -79,16 +79,16 @@ public:
         if (ssl_config.disable_ssl) return;
 #ifndef NETWORK_DISABLE_SSL
         if (ssl_config.certificate_path.empty() || ssl_config.private_key_path.empty() ||
-            !std::filesystem::is_regular_file(ssl_config.certificate_path) ||
-            !std::filesystem::is_regular_file(ssl_config.private_key_path)) {
+            !std_fs::is_regular_file(ssl_config.certificate_path) ||
+            !std_fs::is_regular_file(ssl_config.private_key_path)) {
             throw std::invalid_argument("http_server/ssl need valid certificate and key file");
         }
 
-        if (!ssl_config.tmp_dh_path.empty() && !std::filesystem::is_regular_file(ssl_config.tmp_dh_path)) {
+        if (!ssl_config.tmp_dh_path.empty() && !std_fs::is_regular_file(ssl_config.tmp_dh_path)) {
             throw std::invalid_argument("tmp_dh_path is not existed");
         }
         if (!ssl_config.ca_certificate_path.empty() &&
-            !std::filesystem::is_regular_file(ssl_config.ca_certificate_path)) {
+            !std_fs::is_regular_file(ssl_config.ca_certificate_path)) {
             throw std::invalid_argument("ca_certificate is not existed");
         }
         std::swap(ssl_config_, ssl_config);

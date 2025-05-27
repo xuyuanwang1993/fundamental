@@ -5,15 +5,22 @@ set(__source_import_config__ TRUE)
 if(NOT FUNDAMENTAL_IMPORT_SRC)
     return()
 endif()
+include(${CMAKE_CURRENT_LIST_DIR}/env-check.cmake)
 
 if(FUNDAMENTAL_MAIN_PROJECT)
     option(FUNDAMENTAL_ENABLE_DATABASE_SUPPORT "enable database support." ON)
-    option(FUNDAMENTAL_ENABLE_SCRIPT_SUPPORT "enable chaiscript support." ON)
+    if(ENV_CXX20_SUPPORTED)
+        option(FUNDAMENTAL_ENABLE_SCRIPT_SUPPORT "enable chaiscript support." ON)
+    else()
+        option(FUNDAMENTAL_ENABLE_SCRIPT_SUPPORT "enable chaiscript support." OFF)
+    endif()
+
     option(FUNDAMENTAL_BUILD_NETWORK "enable build of fundamental network library." ON)
 else()
     option(FUNDAMENTAL_ENABLE_DATABASE_SUPPORT "enable database support." OFF)
     option(FUNDAMENTAL_ENABLE_SCRIPT_SUPPORT "enable chaiscript support." OFF)
     option(FUNDAMENTAL_BUILD_NETWORK "enable build of fundamental network library." OFF)
+
 endif()
 
 

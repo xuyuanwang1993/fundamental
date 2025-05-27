@@ -1,13 +1,13 @@
 #pragma once
 #include <memory>
-#include <memory_resource>
+#include "cxx_config_include.hpp"
 #ifdef AllocatorTracker
     #include <iostream>
 #endif
 namespace Fundamental
 {
 template <typename _Tp>
-using AllocatorType = std::pmr::polymorphic_allocator<_Tp>;
+using AllocatorType = std_pmr::polymorphic_allocator<_Tp>;
 
 template <typename MemorySourceType, typename... Args>
 decltype(auto) MakeSharedMemorySource(Args&&... args) {
@@ -16,17 +16,17 @@ decltype(auto) MakeSharedMemorySource(Args&&... args) {
 
 template <typename... Args>
 decltype(auto) MakePoolMemorySource(Args&&... args) {
-    return MakeSharedMemorySource<std::pmr::unsynchronized_pool_resource>(std::forward<Args>(args)...);
+    return MakeSharedMemorySource<std_pmr::unsynchronized_pool_resource>(std::forward<Args>(args)...);
 }
 
 template <typename... Args>
 decltype(auto) MakeThreadSafePoolMemorySource(Args&&... args) {
-    return MakeSharedMemorySource<std::pmr::synchronized_pool_resource>(std::forward<Args>(args)...);
+    return MakeSharedMemorySource<std_pmr::synchronized_pool_resource>(std::forward<Args>(args)...);
 }
 
 template <typename... Args>
 decltype(auto) MakeMonoBufferMemorySource(Args&&... args) {
-    return MakeSharedMemorySource<std::pmr::monotonic_buffer_resource>(std::forward<Args>(args)...);
+    return MakeSharedMemorySource<std_pmr::monotonic_buffer_resource>(std::forward<Args>(args)...);
 }
 namespace internal
 {
@@ -34,19 +34,19 @@ template <
     size_t ObjectSize,
     bool ThreadSafe,
     typename PoolSourceType =
-        std::conditional_t<ThreadSafe, std::pmr::synchronized_pool_resource, std::pmr::unsynchronized_pool_resource>>
-inline std::pmr::memory_resource* GetObjectPoolSource() {
-    static std::pmr::memory_resource* s_object_pool_source =
-        new PoolSourceType(std::pmr::pool_options { 16, ObjectSize * 16 });
+        std::conditional_t<ThreadSafe, std_pmr::synchronized_pool_resource, std_pmr::unsynchronized_pool_resource>>
+inline std_pmr::memory_resource* GetObjectPoolSource() {
+    static std_pmr::memory_resource* s_object_pool_source =
+        new PoolSourceType(std_pmr::pool_options { 16, ObjectSize * 16 });
     return s_object_pool_source;
 }
 } // namespace internal
 
 // fixed-size object allocator
 template <typename ObjectType, bool ThreadSafe, size_t blockSize = sizeof(ObjectType)>
-struct ObjectPoolAllocator : std::pmr::polymorphic_allocator<ObjectType> {
+struct ObjectPoolAllocator : std_pmr::polymorphic_allocator<ObjectType> {
     ObjectPoolAllocator() :
-    std::pmr::polymorphic_allocator<ObjectType>(internal::GetObjectPoolSource<blockSize, ThreadSafe>()) {
+    std_pmr::polymorphic_allocator<ObjectType>(internal::GetObjectPoolSource<blockSize, ThreadSafe>()) {
     }
     ~ObjectPoolAllocator() {
     }
@@ -56,31 +56,31 @@ struct ObjectPoolAllocator : std::pmr::polymorphic_allocator<ObjectType> {
         if ((__gnu_cxx::__int_traits<size_t>::__max / sizeof(ObjectType)) < __n) std::__throw_bad_array_new_length();
         std::cout << "allocate align_size:" << alignof(ObjectType) << " total:" << __n * sizeof(ObjectType)
                   << " count:" << __n << std::endl;
-        return static_cast<ObjectType*>(std::pmr::polymorphic_allocator<ObjectType>::allocate(__n));
+        return static_cast<ObjectType*>(std_pmr::polymorphic_allocator<ObjectType>::allocate(__n));
     }
 
     void deallocate(ObjectType* __p, size_t __n) noexcept __attribute__((__nonnull__)) {
         std::cout << "deallocate align_size:" << alignof(ObjectType) << " total:" << __n * sizeof(ObjectType)
                   << " count:" << __n << std::endl;
-        std::pmr::polymorphic_allocator<ObjectType>::deallocate(__p, __n);
+        std_pmr::polymorphic_allocator<ObjectType>::deallocate(__p, __n);
     }
 #endif
 
     template <typename... _CtorArgs>
     [[nodiscard]] ObjectType* NewObject(_CtorArgs&&... __ctor_args) {
-        auto* __p = std::pmr::polymorphic_allocator<ObjectType>::allocate(1);
+        auto* __p = std_pmr::polymorphic_allocator<ObjectType>::allocate(1);
         __try
-        { std::pmr::polymorphic_allocator<ObjectType>::construct(__p, std::forward<_CtorArgs>(__ctor_args)...); }
+        { std_pmr::polymorphic_allocator<ObjectType>::construct(__p, std::forward<_CtorArgs>(__ctor_args)...); }
         __catch(...) {
-            std::pmr::polymorphic_allocator<ObjectType>::deallocate(__p, 1);
+            std_pmr::polymorphic_allocator<ObjectType>::deallocate(__p, 1);
             __throw_exception_again;
         }
         return __p;
     }
 
     void DeleteObject(ObjectType* __p) {
-        std::pmr::polymorphic_allocator<ObjectType>::destroy(__p);
-        std::pmr::polymorphic_allocator<ObjectType>::deallocate(__p, 1);
+        std_pmr::polymorphic_allocator<ObjectType>::destroy(__p);
+        std_pmr::polymorphic_allocator<ObjectType>::deallocate(__p, 1);
     }
 };
 

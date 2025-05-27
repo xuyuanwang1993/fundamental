@@ -183,14 +183,33 @@ if(F_ENABLE_COMPILE_OPTIMIZE)
     )
 endif()
 
-set_target_properties(BuildSettings PROPERTIES POSITION_INDEPENDENT_CODE ON)
-
 
 
 target_link_libraries(BuildSettings INTERFACE
     pthread
 )
+
+if(NOT HAS_STD_FILESYSTEM)
+    target_compile_definitions(BuildSettings INTERFACE
+        USE_EXPERIMENTAL_FILESYSTEM
+    )
+    target_link_libraries(BuildSettings INTERFACE
+        stdc++fs
+    )
+endif()
+
+if(NOT HAS_STD_MEMORY_SOURCE)
+    target_compile_definitions(BuildSettings INTERFACE
+        USE_EXPERIMENTAL_MEMORY_SOURCE
+    )
+endif()
+
 target_enable_clang_tidy(BuildSettings)
+
+# enable POSITION_INDEPENDENT_CODE ON
+function(config_enable_position_independent_code target_name)
+    set_target_properties(${target_name} PROPERTIES POSITION_INDEPENDENT_CODE ON)
+endfunction()
 
 # enable memory access check for debug mode
 function(config_enable_sanitize_address_check target_name)

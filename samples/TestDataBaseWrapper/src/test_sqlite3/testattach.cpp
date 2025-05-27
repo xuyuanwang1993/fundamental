@@ -1,13 +1,13 @@
 #include "database/sqlite3/sqlite.hpp"
 #include "test_sqlite3_common.hpp"
-#include <filesystem>
+#include "fundamental/basic/cxx_config_include.hpp"
 #include <gtest/gtest.h>
 using namespace std;
 
 TEST(test_sqlite3, testattach) {
-    Fundamental::ScopeGuard g([&]() { std::filesystem::remove("test.db"); });
+    Fundamental::ScopeGuard g([&]() { std_fs::remove("test.db"); });
     {
-        std::filesystem::remove("test.db");
+        std_fs::remove("test.db");
         sqlite::database att_db = contacts_db("test.db");
         default_init_contacts_db(att_db);
     }

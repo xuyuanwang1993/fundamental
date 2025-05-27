@@ -61,7 +61,7 @@ const http_handler http_server::s_default_file_handler =
                 response.set_raw_content_type(ExtensionToType(extension));
 
                 Fundamental::ScopeGuard g([&]() { response.perform_response(); });
-                if (!std::filesystem::is_regular_file(full_path)) {
+                if (!std_fs::is_regular_file(full_path)) {
                     FDEBUG("{} is not existed", full_path);
                     response.stock_response(http_response::response_type::not_found);
                     return;
@@ -72,7 +72,7 @@ const http_handler http_server::s_default_file_handler =
                     return;
                 }
 
-                auto size = std::filesystem::file_size(full_path);
+                auto size = std_fs::file_size(full_path);
                 DeclareTimeTacker(TrackerType, send_t, s_tag,
                                   Fundamental::StringFormat("http send file:{} size:{}", full_path, size), 1000, true,
                                   TrackerOutPut);
@@ -121,7 +121,7 @@ const http_handler http_server::s_default_file_handler =
                 auto& request  = conn->get_request();
 
                 Fundamental::ScopeGuard g([&]() { response.perform_response(); });
-                if (std::filesystem::is_regular_file(full_path)) {
+                if (std_fs::is_regular_file(full_path)) {
                     response.stock_response(http_response::response_type::forbidden);
                     return;
                 }

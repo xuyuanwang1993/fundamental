@@ -67,10 +67,6 @@ target_include_directories(${lib_name}_property INTERFACE
     ${src_root_dir}
 )
 
-set_target_properties(${lib_name}_property PROPERTIES
-    FOLDER ${src_root_dir}
-)
-
 # Config link dependencies
 target_link_libraries(${lib_name}_property INTERFACE
     ${extra_libs}
@@ -92,6 +88,9 @@ if(F_BUILD_STATIC)
         ${lib_name}_property
     )
     add_library(${GLOB_NAMESPACE}${lib_name}${STATIC_LIB_SUFFIX} ALIAS ${lib_name}${STATIC_LIB_SUFFIX})
+    set_target_properties(${lib_name}${STATIC_LIB_SUFFIX} PROPERTIES
+        FOLDER ${src_root_dir}
+    )
 endif()
 
 if(F_BUILD_SHARED)
@@ -107,6 +106,9 @@ if(F_BUILD_SHARED)
     )
 
     add_library(${GLOB_NAMESPACE}${lib_name} ALIAS ${lib_name})
+    set_target_properties(${lib_name} PROPERTIES
+        FOLDER ${src_root_dir}
+    )
 endif()
 
 
