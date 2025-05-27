@@ -197,7 +197,7 @@ void http_response::stock_response(http_response::response_type status) {
 
     status_ = status;
 
-    auto content           = StockReplies::toString(status);
+    auto content           = StockReplies::toString(status_);
     auto& new_item         = data_storage_.emplace_back();
     new_item.type          = data_type::ref_data;
     new_item.p_ref         = content.data();
@@ -217,7 +217,7 @@ void http_response::stock_response(http_response::response_type status) {
 void http_response::set_status(response_type status) {
 
     if (!can_set_header()) return;
-    status = status;
+    status_ = status;
 }
 
 void http_response::set_content_type(const std::string& extension) {
