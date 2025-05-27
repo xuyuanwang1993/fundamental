@@ -3,7 +3,7 @@
 #include "utils.hpp"
 
 #include <condition_variable>
-#include <filesystem>
+#include "fundamental/basic/cxx_config_include.hpp"
 #include <future>
 #include <iomanip>
 #include <iostream>
@@ -38,8 +38,8 @@ using namespace spdlog;
 void PrepareLogdir(const std::string& logPath) {
     spdlog::drop_all();
     try {
-        bool ret = std::filesystem::create_directories(logPath);
-        if (!ret && !std::filesystem::is_directory(logPath)) {
+        bool ret = std_fs::create_directories(logPath);
+        if (!ret && !std_fs::is_directory(logPath)) {
             std::cout << "create directory " << logPath << " failed" << std::endl;
             std::abort();
         }
@@ -63,7 +63,7 @@ public:
             m_rotationH = 0;
             m_rotationM = 0;
         }
-        auto path    = std::filesystem::path(m_baseFilename);
+        auto path    = std_fs::path(m_baseFilename);
         m_outputDir  = path.parent_path().string();
         m_matchStr   = StringFormat("{}{}", R"((.*)_(\d{4})-(\d{2})-(\d{2})(.*))", path.extension().string());
         m_rotationTp = _next_rotation_tp();
@@ -168,7 +168,7 @@ private:
                 w.write(SPDLOG_FILENAME_T("{}-{}{}"), basename, m_fileIndex, ext);
                 auto newName = w.str();
                 try {
-                    std::filesystem::rename(m_lastLogFileName, newName);
+                    std_fs::rename(m_lastLogFileName, newName);
                 } catch (const std::exception& e) {
                     std::cerr << "rename " << m_lastLogFileName << " to " << newName << " failed " << e.what()
                               << std::endl;

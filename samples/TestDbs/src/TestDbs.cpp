@@ -2,7 +2,7 @@
 #include "fundamental/basic/log.h"
 
 #include <chrono>
-#include <filesystem>
+#include "fundamental/basic/cxx_config_include.hpp"
 #include <iostream>
 #include <rocksdb/db.h>
 #include <rocksdb/options.h>
@@ -37,7 +37,7 @@ void test_sqlite3(std::size_t test_nums) {
     using Type   = Fundamental::STimeTracker<std::chrono::milliseconds>;
     auto db_name = "test.sqlite3.db";
     try {
-        std::filesystem::remove(db_name);
+        std_fs::remove(db_name);
     } catch (const std::exception& e) {
     }
     DeclareTimeTacker(Type, t, "test sqlite3 all", Fundamental::StringFormat("nums:{}", test_nums), 10, true, nullptr);
@@ -223,7 +223,7 @@ void test_rocksdb(std::size_t test_nums) {
     using Type   = Fundamental::STimeTracker<std::chrono::milliseconds>;
     auto db_name = "test.rocksdb.db";
     try {
-        std::filesystem::remove_all(db_name);
+        std_fs::remove_all(db_name);
     } catch (const std::exception& e) {
     }
     DeclareTimeTacker(Type, t, "test rocksdb all", Fundamental::StringFormat("nums:{}", test_nums), 10, true, nullptr);

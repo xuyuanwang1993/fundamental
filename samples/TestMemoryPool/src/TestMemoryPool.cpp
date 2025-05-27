@@ -6,12 +6,12 @@
 #include <array>
 #include <deque>
 #include <iostream>
-#include <memory_resource>
+#include "fundamental/basic/cxx_config_include.hpp"
 #include <vector>
 
-class tracer_memory_resource : public std::pmr::memory_resource {
+class tracer_memory_resource : public std_pmr::memory_resource {
 public:
-    explicit tracer_memory_resource(std::pmr::memory_resource* refsource) : ref(refsource) {
+    explicit tracer_memory_resource(std_pmr::memory_resource* refsource) : ref(refsource) {
     }
 
 protected:
@@ -30,26 +30,26 @@ protected:
     }
 
 private:
-    std::pmr::memory_resource* const ref;
+    std_pmr::memory_resource* const ref;
 };
 
 void TestObjectPool();
 
 int main() {
     {
-        std::pmr::memory_resource* upstream = std::pmr::new_delete_resource();
+        std_pmr::memory_resource* upstream = std_pmr::new_delete_resource();
         tracer_memory_resource source(upstream);
-        std::pmr::pool_options options;
+        std_pmr::pool_options options;
         constexpr std::size_t kLargeBlockSize = 4098;
         options.largest_required_pool_block   = kLargeBlockSize;
         options.max_blocks_per_chunk          = 4;
 
         auto poolResource = Fundamental::MakePoolMemorySource(options, &source);
 
-        std::pmr::memory_resource* activeSource = poolResource.get();
+        std_pmr::memory_resource* activeSource = poolResource.get();
         {
             std::cout << "test int vec " << std::endl;
-            std::pmr::vector<int> myVector { activeSource };
+            std_pmr::vector<int> myVector { activeSource };
 
             for (int i = 0; i < 32; ++i) {
                 std::cout << "emplace" << std::endl;
@@ -66,7 +66,7 @@ int main() {
         };
         {
             std::cout << "test large block vec " << sizeof(LargeBlock) << std::endl;
-            std::pmr::vector<LargeBlock> testVec { activeSource };
+            std_pmr::vector<LargeBlock> testVec { activeSource };
             for (int i = 0; i < 10; ++i) {
                 std::cout << "emplace" << std::endl;
                 testVec.emplace_back();
@@ -77,7 +77,7 @@ int main() {
             std::cout << "shrink_to_fit" << std::endl;
             testVec.shrink_to_fit();
         }
-        { std::deque<int, std::pmr::polymorphic_allocator<int>> dq; }
+        { std::deque<int, std_pmr::polymorphic_allocator<int>> dq; }
         std::cout << "finished" << std::endl;
     }
 
