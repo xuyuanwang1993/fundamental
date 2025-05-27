@@ -1,4 +1,6 @@
 #include "http_request.hpp"
+#include "fundamental/basic/log.h"
+#include "fundamental/basic/string_utils.hpp"
 namespace network::http
 {
 
@@ -8,6 +10,65 @@ is_header_casesensitive_(is_header_casesensitive), state_(method_start) {
 
 void http_request::reset_all() {
     state_ = method_start;
+}
+
+Fundamental::algorithm::range_set<std::size_t> http_request::get_bytes_range(std::size_t file_size) const {
+    auto range_str = get_header("Range");
+    Fundamental::algorithm::range_set<std::size_t> ret;
+    constexpr std::size_t kDefaultStart = 0;
+    do {
+
+        if (range_str.empty()) break;
+        auto ret_1 = Fundamental::StringSplit(range_str, '=');
+        if (ret_1.size() != 2) break;
+        if (ret_1[0] != "bytes") {
+            throw std::invalid_argument(Fundamental::StringFormat("range only support bytes type"));
+        }
+        auto ret_ranges = Fundamental::StringSplit(ret_1[1], ',');
+        if (ret_ranges.empty()) break;
+        for (auto& r : ret_ranges) {
+            auto s = r;
+            Fundamental::StringTrimStart(s);
+            Fundamental::StringTrimEnd(s);
+            if (s.empty()) continue;
+            auto split_range = Fundamental::StringSplit(s, '-');
+            if (split_range.size() > 2) {
+                throw std::invalid_argument(Fundamental::StringFormat("invalid range"));
+            }
+            std::vector<std::size_t> interge_ranges;
+            for (auto& i : split_range) {
+                try {
+                    interge_ranges.emplace_back(std::stoull(i));
+                } catch (const std::exception& e) {
+                    throw std::invalid_argument(Fundamental::StringFormat("invalid range {}", e.what()));
+                }
+            }
+            auto start = kDefaultStart;
+            auto end   = file_size;
+            if (s[0] == '-') {
+                start = file_size >= interge_ranges[0] ? (file_size - interge_ranges[0]) : 0;
+            } else if (s.back() == '-') {
+                start = interge_ranges[0];
+            } else {
+                if (interge_ranges.size() != 2) {
+                    throw std::invalid_argument(Fundamental::StringFormat("invalid range format"));
+                }
+                start = interge_ranges[0];
+                if (interge_ranges[1] >= file_size) {
+                    throw std::invalid_argument(Fundamental::StringFormat("invalid range overflow"));
+                }
+                end = interge_ranges[1] + 1;
+            }
+            if (start >= end) {
+                throw std::invalid_argument(Fundamental::StringFormat("invalid range overflow"));
+            }
+            ret.range_emplace(start, end);
+        }
+    } while (0);
+    if (ret.size() > 1) {
+        throw std::invalid_argument(Fundamental::StringFormat("invalid ranges,only support single range"));
+    }
+    return ret;
 }
 
 std::optional<bool> http_request::Consume(char** ppInput, std::size_t* pLeftSize) {

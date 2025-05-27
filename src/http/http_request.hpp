@@ -5,8 +5,10 @@
 #include <array>
 #include <optional>
 
+#include "fundamental/algorithm/range_set.hpp"
 #include "fundamental/basic/string_utils.hpp"
 #include "fundamental/basic/url_utils.hpp"
+
 namespace network
 {
 namespace http
@@ -55,6 +57,9 @@ public:
     }
     /// Reset to initial parser state.
     void reset_all();
+    // utils
+    // throw when range is invalid
+    Fundamental::algorithm::range_set<std::size_t> get_bytes_range(std::size_t file_size) const;
 
 private:
     void handler_parse_success() {
