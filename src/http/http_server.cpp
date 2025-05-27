@@ -56,6 +56,7 @@ const http_handler http_server::s_default_file_handler =
 
             pool.Enqueue([conn, full_path, extension]() {
                 // Open the file to send back.
+                auto& request  = conn->get_request();
                 auto& response = conn->get_response();
                 // maybe we shoudle probe file type by it's content
                 response.set_raw_content_type(ExtensionToType(extension));
@@ -72,7 +73,20 @@ const http_handler http_server::s_default_file_handler =
                     return;
                 }
 
-                auto size = std_fs::file_size(full_path);
+                auto size = static_cast<std::size_t>(std_fs::file_size(full_path));
+                try {
+                    auto fetch_range = request.get_bytes_range(size);
+                    auto iter        = fetch_range.begin();
+                    if (iter != fetch_range.end()) {
+                        response.set_bytes_range(iter->low, iter->up - 1, size);
+                        size = iter->up - iter->low;
+                        is.seekg(iter->low);
+                    }
+                } catch (const std::exception& e) {
+                    response.stock_response(http_response::forbidden);
+                    return;
+                }
+
                 DeclareTimeTacker(TrackerType, send_t, s_tag,
                                   Fundamental::StringFormat("http send file:{} size:{}", full_path, size), 1000, true,
                                   TrackerOutPut);
@@ -130,7 +144,7 @@ const http_handler http_server::s_default_file_handler =
                 auto response_str = Fundamental::StringFormat("write {} bytes result:{}", body.size(), write_ret);
                 response.set_content_type(".txt");
                 response.set_body_size(response_str.size());
-                FINFO("{}",response_str);
+                FINFO("{}", response_str);
                 response.append_body(std::move(response_str));
             });
             break;

@@ -12,8 +12,10 @@ class http_connection;
 /// response send to remote,owned by a http connection
 class http_response {
     friend class http_connection;
+
 public:
     Fundamental::Signal<void(std::size_t)> notify_pending_size;
+
 private:
     enum http_response_status_mask : std::uint32_t
     {
@@ -52,6 +54,7 @@ public:
         created               = 201,
         accepted              = 202,
         no_content            = 204,
+        partial_content       = 206,
         multiple_choices      = 300,
         moved_permanently     = 301,
         moved_temporarily     = 302,
@@ -98,6 +101,8 @@ public:
     /// [thread-safe] we need from_async_cb finish flag to start body write processing when we finish writing headeres
     /// you shoule call this function your self when you finish fill response asynchronously
     void perform_response(bool from_async_cb = false);
+    // utils
+    void set_bytes_range(std::size_t start, std::size_t end, std::size_t total);
 
 private:
     void write_headeres();

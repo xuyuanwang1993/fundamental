@@ -14,6 +14,7 @@ static constexpr std::string_view ok                    = "HTTP/1.0 200 OK\r\n";
 static constexpr std::string_view created               = "HTTP/1.0 201 Created\r\n";
 static constexpr std::string_view accepted              = "HTTP/1.0 202 Accepted\r\n";
 static constexpr std::string_view no_content            = "HTTP/1.0 204 No Content\r\n";
+static constexpr std::string_view partial_content       = "HTTP/1.1 206 Partial Content\r\n";
 static constexpr std::string_view multiple_choices      = "HTTP/1.0 300 Multiple Choices\r\n";
 static constexpr std::string_view moved_permanently     = "HTTP/1.0 301 Moved Permanently\r\n";
 static constexpr std::string_view moved_temporarily     = "HTTP/1.0 302 Moved Temporarily\r\n";
@@ -34,6 +35,7 @@ constexpr decltype(auto) status_to_buffer(http_response::response_type status) {
     case http_response::created: return created;
     case http_response::accepted: return accepted;
     case http_response::no_content: return no_content;
+    case http_response::partial_content: return partial_content;
     case http_response::multiple_choices: return multiple_choices;
     case http_response::moved_permanently: return moved_permanently;
     case http_response::moved_temporarily: return moved_temporarily;
@@ -303,52 +305,52 @@ void http_response::append_body(const void* ref_data, std::size_t size, std::fun
 void http_response::append_body(std::string&& body) {
     if (!can_set_body()) return;
     data_item new_item;
-    auto size=body.size();
+    auto size = body.size();
     if (body.size() > 0) {
         new_item.type = data_type::str_data;
         new_item.str  = std::move(body);
     }
-    asio::post(http_con_ref.socket_.get_executor(), [this, new_item = std::move(new_item), size = size,
-                                                     ref = http_con_ref.shared_from_this()]() mutable {
-        if (!ref->reference_.is_valid()) return;
-        if (!can_set_body()) return;
-        Fundamental::ScopeGuard guard([this]() { perform_response(); });
+    asio::post(http_con_ref.socket_.get_executor(),
+               [this, new_item = std::move(new_item), size = size, ref = http_con_ref.shared_from_this()]() mutable {
+                   if (!ref->reference_.is_valid()) return;
+                   if (!can_set_body()) return;
+                   Fundamental::ScopeGuard guard([this]() { perform_response(); });
 
-        if (size > 0) {
-            data_storage_.emplace_back() = std::move(new_item);
-            current_body_size += size;
-            data_pending_size += size;
-        }
-        if (current_body_size >= max_body_size) {
-            response_pack_status |= http_response_status_mask::http_response_body_set;
-            if (data_storage_.size() > 0) data_storage_.back().is_last_chunk = true;
-        }
-    });
+                   if (size > 0) {
+                       data_storage_.emplace_back() = std::move(new_item);
+                       current_body_size += size;
+                       data_pending_size += size;
+                   }
+                   if (current_body_size >= max_body_size) {
+                       response_pack_status |= http_response_status_mask::http_response_body_set;
+                       if (data_storage_.size() > 0) data_storage_.back().is_last_chunk = true;
+                   }
+               });
 }
 
 void http_response::append_body(std::vector<std::uint8_t>&& body) {
     if (!can_set_body()) return;
     data_item new_item;
-    auto size=body.size();
+    auto size = body.size();
     if (body.size() > 0) {
         new_item.type = data_type::vec_data;
         new_item.vec  = std::move(body);
     }
-    asio::post(http_con_ref.socket_.get_executor(), [this, new_item = std::move(new_item), size = size,
-                                                     ref = http_con_ref.shared_from_this()]() mutable {
-        if (!ref->reference_.is_valid()) return;
-        if (!can_set_body()) return;
-        Fundamental::ScopeGuard guard([this]() { perform_response(); });
-        if (size > 0) {
-            data_storage_.emplace_back() = std::move(new_item);
-            current_body_size += size;
-            data_pending_size += size;
-        }
-        if (current_body_size >= max_body_size) {
-            response_pack_status |= http_response_status_mask::http_response_body_set;
-            if (data_storage_.size() > 0) data_storage_.back().is_last_chunk = true;
-        }
-    });
+    asio::post(http_con_ref.socket_.get_executor(),
+               [this, new_item = std::move(new_item), size = size, ref = http_con_ref.shared_from_this()]() mutable {
+                   if (!ref->reference_.is_valid()) return;
+                   if (!can_set_body()) return;
+                   Fundamental::ScopeGuard guard([this]() { perform_response(); });
+                   if (size > 0) {
+                       data_storage_.emplace_back() = std::move(new_item);
+                       current_body_size += size;
+                       data_pending_size += size;
+                   }
+                   if (current_body_size >= max_body_size) {
+                       response_pack_status |= http_response_status_mask::http_response_body_set;
+                       if (data_storage_.size() > 0) data_storage_.back().is_last_chunk = true;
+                   }
+               });
 }
 
 std::size_t http_response::get_current_body_size() const {
@@ -472,6 +474,12 @@ void http_response::perform_response(bool from_async_cb) {
                 perform_response(true);
             });
     });
+}
+
+void http_response::set_bytes_range(std::size_t start, std::size_t end, std::size_t total) {
+    set_status(network::http::http_response::partial_content);
+    add_header("Accept-Ranges", "bytes");
+    add_header("Content-Range", Fundamental::StringFormat("bytes {}-{}/{}", start, end, total));
 }
 
 } // namespace network::http

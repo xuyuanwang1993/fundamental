@@ -20,7 +20,7 @@ set(HAS_STD_FILESYSTEM "${HAS_STD_FILESYSTEM}" CACHE INTERNAL "")
 
 check_cxx_source_compiles("
   #include <memory_resource>
-  int main() { std::pmr::memory_resource s; return 0; }
+  int main() { std::pmr::pool_options option; return 0; }
 "    HAS_STD_MEMORY_SOURCE)
 message(STATUS "HAS_STD_MEMORY_SOURCE=${HAS_STD_MEMORY_SOURCE}")
 set(HAS_STD_MEMORY_SOURCE "${HAS_STD_MEMORY_SOURCE}" CACHE INTERNAL "")
