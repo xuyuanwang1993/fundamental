@@ -11,6 +11,7 @@ if(IMPORT_BENCHMARK)
   if(benchmark_FOUND)
     message(STATUS "use system benchmark")
   else()
+    message(STATUS "use custom benchmark")
     include(FetchContent)
     FetchContent_Declare(
       benchmark

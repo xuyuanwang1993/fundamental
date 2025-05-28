@@ -7,10 +7,11 @@ set(__import_gtest_config__ TRUE)
 option(IMPORT_GTEST "import gtest" ON)
 if(IMPORT_GTEST)
 
-  find_package(gtest QUIET)
-  if(gtest_FOUND)
+  find_package(GTest QUIET)
+  if(GTest_FOUND)
     message(STATUS "use system gtest")
   else()
+  message(STATUS "use custom gtest")
     include(FetchContent)
     FetchContent_Declare(
       googletest
@@ -33,6 +34,7 @@ if(IMPORT_GTEST)
 
     target_link_libraries(${target_name}
       PRIVATE
+      import_gtest_interface
     )
     gtest_discover_tests(${target_name})
   endfunction()
