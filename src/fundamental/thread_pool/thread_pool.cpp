@@ -160,9 +160,12 @@ void ThreadPool::Run(std::size_t index) {
             {
                 std::scoped_lock<std::mutex> lock(m_workersMutex);
                 auto iter = m_workers.find(index);
-                if (iter != m_workers.end()) op_thread = std::move(iter->second);
-                m_workers.erase(iter);
+                if (iter != m_workers.end()) {
+                    op_thread = std::move(iter->second);
+                    m_workers.erase(iter);
+                }
             }
+            //may join has been called
             if (!op_thread) return;
             // let default pool excute join operation
             DefaultPool().Schedule<false>(clock_t::now(), [op_thread = std::move(op_thread)]() mutable {
