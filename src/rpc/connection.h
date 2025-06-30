@@ -283,7 +283,7 @@ private:
                                      do_ssl_handshake(head_, kSslPreReadSize);
                                  } else {
                                      if (!enable_no_ssl_) {
-                                         if (p_data[0] != network::proxy::ProxyRequest::kMagicNum) {
+                                         if (!network::proxy::IsRpcProxyRequest(p_data[0])) {
                                              on_net_err_(self, "only tls connection is supported");
                                              break;
                                          }
@@ -348,6 +348,7 @@ private:
         }
     }
     void process_proxy_request();
+    void process_raw_tcp_proxy_request();
     void read_head(std::size_t offset = 0) {
         FASSERT(offset < kRpcHeadLen);
         auto self(this->shared_from_this());
@@ -375,6 +376,7 @@ private:
             switch (head_[0]) {
             case RPC_MAGIC_NUM: process_rpc_request(); break;
             case network::proxy::ProxyRequest::kMagicNum: process_proxy_request(); break;
+            case network::proxy::ProxyRawTcpRequest::kMagicNum: process_raw_tcp_proxy_request(); break;
             default: {
                 FERR("{:p} protocol error magic  {:02x}", (void*)this, static_cast<std::uint8_t>(head_[0]));
                 release_obj();

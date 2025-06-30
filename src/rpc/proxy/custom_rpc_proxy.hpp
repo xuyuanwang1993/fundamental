@@ -17,7 +17,6 @@ public:
     CustomRpcProxy(const std::string& serviceName, const std::string& field, const std::string& token) :
     serviceName_(serviceName), field_(field), token_(token) {
     }
-
 protected:
     std::int32_t FinishSend() override {
         recvBufCache.resize(network::proxy::ProxyRequest::kVerifyStrLen);
