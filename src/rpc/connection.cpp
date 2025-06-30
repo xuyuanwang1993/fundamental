@@ -84,8 +84,9 @@ void connection::process_proxy_request() {
                     hostInfo.update();
                     FDEBUG("start proxy {} {} {} -> {}:{}", request.service_name_, request.token_, request.field_,
                            hostInfo.host, hostInfo.service);
-                    auto ret =
-                        network::proxy::proxy_handler::make_shared(hostInfo.host, hostInfo.service, std::move(socket_));
+                    auto ret = network::proxy::proxy_handler::make_shared(
+                        hostInfo.host, hostInfo.service, std::move(socket_),
+                        std::string(ProxyRequest::kVerifyStr, ProxyRequest::kVerifyStrLen));
                     // release proxy connection when server was released
                     auto release_handle = server->reference_.notify_release.Connect([con = ret->weak_from_this()]() {
                         auto ptr = con.lock();
@@ -150,18 +151,18 @@ void connection::process_raw_tcp_proxy_request() {
                         FERR("server maybe post stop, cancel proxy");
                         break;
                     }
-                    FDEBUG("start raw tcp proxy {}:{}", request.host_,request.service_);
+                    FDEBUG("start raw tcp proxy {}:{}", request.host_, request.service_);
                     auto ret =
                         network::proxy::proxy_handler::make_shared(request.host_, request.service_, std::move(socket_));
                     // release proxy connection when server was released
                     auto release_handle = server->reference_.notify_release.Connect([con = ret->weak_from_this()]() {
-                    auto ptr = con.lock();
-                    if (ptr) ptr->release_obj();
+                        auto ptr = con.lock();
+                        if (ptr) ptr->release_obj();
                     });
                     // unbind
                     ret->reference_.notify_release.Connect([release_handle, s = server_wref_]() {
-                    auto ptr = s.lock();
-                    if (ptr) ptr->reference_.notify_release.DisConnect(release_handle);
+                        auto ptr = s.lock();
+                        if (ptr) ptr->reference_.notify_release.DisConnect(release_handle);
                     });
                     ret->SetUp();
                 } while (0);

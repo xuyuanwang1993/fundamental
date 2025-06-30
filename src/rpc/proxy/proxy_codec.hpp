@@ -104,7 +104,7 @@ struct ProxyRawTcpRequest {
     static constexpr std::size_t kMinSize   = 7;
     static constexpr std::size_t kSizeLen   = 2;
     static constexpr char kSeperateChar     = ':';
-    static constexpr char kEndChar          = '\n';
+    static constexpr char kEndChar          = '$';
     std::string host_;
     std::string service_;
     ProxyRawTcpRequest() = default;

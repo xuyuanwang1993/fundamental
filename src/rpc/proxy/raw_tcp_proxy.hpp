@@ -12,7 +12,7 @@ class RawTcpProxy : public RpcClientProxyInterface {
 public:
     template <typename... Args>
     static decltype(auto) make_shared(Args&&... args) {
-        return std::make_shared<CustomRpcProxy>(std::forward<Args>(args)...);
+        return std::make_shared<RawTcpProxy>(std::forward<Args>(args)...);
     }
     RawTcpProxy(const std::string& host, const std::string& service) : host_(host), service_(service) {
     }
