@@ -11,10 +11,11 @@ namespace proxy
 {
 proxy_handler::proxy_handler(const std::string& proxy_host,
                              const std::string& proxy_service,
-                             asio::ip::tcp::socket&& socket) :
+                             asio::ip::tcp::socket&& socket,
+                             std::string input_handshake_data) :
 proxy_host(proxy_host), proxy_service(proxy_service), socket_(std::move(socket)), proxy_socket_(socket_.get_executor()),
-resolver(socket_.get_executor()), cachePool(Fundamental::MakePoolMemorySource()), client2server(cachePool),
-server2client(cachePool) {
+resolver(socket_.get_executor()), handshake_data(input_handshake_data), cachePool(Fundamental::MakePoolMemorySource()),
+client2server(cachePool), server2client(cachePool) {
     enable_tcp_keep_alive(socket_);
 #ifdef RPC_VERBOSE
     client2server.tag_ = "client2server";
@@ -114,19 +115,22 @@ void proxy_handler::StartConnect(asio::ip::tcp::resolver::results_type&& result)
 }
 
 void proxy_handler::HandShake() {
-    asio::async_write(socket_, asio::const_buffer(ProxyRequest::kVerifyStr, ProxyRequest::kVerifyStrLen),
-                      [this, self = shared_from_this()](std::error_code ec, std::size_t bytesWrite) {
-                          if (!reference_.is_valid()) {
-                              return;
-                          }
-                          if (ec) {
-                              HandleDisconnect(ec, "HandShake");
-                              return;
-                          }
+    if (!handshake_data.empty()) {
+        asio::async_write(socket_, asio::const_buffer(handshake_data.data(), handshake_data.size()),
+                          [this, self = shared_from_this()](std::error_code ec, std::size_t bytesWrite) {
+                              if (!reference_.is_valid()) {
+                                  return;
+                              }
+                              if (ec) {
+                                  HandleDisconnect(ec, "HandShake");
+                                  return;
+                              }
 #ifdef RPC_VERBOSE
-                          FDEBUG("proxy handshake sucess");
+                              FDEBUG("proxy handshake sucess");
 #endif
-                      });
+                          });
+    }
+
     StartClientRead();
 }
 

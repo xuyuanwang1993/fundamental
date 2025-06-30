@@ -233,7 +233,9 @@ public:
 #ifdef RPC_VERBOSE
         FDEBUG(" client deconstruct {:p}", (void*)this);
 #endif
-        if (proxy_interface) proxy_interface->release_obj();
+        for (auto& i : proxy_interfaces)
+            if (i) i->release_obj();
+        proxy_interfaces.clear();
     }
     void config_tcp_no_delay(bool flag = true) {
         tcp_no_delay_flag = flag;
@@ -292,11 +294,16 @@ public:
             deadline_.cancel();
         }
     }
-
-    void set_proxy(std::shared_ptr<RpcClientProxyInterface> proxy) {
-        proxy_interface = proxy;
+    void append_proxy(std::shared_ptr<RpcClientProxyInterface> proxy) {
+        proxy_interfaces.emplace_back(proxy);
     }
-
+    void set_proxy(std::shared_ptr<RpcClientProxyInterface> proxy) {
+        proxy_interfaces.clear();
+        proxy_interfaces.emplace_back(proxy);
+    }
+    void set_proxy(std::vector<std::shared_ptr<RpcClientProxyInterface>> proxy_vec) {
+        proxy_interfaces = proxy_vec;
+    }
     void config_addr(const std::string& host, const std::string& service) {
         host_         = host;
         service_name_ = service;
@@ -406,8 +413,10 @@ public:
         reference_.release();
 
         asio::post(ios_, [this, ref = shared_from_this()] {
-            if (proxy_interface) proxy_interface->release_obj();
-            proxy_interface.reset();
+            for (auto& i : proxy_interfaces)
+                if (i) i->release_obj();
+            proxy_interfaces.clear();
+            proxy_interfaces.shrink_to_fit();
             close(true);
 
             resolver_.cancel();
@@ -619,14 +628,19 @@ private:
                                     });
             });
     }
-    void perform_proxy() {
+    void perform_proxy(std::size_t layer) {
         change_connection_status(rpc_connection_proxy_handshaking);
-        proxy_interface->init(
-            [this, ptr = shared_from_this()]() {
+        proxy_interfaces[layer]->init(
+            [this, ptr = shared_from_this(), layer]() {
                 if (!reference_.is_valid()) {
                     return;
                 }
-                handle_transfer_ready();
+                auto next_layer = layer + 1;
+                if (next_layer == proxy_interfaces.size()) {
+                    handle_transfer_ready();
+                } else {
+                    perform_proxy(next_layer);
+                }
             },
             [this, ptr = shared_from_this()](const asio::error_code& ec) {
                 if (!reference_.is_valid()) {
@@ -640,11 +654,11 @@ private:
                 error_callback(ec);
             },
             &socket_);
-        proxy_interface->perform();
+        proxy_interfaces[layer]->perform();
     }
     void handle_connect_success() {
-        if (proxy_interface)
-            perform_proxy();
+        if (!proxy_interfaces.empty())
+            perform_proxy(0);
         else {
             handle_transfer_ready();
         }
@@ -1232,7 +1246,7 @@ private:
     std::mutex sub_mtx_;
     std::unordered_map<std::string, std::function<void(string_view)>> sub_map_;
     //
-    std::shared_ptr<RpcClientProxyInterface> proxy_interface;
+    std::vector<std::shared_ptr<RpcClientProxyInterface>> proxy_interfaces;
     rpc_client_ssl_level ssl_level = rpc_client_ssl_level::rpc_client_ssl_level_none;
 #ifndef NETWORK_DISABLE_SSL
     std::unique_ptr<asio::ssl::stream<asio::ip::tcp::socket&>> ssl_stream_ = nullptr;

@@ -18,7 +18,7 @@ source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${lib_source})
 
 add_library(${lib_name} STATIC ${lib_source})
 
-
+#target_compile_definitions(${lib_name} PUBLIC RPC_VERBOSE=1)
 target_include_directories(${lib_name} PUBLIC
     ${src_root_dir}
 )

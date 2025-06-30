@@ -15,7 +15,10 @@ inline unsigned int generate_32bit_random_number() {
 
     return random_number;
 }
+//'('
 #define PROXY_MAGIC_NUM         40
+//')'
+#define PROXY_RAW_TCP_MAGIC_NUM 41
 #define PROXY_RESPONSE_DATA     "ok"
 #define PROXY_RESPONSE_DATA_LEN 2
 #define PROXY_MASK_INIT_VALUE   0

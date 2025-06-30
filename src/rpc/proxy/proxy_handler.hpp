@@ -61,7 +61,8 @@ public:
     }
     explicit proxy_handler(const std::string& proxy_host,
                            const std::string& proxy_service,
-                           asio::ip::tcp::socket&& socket);
+                           asio::ip::tcp::socket&& socket,
+                             std::string input_handshake_data="");
     void release_obj() {
         reference_.release();
         asio::post(socket_.get_executor(), [this, ref = shared_from_this()] {
@@ -97,7 +98,7 @@ protected:
     //
     asio::ip::tcp::socket proxy_socket_;
     asio::ip::tcp::resolver resolver;
-    char handshakeBuf[2];
+    std::string handshake_data;
     std::int32_t status = ClientProxying;
     //
     decltype(Fundamental::MakePoolMemorySource()) cachePool;
