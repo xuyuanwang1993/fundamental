@@ -50,7 +50,7 @@ if(FUNDAMENTAL_IMPORT_SRC)
     if(FUNDAMENTAL_ENABLE_TESTING)
         add_subdirectory(samples)
     endif()
-
+    add_subdirectory(applications)
 endif()
 
 
