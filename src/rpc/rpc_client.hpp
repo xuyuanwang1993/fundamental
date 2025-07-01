@@ -295,10 +295,12 @@ public:
         }
     }
     void append_proxy(std::shared_ptr<RpcClientProxyInterface> proxy) {
+        if(!proxy) return;
         proxy_interfaces.emplace_back(proxy);
     }
     void set_proxy(std::shared_ptr<RpcClientProxyInterface> proxy) {
         proxy_interfaces.clear();
+        if(!proxy) return;
         proxy_interfaces.emplace_back(proxy);
     }
     void set_proxy(std::vector<std::shared_ptr<RpcClientProxyInterface>> proxy_vec) {
