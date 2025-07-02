@@ -13,7 +13,8 @@
 #include <unordered_map>
 #include <vector>
 
-namespace Fundamental {
+namespace Fundamental
+{
 
 // to support custom type, you can specialize this template in namespace Fundamental like below
 // or support the following constructor T(const std::string&)
@@ -24,7 +25,8 @@ inline T from_string(const std::string& v) {
 
 class arg_parser {
 public:
-    enum param_type : std::int32_t {
+    enum param_type : std::int32_t
+    {
         with_none_param,
         required_param,
         optional_param
@@ -45,10 +47,16 @@ public:
     static constexpr const char* kVersionOptionName     = "version";
 
 public:
-    arg_parser(int argc, char* argv[], const std::string& version = "1.0.0");
+    arg_parser(int argc,
+               char* argv[],
+               const std::string& version    = "1.0.0",
+               const std::string& build_date = __DATE__,
+               const std::string& build_time = __TIME__);
     ~arg_parser();
-    bool AddOption(const std::string& name, const std::string& opt_usage,
-                   std::int32_t short_option_value = kNoShortOption, param_type type = with_none_param,
+    bool AddOption(const std::string& name,
+                   const std::string& opt_usage,
+                   std::int32_t short_option_value      = kNoShortOption,
+                   param_type type                      = with_none_param,
                    const std::string& param_description = "param");
     // return false only means some fatal error occurs,you can see the error message in stderr
     bool ParseCommandLine();
@@ -92,6 +100,8 @@ private:
     const int argc;
     char** const argv;
     const std::string version;
+    const std::string build_date;
+    const std::string build_time;
     std::int32_t current_option_value = 128;
     std::string_view program_path;
     std::vector<std::string> no_option_params;
@@ -99,8 +109,12 @@ private:
     std::map<std::int32_t, std::string> short_options_dict;
 };
 
-inline arg_parser::arg_parser(int argc, char* argv[], const std::string& version) :
-argc(argc), argv(argv), version(version), program_path(argv[0]) {
+inline arg_parser::arg_parser(int argc,
+                              char* argv[],
+                              const std::string& version,
+                              const std::string& build_date,
+                              const std::string& build_time) :
+argc(argc), argv(argv), version(version), build_date(build_date), build_time(build_time), program_path(argv[0]) {
     AddOption(kHelperOptionName, "show this help page", kHealperShortOption, with_none_param);
     AddOption(kVersionOptionName, "show version information", kVersionShortOption, with_none_param);
     auto size = sizeof(kReservedShortOption);
@@ -112,8 +126,11 @@ argc(argc), argv(argv), version(version), program_path(argv[0]) {
 inline arg_parser::~arg_parser() {
 }
 
-inline bool arg_parser::AddOption(const std::string& name, const std::string& opt_usage, std::int32_t option_value,
-                                  param_type type, const std::string& param_description) {
+inline bool arg_parser::AddOption(const std::string& name,
+                                  const std::string& opt_usage,
+                                  std::int32_t option_value,
+                                  param_type type,
+                                  const std::string& param_description) {
     auto iter = options.find(name);
     if (iter != options.end()) {
         std::cerr << "option " << name << " already exists." << std::endl;
@@ -220,6 +237,7 @@ inline bool arg_parser::ParseCommandLine() {
 
 inline void arg_parser::ShowHelp() {
     std::cout << "Usage for program:" << program_path << " version:" << version << std::endl;
+    std::cout << build_date << " " << build_time << " built" << std::endl;
     std::cout << "Notice:For options with optional arguments,the argument must either immediately follow the short "
                  "option or be connected with =."
               << std::endl;
@@ -265,7 +283,7 @@ inline void arg_parser::DumpOptions() const {
     for (const auto& [name, option] : options) {
         if (option.option_value < 128) {
             std::cout << "-" << (char)(option.option_value) << ",";
-        } 
+        }
         std::cout << "--" << name;
         std::cout << "\t";
         if (option.parser_values.has_value())
