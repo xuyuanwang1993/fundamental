@@ -40,3 +40,5 @@ target_compile_definitions(${app_target_name}
     PRIVATE
     APP_NAME="${app_target_name}"
 )
+
+config_strip_debug_info(${app_target_name})
