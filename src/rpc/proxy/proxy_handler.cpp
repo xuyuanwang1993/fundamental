@@ -12,7 +12,8 @@ namespace proxy
 proxy_handler::proxy_handler(const std::string& proxy_host,
                              const std::string& proxy_service,
                              asio::ip::tcp::socket&& socket,
-                             std::string input_handshake_data) :
+                             std::string input_handshake_data,
+                             std::string pending_data_to_server) :
 proxy_host(proxy_host), proxy_service(proxy_service), socket_(std::move(socket)), proxy_socket_(socket_.get_executor()),
 resolver(socket_.get_executor()), handshake_data(input_handshake_data), cachePool(Fundamental::MakePoolMemorySource()),
 client2server(cachePool), server2client(cachePool) {
@@ -21,6 +22,18 @@ client2server(cachePool), server2client(cachePool) {
     client2server.tag_ = "client2server";
     server2client.tag_ = "server2client";
 #endif
+    // handle pending data
+    std::size_t pending_size   = pending_data_to_server.size();
+    std::size_t pending_offset = 0;
+    while (pending_size > 0) {
+        client2server.PrepareReadCache();
+        auto buffer     = client2server.GetReadBuffer();
+        auto chunk_size = buffer.size() > pending_size ? pending_size : buffer.size();
+        std::memcpy(buffer.data(), pending_data_to_server.data() + pending_offset, chunk_size);
+        client2server.UpdateReadBuffer(chunk_size);
+        pending_size -= chunk_size;
+        pending_offset += chunk_size;
+    }
 }
 
 void proxy_handler::SetUp() {

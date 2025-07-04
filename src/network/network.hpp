@@ -43,6 +43,18 @@ struct network_server_ssl_config {
     bool enable_no_ssl = true;
 };
 
+struct rpc_server_external_config {
+    // Whether to enable transparent proxy mode. When enabled,
+    // traffic will be forwarded to the service at transparent_proxy_host:transparent_proxy_port
+    bool enable_transparent_proxy = false;
+    // In transparent proxy mode, if enabled, custom TCP proxy traffic will be distributed to the custom TCP proxy
+    bool filter_raw_tcp_proxy     = false;
+    // Transparent proxy target host    
+    std::string transparent_proxy_host;
+     // Transparent proxy target port
+    std::string transparent_proxy_port;
+};
+
 struct network_client_ssl_config {
     std::string certificate_path;
     std::string private_key_path;

@@ -62,7 +62,8 @@ public:
     explicit proxy_handler(const std::string& proxy_host,
                            const std::string& proxy_service,
                            asio::ip::tcp::socket&& socket,
-                             std::string input_handshake_data="");
+                           std::string input_handshake_data   = "",
+                           std::string pending_data_to_server = "");
     void release_obj() {
         reference_.release();
         asio::post(socket_.get_executor(), [this, ref = shared_from_this()] {

@@ -129,8 +129,8 @@ struct ProxyRawTcpRequest {
         std::string temp_data = std::string(ptr + 1 + kSizeLen, ptr + len);
         auto pos              = temp_data.find_first_of(kEndChar);
         if (pos == std::string::npos) return false;
-        temp_data      = temp_data.substr(0, pos);
-        pos            = temp_data.find_last_of(kSeperateChar);
+        temp_data = temp_data.substr(0, pos);
+        pos       = temp_data.find_last_of(kSeperateChar);
         if (pos == std::string::npos) return false;
         host_    = temp_data.substr(0, pos);
         service_ = temp_data.substr(pos + 1);
@@ -168,6 +168,10 @@ struct ProxyRawTcpRequest {
 };
 inline constexpr bool IsRpcProxyRequest(std::uint8_t magic_num) {
     return magic_num == ProxyRequest::kMagicNum || ProxyRawTcpRequest::kMagicNum;
+}
+
+inline constexpr bool IsRawTcpRequest(std::uint8_t magic_num) {
+    return ProxyRawTcpRequest::kMagicNum;
 }
 } // namespace proxy
 } // namespace network

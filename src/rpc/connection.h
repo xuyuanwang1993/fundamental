@@ -212,6 +212,9 @@ public:
     void config_proxy_manager(network::proxy::ProxyManager* manager) {
         proxy_manager_ = manager;
     }
+    void set_external_config(rpc_server_external_config config) {
+        external_config = config;
+    }
     void set_tcp_no_delay(bool flag = true) {
         try {
             socket_.set_option(asio::ip::tcp::no_delay(flag));
@@ -302,7 +305,7 @@ private:
 
     bool is_ssl() const {
 #ifndef NETWORK_DISABLE_SSL
-        return ssl_context_ref != nullptr;
+        return ssl_context_ref != nullptr && !external_config.enable_transparent_proxy;
 #else
         return false;
 #endif
@@ -349,6 +352,7 @@ private:
     }
     void process_proxy_request();
     void process_raw_tcp_proxy_request();
+    void process_transparent_proxy();
     void read_head(std::size_t offset = 0) {
         FASSERT(offset < kRpcHeadLen);
         auto self(this->shared_from_this());
@@ -373,6 +377,11 @@ private:
 #ifdef RPC_VERBOSE
             FDEBUG("server {:p} read head {}", (void*)this, Fundamental::Utils::BufferToHex(head_, kRpcHeadLen));
 #endif
+            // work as a transparent_proxy，proxy directly
+            if (external_config.enable_transparent_proxy) {
+                process_transparent_proxy();
+                return;
+            }
             switch (head_[0]) {
             case RPC_MAGIC_NUM: process_rpc_request(); break;
             case network::proxy::ProxyRequest::kMagicNum: process_proxy_request(); break;
@@ -688,6 +697,7 @@ private:
 #endif
     // proxy
     network::proxy::ProxyManager* proxy_manager_ = nullptr;
+    rpc_server_external_config external_config;
     // remote endpoint
     std::string remote_ip;
     std::uint16_t remote_port = 0;

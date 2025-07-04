@@ -4,8 +4,8 @@
 #include "basic/router.hpp"
 #include "connection.h"
 
-#include <condition_variable>
 #include "fundamental/basic/cxx_config_include.hpp"
+#include <condition_variable>
 #include <mutex>
 #include <set>
 #include <thread>
@@ -24,6 +24,7 @@ namespace rpc_service
 {
 class ServerStreamReadWriter;
 using rpc_conn = std::weak_ptr<connection>;
+
 class rpc_server : private asio::noncopyable, public std::enable_shared_from_this<rpc_server> {
     friend class connection;
 
@@ -165,8 +166,7 @@ public:
         if (!ssl_config.tmp_dh_path.empty() && !std_fs::is_regular_file(ssl_config.tmp_dh_path)) {
             throw std::invalid_argument("tmp_dh_path is not existed");
         }
-        if (!ssl_config.ca_certificate_path.empty() &&
-            !std_fs::is_regular_file(ssl_config.ca_certificate_path)) {
+        if (!ssl_config.ca_certificate_path.empty() && !std_fs::is_regular_file(ssl_config.ca_certificate_path)) {
             throw std::invalid_argument("ca_certificate is not existed");
         }
         std::swap(ssl_config_, ssl_config);
@@ -202,6 +202,9 @@ public:
     }
     void enable_data_proxy(network::proxy::ProxyManager* manager) {
         proxy_manager = manager;
+    }
+    void set_external_config(rpc_server_external_config config) {
+        external_config = config;
     }
 
 private:
@@ -274,6 +277,7 @@ private:
                     }
                     new_conn->set_conn_id(id);
                     new_conn->config_proxy_manager(proxy_manager);
+                    new_conn->set_external_config(external_config);
                     new_conn->start();
 #ifdef RPC_VERBOSE
                     FDEBUG("start connection {:p} -> {}", (void*)(new_conn.get()), id);
@@ -318,6 +322,7 @@ private:
 #endif
     // proxy
     network::proxy::ProxyManager* proxy_manager = nullptr;
+    rpc_server_external_config external_config;
 };
 } // namespace rpc_service
   // namespace rpc_service
