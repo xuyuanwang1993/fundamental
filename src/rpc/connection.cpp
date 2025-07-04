@@ -172,5 +172,43 @@ void connection::process_raw_tcp_proxy_request() {
     } while (0);
     release_obj();
 }
+
+void connection::process_transparent_proxy() {
+
+    if (external_config.filter_raw_tcp_proxy && head_[0] == network::proxy::ProxyRawTcpRequest::kMagicNum) {
+        process_raw_tcp_proxy_request();
+        return;
+    }
+
+    auto self(this->shared_from_this());
+
+    // switch to proxy connection,don't need timer check any more
+    cancel_timer();
+    b_waiting_process_any_data.exchange(false);
+    do {
+        auto server = this->server_wref_.lock();
+        if (!server) {
+            FERR("server maybe post stop, cancel proxy");
+            break;
+        }
+        FDEBUG("start raw transparent proxy {}:{} to {}:{}", get_remote_peer_ip(), get_remote_peer_port(),
+               external_config.transparent_proxy_host, external_config.transparent_proxy_port);
+        auto ret = network::proxy::proxy_handler::make_shared(
+            external_config.transparent_proxy_host, external_config.transparent_proxy_port, std::move(socket_), "",
+            std::string(head_, head_ + kRpcHeadLen));
+        // release proxy connection when server was released
+        auto release_handle = server->reference_.notify_release.Connect([con = ret->weak_from_this()]() {
+            auto ptr = con.lock();
+            if (ptr) ptr->release_obj();
+        });
+        // unbind
+        ret->reference_.notify_release.Connect([release_handle, s = server_wref_]() {
+            auto ptr = s.lock();
+            if (ptr) ptr->reference_.notify_release.DisConnect(release_handle);
+        });
+        ret->SetUp();
+    } while (0);
+    release_obj();
+}
 } // namespace rpc_service
 } // namespace network
