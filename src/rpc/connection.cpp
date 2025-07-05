@@ -124,8 +124,8 @@ void connection::process_raw_tcp_proxy_request() {
         auto self(this->shared_from_this());
         auto p_data = proxy_buffer->data() + kRpcHeadLen;
         async_buffer_read(
-            { asio::buffer(p_data, data_size - kRpcHeadLen) },
-            [this, self, proxy_buffer = std::move(proxy_buffer)](asio::error_code ec, std::size_t length) {
+            { asio::buffer(p_data, data_size > kRpcHeadLen ? (data_size - kRpcHeadLen) : 0) },
+            [this, self, proxy_buffer = std::move(proxy_buffer), data_size](asio::error_code ec, std::size_t length) {
                 if (!socket_.is_open()) {
                     on_net_err_(self, "socket already closed");
                     return;
@@ -151,9 +151,15 @@ void connection::process_raw_tcp_proxy_request() {
                         FERR("server maybe post stop, cancel proxy");
                         break;
                     }
-                    FDEBUG("start raw tcp proxy {}:{}", request.host_, request.service_);
-                    auto ret =
-                        network::proxy::proxy_handler::make_shared(request.host_, request.service_, std::move(socket_));
+                    FINFO("start raw tcp proxy from {}:{} to {}:{}", get_remote_peer_ip(), get_remote_peer_port(),
+                          request.host_, request.service_);
+                    std::string pending_data;
+                    if (data_size < proxy_buffer->size()) {
+                        pending_data =
+                            std::string(proxy_buffer->data() + data_size, proxy_buffer->data() + proxy_buffer->size());
+                    }
+                    auto ret = network::proxy::proxy_handler::make_shared(
+                        request.host_, request.service_, std::move(socket_), "", std::move(pending_data));
                     // release proxy connection when server was released
                     auto release_handle = server->reference_.notify_release.Connect([con = ret->weak_from_this()]() {
                         auto ptr = con.lock();
