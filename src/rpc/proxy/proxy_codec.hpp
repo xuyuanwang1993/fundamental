@@ -145,6 +145,11 @@ struct ProxyRawTcpRequest {
         p_data[offset]     = kMagicNum;
         ++offset;
         auto len_data = std::to_string(data_size);
+        //filled with zero
+        if(len_data.size()<kSizeLen)
+        {
+            len_data.insert(0,kSizeLen-len_data.size(),'0');
+        }
         std::memcpy(p_data + offset, len_data.data(), kSizeLen);
         offset += kSizeLen;
         std::memcpy(p_data + offset, host_.data(), host_.size());
@@ -160,7 +165,7 @@ struct ProxyRawTcpRequest {
     static std::size_t PeekSize(const void* ptr) {
         auto ret = (const std::uint8_t*)ptr;
         try {
-            return std::stoul(std::string(ret, ret + 2));
+            return std::stoul(std::string(ret, ret + kSizeLen));
         } catch (const std::exception& e) {
             return 0;
         }
