@@ -171,12 +171,5 @@ struct ProxyRawTcpRequest {
         }
     }
 };
-inline constexpr bool IsRpcProxyRequest(std::uint8_t magic_num) {
-    return magic_num == ProxyRequest::kMagicNum || ProxyRawTcpRequest::kMagicNum;
-}
-
-inline constexpr bool IsRawTcpRequest(std::uint8_t magic_num) {
-    return ProxyRawTcpRequest::kMagicNum;
-}
 } // namespace proxy
 } // namespace network

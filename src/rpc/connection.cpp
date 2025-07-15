@@ -1,5 +1,6 @@
 #include "connection.h"
 #include "proxy/proxy_handler.hpp"
+#include "proxy/socks5/socks5_session.h"
 #include "rpc_server.hpp"
 namespace network
 {
@@ -213,6 +214,23 @@ void connection::process_transparent_proxy() {
             if (ptr) ptr->reference_.notify_release.DisConnect(release_handle);
         });
         ret->SetUp();
+    } while (0);
+    release_obj();
+}
+void connection::process_socks5_proxy(const void* preread_data, std::size_t len) {
+    auto self(this->shared_from_this());
+
+    // switch to proxy connection,don't need timer check any more
+    cancel_timer();
+    b_waiting_process_any_data.exchange(false);
+    do {
+        auto server = this->server_wref_.lock();
+        if (!server) {
+            FERR("server maybe post stop, cancel proxy");
+            break;
+        }
+        auto ret = SocksV5::Socks5Session::make_shared(executor_, socks5_handler, std::move(socket_));
+        ret->start(preread_data, len);
     } while (0);
     release_obj();
 }

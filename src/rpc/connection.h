@@ -7,6 +7,7 @@
 #include "proxy/proxy_codec.hpp"
 #include "proxy/proxy_handler.hpp"
 #include "proxy/proxy_manager.hpp"
+#include "proxy/socks5/common.h"
 
 #include <any>
 #include <array>
@@ -143,7 +144,7 @@ public:
         if (is_ssl()) {
             ssl_handshake();
         } else {
-            read_head();
+            probe_protocal(0);
         }
     }
 
@@ -285,17 +286,15 @@ private:
                                      }
                                      do_ssl_handshake(head_, kSslPreReadSize);
                                  } else {
-                                     if (!enable_no_ssl_) {
-                                         if (!network::proxy::IsRpcProxyRequest(p_data[0])) {
-                                             on_net_err_(self, "only tls connection is supported");
-                                             break;
-                                         }
+                                     if (!enable_no_ssl_ && p_data[0] == RPC_MAGIC_NUM) {
+                                         on_net_err_(self, "only tls connection is supported");
+                                         break;
                                      }
 #ifdef RPC_VERBOSE
                                      FDEBUG("[rpc] WARNNING!!! falling  down to no ssl socket");
 #endif
                                      ssl_context_ref = nullptr;
-                                     read_head(kSslPreReadSize);
+                                     probe_protocal(kSslPreReadSize);
                                  }
                                  return;
                              } while (0);
@@ -305,7 +304,7 @@ private:
 
     bool is_ssl() const {
 #ifndef NETWORK_DISABLE_SSL
-        return ssl_context_ref != nullptr && !external_config.enable_transparent_proxy;
+        return ssl_context_ref != nullptr;
 #else
         return false;
 #endif
@@ -353,6 +352,41 @@ private:
     void process_proxy_request();
     void process_raw_tcp_proxy_request();
     void process_transparent_proxy();
+    void process_socks5_proxy(const void* preread_data, std::size_t len);
+    void probe_protocal(std::size_t offset = 0) {
+        static constexpr std::size_t kProbeReadSize = 1;
+        static_assert(kProbeReadSize < kRpcHeadLen, "probe size must < kRpcHeadLen");
+        auto self(this->shared_from_this());
+        if (offset < kProbeReadSize) {
+            async_buffer_read({ asio::buffer(head_ + offset, kProbeReadSize - offset) },
+                              [this, self](asio::error_code ec, std::size_t length) {
+                                  if (!reference_.is_valid()) {
+                                      return;
+                                  }
+                                  if (!socket_.is_open()) {
+                                      on_net_err_(self, "socket already closed");
+                                      return;
+                                  }
+                                  if (ec) {
+#ifdef RPC_VERBOSE
+                                      FDEBUG("{:p} rpc read probe head failed {}", (void*)this, ec.message());
+#endif
+                                      on_net_err_(self, ec.message());
+                                      release_obj();
+                                      return;
+                                  }
+                                  probe_protocal(kProbeReadSize);
+                              });
+        } else {
+            switch (head_[0]) {
+                // Protocols with packet lengths that may be smaller than the RPC header length (18) should be processed
+                // separately.
+            case SocksV5::SocksVersion::V5: process_socks5_proxy(head_, offset); break;
+
+            default: read_head(offset); break;
+            }
+        }
+    }
     void read_head(std::size_t offset = 0) {
         FASSERT(offset < kRpcHeadLen);
         auto self(this->shared_from_this());
@@ -698,6 +732,7 @@ private:
     // proxy
     network::proxy::ProxyManager* proxy_manager_ = nullptr;
     rpc_server_external_config external_config;
+    SocksV5::Sock5Handler socks5_handler;
     // remote endpoint
     std::string remote_ip;
     std::uint16_t remote_port = 0;
