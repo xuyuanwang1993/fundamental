@@ -1069,7 +1069,6 @@ TEST(rpc_test, test_proxy_list) {
     EXPECT_EQ(ret,str);
 }
 #endif
-
 int main(int argc, char** argv) {
     int mode = 0;
     if (argc > 1) mode = std::stoi(argv[1]);

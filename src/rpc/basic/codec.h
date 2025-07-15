@@ -4,7 +4,7 @@
 #include "fundamental/rttr_handler/binary_packer.h"
 
 #include <vector>
-
+#include "const_vars.h"
 namespace network {
 namespace rpc_service {
 

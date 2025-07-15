@@ -2,8 +2,8 @@
 #include "basic/client_util.hpp"
 #include "basic/md5.hpp"
 #include "basic/meta_util.hpp"
-#include "basic/rpc_client_proxy.hpp"
 #include "network/network.hpp"
+#include "network/proxy_interface.hpp"
 
 #include <deque>
 #include <functional>
@@ -111,7 +111,7 @@ enum rpc_client_ssl_level
     rpc_client_ssl_level_optional,
     rpc_client_ssl_level_required
 };
-
+class rpc_client;
 // call these interface not in io thread
 class ClientStreamReadWriter : public std::enable_shared_from_this<ClientStreamReadWriter> {
     friend class rpc_client;
@@ -234,7 +234,7 @@ public:
         FDEBUG(" client deconstruct {:p}", (void*)this);
 #endif
         for (auto& i : proxy_interfaces)
-            if (i) i->release_obj();
+            if (i) i->abort_all_operation();
         proxy_interfaces.clear();
     }
     void config_tcp_no_delay(bool flag = true) {
@@ -294,16 +294,16 @@ public:
             deadline_.cancel();
         }
     }
-    void append_proxy(std::shared_ptr<RpcClientProxyInterface> proxy) {
-        if(!proxy) return;
+    void append_proxy(std::shared_ptr<network_proxy_interface> proxy) {
+        if (!proxy) return;
         proxy_interfaces.emplace_back(proxy);
     }
-    void set_proxy(std::shared_ptr<RpcClientProxyInterface> proxy) {
+    void set_proxy(std::shared_ptr<network_proxy_interface> proxy) {
         proxy_interfaces.clear();
-        if(!proxy) return;
+        if (!proxy) return;
         proxy_interfaces.emplace_back(proxy);
     }
-    void set_proxy(std::vector<std::shared_ptr<RpcClientProxyInterface>> proxy_vec) {
+    void set_proxy(std::vector<std::shared_ptr<network_proxy_interface>> proxy_vec) {
         proxy_interfaces = proxy_vec;
     }
     void config_addr(const std::string& host, const std::string& service) {
@@ -416,7 +416,7 @@ public:
 
         asio::post(ios_, [this, ref = shared_from_this()] {
             for (auto& i : proxy_interfaces)
-                if (i) i->release_obj();
+                if (i) i->abort_all_operation();
             proxy_interfaces.clear();
             proxy_interfaces.shrink_to_fit();
             close(true);
@@ -630,33 +630,85 @@ private:
                                     });
             });
     }
+    void proxy_write(write_buffer_t write_buffers, const network_proxy_interface::operation_cb& finish_cb) {
+        if (!reference_.is_valid()) {
+            finish_cb(std::make_error_code(std::errc::operation_canceled), "aborted");
+            return;
+        }
+        std::vector<asio::const_buffer> buffers;
+        for (auto& buffer : write_buffers) {
+            buffers.emplace_back(asio::const_buffer { buffer.data, buffer.len });
+        }
+        asio::async_write(socket_, std::move(buffers),
+                          [this, ptr = shared_from_this(), finish_cb](const asio::error_code& ec, size_t) {
+                              if (!reference_.is_valid()) {
+                                  finish_cb(std::make_error_code(std::errc::operation_canceled), "aborted");
+                                  return;
+                              }
+                              finish_cb(ec, "");
+                          });
+    }
+    void proxy_read(read_buffer_t read_buffers, const network_proxy_interface::operation_cb& finish_cb) {
+        if (!reference_.is_valid()) {
+            finish_cb(std::make_error_code(std::errc::operation_canceled), "aborted");
+            return;
+        }
+        std::vector<asio::mutable_buffer> buffers;
+        for (auto& buffer : read_buffers) {
+            buffers.emplace_back(asio::mutable_buffer { buffer.data, buffer.len });
+        }
+        asio::async_read(socket_, std::move(buffers),
+                         [this, ptr = shared_from_this(), finish_cb](const asio::error_code& ec, size_t) {
+                             if (!reference_.is_valid()) {
+                                 finish_cb(std::make_error_code(std::errc::operation_canceled), "aborted");
+                                 return;
+                             }
+                             finish_cb(ec, "");
+                         });
+    }
     void perform_proxy(std::size_t layer) {
         change_connection_status(rpc_connection_proxy_handshaking);
-        proxy_interfaces[layer]->init(
-            [this, ptr = shared_from_this(), layer]() {
+        auto write_callback =
+            [this, ptr = shared_from_this()](write_buffer_t write_buffers,
+                                             const network_proxy_interface::operation_cb& finish_cb) mutable {
+                proxy_write(std::move(write_buffers), finish_cb);
+            };
+        auto read_callback =
+            [this, ptr = shared_from_this()](read_buffer_t read_buffers,
+                                             const network_proxy_interface::operation_cb& finish_cb) mutable {
+                proxy_read(std::move(read_buffers), finish_cb);
+            };
+        ;
+        auto abort_callback = [this, ptr = shared_from_this()]() mutable {
+            if (!reference_.is_valid()) {
+                return;
+            }
+            asio::post(ios_, [this, ref = shared_from_this()] { close(true); });
+        };
+        auto finish_callback = [this, ptr = shared_from_this(), layer](std::error_code ec, const std::string& msg) {
+            do {
                 if (!reference_.is_valid()) {
-                    return;
+                    if (!ec) ec = std::make_error_code(std::errc::bad_file_descriptor);
+                    break;
                 }
+                if (ec) break;
                 auto next_layer = layer + 1;
                 if (next_layer == proxy_interfaces.size()) {
                     handle_transfer_ready();
                 } else {
                     perform_proxy(next_layer);
                 }
-            },
-            [this, ptr = shared_from_this()](const asio::error_code& ec) {
-                if (!reference_.is_valid()) {
-                    return;
-                }
-                change_connection_status(rpc_connection_closing);
-                Fundamental::ScopeGuard g([&]() {
-                    if (connection_status.load() == rpc_connection_closing)
-                        change_connection_status(rpc_connection_closed);
-                });
-                error_callback(ec);
-            },
-            &socket_);
-        proxy_interfaces[layer]->perform();
+                return;
+            } while (0);
+
+            change_connection_status(rpc_connection_closing);
+            Fundamental::ScopeGuard g([&]() {
+                if (connection_status.load() == rpc_connection_closing) change_connection_status(rpc_connection_closed);
+            });
+            error_callback(ec);
+        };
+        proxy_interfaces[layer]->init(read_callback, write_callback, finish_callback, abort_callback);
+        proxy_interfaces[layer]->start();
     }
     void handle_connect_success() {
         if (!proxy_interfaces.empty())
@@ -1248,7 +1300,7 @@ private:
     std::mutex sub_mtx_;
     std::unordered_map<std::string, std::function<void(string_view)>> sub_map_;
     //
-    std::vector<std::shared_ptr<RpcClientProxyInterface>> proxy_interfaces;
+    std::vector<std::shared_ptr<network_proxy_interface>> proxy_interfaces;
     rpc_client_ssl_level ssl_level = rpc_client_ssl_level::rpc_client_ssl_level_none;
 #ifndef NETWORK_DISABLE_SSL
     std::unique_ptr<asio::ssl::stream<asio::ip::tcp::socket&>> ssl_stream_ = nullptr;
