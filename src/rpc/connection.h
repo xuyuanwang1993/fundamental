@@ -213,6 +213,9 @@ public:
     void config_proxy_manager(network::proxy::ProxyManager* manager) {
         proxy_manager_ = manager;
     }
+    void config_socks5_handler(std::shared_ptr<SocksV5::Sock5Handler> handler) {
+        socks5_handler = handler;
+    }
     void set_external_config(rpc_server_external_config config) {
         external_config = config;
     }
@@ -381,10 +384,19 @@ private:
             switch (head_[0]) {
                 // Protocols with packet lengths that may be smaller than the RPC header length (18) should be processed
                 // separately.
-            case SocksV5::SocksVersion::V5: process_socks5_proxy(head_, offset); break;
-
-            default: read_head(offset); break;
+            case SocksV5::SocksVersion::V5: {
+                if (socks5_handler) {
+                    process_socks5_proxy(head_, offset);
+                    return;
+                }
+                // use default handler
+                break;
             }
+
+            default: break;
+            }
+            // default action
+            read_head(offset);
         }
     }
     void read_head(std::size_t offset = 0) {
@@ -732,7 +744,7 @@ private:
     // proxy
     network::proxy::ProxyManager* proxy_manager_ = nullptr;
     rpc_server_external_config external_config;
-    SocksV5::Sock5Handler socks5_handler;
+    std::shared_ptr<SocksV5::Sock5Handler> socks5_handler;
     // remote endpoint
     std::string remote_ip;
     std::uint16_t remote_port = 0;

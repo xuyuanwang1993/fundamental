@@ -2,10 +2,11 @@
 #include "fundamental/basic/log.h"
 namespace SocksV5
 {
-Socks5Session::Socks5Session(const asio::any_io_executor& ioc_, Sock5Handler& handler, asio::ip::tcp::socket&& socket) :
+Socks5Session::Socks5Session(const asio::any_io_executor& ioc_,
+                             std::shared_ptr<const SocksV5::Sock5Handler> handler,
+                             asio::ip::tcp::socket&& socket) :
 ioc(ioc_), udp_resolver(ioc_), socket(ioc_), dst_socket(ioc_), deadline(ioc_), ref_handler(handler) {
     deadline.expires_at(asio::steady_timer::time_point::max());
-    this->timeout = handler.timeout_check_sec_interval;
 }
 
 asio::ip::tcp::socket& Socks5Session::get_socket() {
@@ -13,11 +14,17 @@ asio::ip::tcp::socket& Socks5Session::get_socket() {
 }
 
 void Socks5Session::start(const void* probe_data, std::size_t probe_len) {
-    if (probe_len > kMaxProbeLen) {
+    if (!ref_handler) {
         FWARN("Socks5 Session Failed to Start : probe len {} overflow {}", probe_len, kMaxProbeLen);
         this->stop();
         return;
     }
+    if (probe_len > kMaxProbeLen) {
+        FWARN("Socks5 Session Failed to Start : proxy handler is invalid");
+        this->stop();
+        return;
+    }
+    this->timeout = ref_handler->timeout_check_sec_interval;
     try {
         this->local_endpoint   = socket.local_endpoint();
         this->tcp_cli_endpoint = socket.remote_endpoint();
@@ -147,7 +154,7 @@ void Socks5Session::get_methods_list() {
 SocksV5::Method Socks5Session::choose_method() {
     for (auto&& method : this->methods) {
         Fundamental::error_code ec;
-        ref_handler.method_verify_handler.Emit(method, ec);
+        ref_handler->method_verify_handler.Emit(method, ec);
         if (!ec) {
             return method;
         }
@@ -276,8 +283,8 @@ void Socks5Session::get_password_content() {
 
 void Socks5Session::do_auth_and_reply() {
     Fundamental::error_code ec;
-    ref_handler.user_verify_handler.Emit(std::string(this->uname.begin(), this->uname.end()),
-                                         std::string(this->passwd.begin(), this->passwd.end()), ec);
+    ref_handler->user_verify_handler.Emit(std::string(this->uname.begin(), this->uname.end()),
+                                          std::string(this->passwd.begin(), this->passwd.end()), ec);
     if (!ec) {
         this->status = SocksV5::ReplyAuthStatus::Success;
     } else {

@@ -13,7 +13,7 @@ public:
     static decltype(auto) make_shared(Args&&... args) {
         return std::make_shared<Socks5Session>(std::forward<Args>(args)...);
     }
-    explicit Socks5Session(const asio::any_io_executor& ioc_, Sock5Handler& handler, asio::ip::tcp::socket&& socket);
+    explicit Socks5Session(const asio::any_io_executor& ioc_,std::shared_ptr<const SocksV5::Sock5Handler> handler, asio::ip::tcp::socket&& socket);
 
     virtual ~Socks5Session() = default;
 
@@ -301,6 +301,6 @@ protected:
     std::vector<uint8_t> client_buffer;
     std::vector<uint8_t> dst_buffer;
     // handler
-    const Sock5Handler& ref_handler;
+    const std::shared_ptr<const SocksV5::Sock5Handler> ref_handler;
 };
 } // namespace SocksV5
