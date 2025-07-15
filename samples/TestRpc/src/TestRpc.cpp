@@ -944,6 +944,8 @@ TEST(rpc_test, test_ssl_proxy_echo_stream) {
     EXPECT_TRUE(!stream->Finish(0));
 }
 TEST(rpc_test, test_ssl_concept) {
+    bool verify_client = ::getenv("verify_client") != nullptr;
+    bool enable_no_ssl = ::getenv("disable_no_ssl") == nullptr;
     // sudo tcpdump -i any -n -vv -X port 9000
     {
         auto client = network::make_guard<rpc_client>();
@@ -969,7 +971,12 @@ TEST(rpc_test, test_ssl_concept) {
         std::string base = "1111";
         stream->Write(base);
         stream->WriteDone();
-        EXPECT_TRUE(stream->Finish(0));
+        auto ec = stream->Finish(0);
+        if (verify_client) {
+            EXPECT_TRUE(ec);
+        } else {
+            EXPECT_TRUE(!ec);
+        }
     }
     {
         auto client             = network::make_guard<rpc_client>();
@@ -978,9 +985,13 @@ TEST(rpc_test, test_ssl_concept) {
         auto stream = client->upgrade_to_stream("test_echo_stream");
         EXPECT_TRUE(stream != nullptr);
         std::string base = "1111";
-        EXPECT_TRUE(stream->Write(base));
-        EXPECT_TRUE(stream->WriteDone());
-        EXPECT_TRUE(!stream->Finish(0));
+        stream->Write(base);
+        stream->WriteDone();
+        if (enable_no_ssl) {
+            EXPECT_TRUE(!stream->Finish(0));
+        } else {
+            EXPECT_TRUE(stream->Finish(0));
+        }
     }
 }
 
@@ -1058,7 +1069,6 @@ TEST(rpc_test, test_proxy_list) {
     EXPECT_EQ(ret,str);
 }
 #endif
-
 
 int main(int argc, char** argv) {
     int mode = 0;
