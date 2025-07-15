@@ -281,6 +281,7 @@ private:
                     new_conn->set_conn_id(id);
                     new_conn->config_proxy_manager(proxy_manager);
                     new_conn->set_external_config(external_config);
+                    new_conn->config_socks5_handler(socks5_proxy_handler);
                     new_conn->start();
 #ifdef RPC_VERBOSE
                     FDEBUG("start connection {:p} -> {}", (void*)(new_conn.get()), id);
