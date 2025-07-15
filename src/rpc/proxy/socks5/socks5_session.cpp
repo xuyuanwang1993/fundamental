@@ -4,8 +4,8 @@ namespace SocksV5
 {
 Socks5Session::Socks5Session(const asio::any_io_executor& ioc_,
                              std::shared_ptr<const SocksV5::Sock5Handler> handler,
-                             asio::ip::tcp::socket&& socket) :
-ioc(ioc_), udp_resolver(ioc_), socket(ioc_), dst_socket(ioc_), deadline(ioc_), ref_handler(handler) {
+                             asio::ip::tcp::socket&& socket_) :
+ioc(ioc_), udp_resolver(ioc_), socket(std::move(socket_)), dst_socket(ioc_), deadline(ioc_), ref_handler(handler) {
     deadline.expires_at(asio::steady_timer::time_point::max());
 }
 

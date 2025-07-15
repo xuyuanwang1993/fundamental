@@ -13,6 +13,7 @@ int main(int argc, char* argv[]) {
     if (argc > 2) {
         port = std::stoul(argv[2]);
     }
+    FINFO("run with {} <path> <port>",argv[0]);
     Fundamental::fs::SwitchToProgramDir(argv[0]);
     Fundamental::Logger::LoggerInitOptions options;
     options.minimumLevel = Fundamental::LogLevel::debug;
