@@ -68,6 +68,7 @@ int main(int argc, char* argv[]) {
         config.transparent_proxy_port   = proxy_port;
         server.set_external_config(config);
     }
+    server.enable_socks5_proxy(SocksV5::Sock5Handler::make_default_handler());
     network::init_io_context_pool(threads);
     server.start();
     Fundamental::Application::Instance().Loop();

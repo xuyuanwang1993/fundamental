@@ -11,6 +11,9 @@ file(GLOB lib_source
     proxy/*.h
     proxy/*.cpp
     proxy/*.hpp
+    proxy/socks5/*.h
+    proxy/socks5/*.cpp
+    proxy/socks5/*.hpp
 )
 
 # Add to source group, TREE will enable cmake to config the folder layout automatically

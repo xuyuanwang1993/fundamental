@@ -402,7 +402,7 @@ void server_task(std::promise<void>& sync_p) {
         }
     }
     server.enable_data_proxy(&s_manager);
-
+    server.enable_socks5_proxy(SocksV5::Sock5Handler::make_default_handler());
     server.start();
     rpc_stream_pool.Spawn(5);
     sync_p.set_value();

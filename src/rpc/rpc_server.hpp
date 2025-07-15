@@ -206,6 +206,9 @@ public:
     void set_external_config(rpc_server_external_config config) {
         external_config = config;
     }
+    void enable_socks5_proxy(std::shared_ptr<SocksV5::Sock5Handler> socks5_handler) {
+        socks5_proxy_handler = socks5_handler;
+    }
 
 private:
     void do_accept() {
@@ -278,6 +281,7 @@ private:
                     new_conn->set_conn_id(id);
                     new_conn->config_proxy_manager(proxy_manager);
                     new_conn->set_external_config(external_config);
+                    new_conn->config_socks5_handler(socks5_proxy_handler);
                     new_conn->start();
 #ifdef RPC_VERBOSE
                     FDEBUG("start connection {:p} -> {}", (void*)(new_conn.get()), id);
@@ -323,6 +327,7 @@ private:
     // proxy
     network::proxy::ProxyManager* proxy_manager = nullptr;
     rpc_server_external_config external_config;
+    std::shared_ptr<SocksV5::Sock5Handler> socks5_proxy_handler = nullptr;
 };
 } // namespace rpc_service
   // namespace rpc_service
