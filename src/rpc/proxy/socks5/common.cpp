@@ -4,16 +4,16 @@ namespace SocksV5
 namespace convert
 {
 
-std::string dst_to_string(const std::vector<uint8_t>& dst_addr, ATyp addr_type) {
+std::string dst_to_string(const std::vector<uint8_t>& dst_addr, Socks5HostType addr_type) {
     char addr[UINT8_MAX];
     std::memset(addr, 0, sizeof(addr));
 
     switch (addr_type) {
-    case ATyp::Ipv4: {
+    case Socks5HostType::Ipv4: {
         std::snprintf(addr, sizeof(addr), "%d.%d.%d.%d", dst_addr[0], dst_addr[1], dst_addr[2], dst_addr[3]);
     } break;
 
-    case ATyp::Ipv6: {
+    case Socks5HostType::Ipv6: {
         std::snprintf(addr, sizeof(addr),
                       "%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%"
                       "02x:%02x%02x:%"
@@ -23,7 +23,7 @@ std::string dst_to_string(const std::vector<uint8_t>& dst_addr, ATyp addr_type) 
                       dst_addr[14], dst_addr[15]);
     } break;
 
-    case ATyp::DoMainName: {
+    case Socks5HostType::DoMainName: {
         std::memcpy(addr, dst_addr.data(), dst_addr.size());
     } break;
     }

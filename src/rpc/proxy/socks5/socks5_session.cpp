@@ -336,17 +336,17 @@ void Socks5Session::get_request_from_client() {
 
 void Socks5Session::get_dst_information() {
     switch (this->request_atyp) {
-    case SocksV5::RequestATYP::Ipv4: {
+    case SocksV5::Socks5HostType::Ipv4: {
         this->dst_addr.resize(4);
         this->resolve_ipv4();
     } break;
 
-    case SocksV5::RequestATYP::Ipv6: {
+    case SocksV5::Socks5HostType::Ipv6: {
         dst_addr.resize(16);
         this->resolve_ipv6();
     } break;
 
-    case SocksV5::RequestATYP::DoMainName: {
+    case SocksV5::Socks5HostType::DoMainName: {
         this->dst_addr.resize(UINT8_MAX);
         this->resolve_domain();
     } break;
@@ -371,7 +371,7 @@ void Socks5Session::resolve_ipv4() {
             FDEBUG("Client {} -> Proxy {} DATA : [DST.ADDR = "
                    "{}, DST.PORT = {}]",
                    convert::format_address(this->tcp_cli_endpoint), convert::format_address(this->local_endpoint),
-                   convert::dst_to_string(this->dst_addr, ATyp::Ipv4), this->dst_port);
+                   convert::dst_to_string(this->dst_addr, Socks5HostType::Ipv4), this->dst_port);
 
             this->execute_command();
         } else {
@@ -394,7 +394,7 @@ void Socks5Session::resolve_ipv6() {
             FDEBUG("Client {} -> Proxy {} DATA : [DST.ADDR "
                    "= {}, DST.PORT = {}]",
                    convert::format_address(this->tcp_cli_endpoint), convert::format_address(this->local_endpoint),
-                   convert::dst_to_string(this->dst_addr, ATyp::Ipv6), this->dst_port);
+                   convert::dst_to_string(this->dst_addr, Socks5HostType::Ipv6), this->dst_port);
 
             this->execute_command();
         } else {
@@ -441,7 +441,7 @@ void Socks5Session::resolve_domain_content() {
             FDEBUG("Client {} -> Proxy {} DATA : [DST.ADDR = "
                    "{}, DST.PORT = {}]",
                    convert::format_address(this->tcp_cli_endpoint), convert::format_address(this->local_endpoint),
-                   convert::dst_to_string(this->dst_addr, ATyp::DoMainName), this->dst_port);
+                   convert::dst_to_string(this->dst_addr, Socks5HostType::DoMainName), this->dst_port);
 
             this->execute_command();
         } else {
@@ -474,23 +474,23 @@ void Socks5Session::execute_command() {
 
 void Socks5Session::set_connect_endpoint() {
     switch (this->request_atyp) {
-    case SocksV5::RequestATYP::Ipv4: {
+    case SocksV5::Socks5HostType::Ipv4: {
         std::error_code ec;
         this->tcp_dst_endpoint = asio::ip::tcp::endpoint(
-            asio::ip::make_address(convert::dst_to_string(this->dst_addr, ATyp::Ipv4), ec), this->dst_port);
+            asio::ip::make_address(convert::dst_to_string(this->dst_addr, Socks5HostType::Ipv4), ec), this->dst_port);
 
         this->connect_dst_host();
     } break;
 
-    case SocksV5::RequestATYP::Ipv6: {
+    case SocksV5::Socks5HostType::Ipv6: {
         std::error_code ec;
         this->tcp_dst_endpoint = asio::ip::tcp::endpoint(
-            asio::ip::make_address(convert::dst_to_string(this->dst_addr, ATyp::Ipv6), ec), this->dst_port);
+            asio::ip::make_address(convert::dst_to_string(this->dst_addr, Socks5HostType::Ipv6), ec), this->dst_port);
 
         this->connect_dst_host();
     } break;
 
-    case SocksV5::RequestATYP::DoMainName: {
+    case SocksV5::Socks5HostType::DoMainName: {
         this->async_dns_reslove();
     } break;
     }
@@ -498,23 +498,23 @@ void Socks5Session::set_connect_endpoint() {
 
 void Socks5Session::set_udp_associate_endpoint() {
     switch (this->request_atyp) {
-    case SocksV5::RequestATYP::Ipv4: {
+    case SocksV5::Socks5HostType::Ipv4: {
         std::error_code ec;
         this->udp_cli_endpoint = asio::ip::udp::endpoint(
-            asio::ip::make_address(convert::dst_to_string(this->dst_addr, ATyp::Ipv4), ec), this->dst_port);
+            asio::ip::make_address(convert::dst_to_string(this->dst_addr, Socks5HostType::Ipv4), ec), this->dst_port);
 
         this->reply_udp_associate();
     } break;
 
-    case SocksV5::RequestATYP::Ipv6: {
+    case SocksV5::Socks5HostType::Ipv6: {
         std::error_code ec;
         this->udp_cli_endpoint = asio::ip::udp::endpoint(
-            asio::ip::make_address(convert::dst_to_string(this->dst_addr, ATyp::Ipv6), ec), this->dst_port);
+            asio::ip::make_address(convert::dst_to_string(this->dst_addr, Socks5HostType::Ipv6), ec), this->dst_port);
 
         this->reply_udp_associate();
     } break;
 
-    case SocksV5::RequestATYP::DoMainName: {
+    case SocksV5::Socks5HostType::DoMainName: {
         this->async_udp_dns_reslove();
     } break;
     }
@@ -523,7 +523,7 @@ void Socks5Session::set_udp_associate_endpoint() {
 void Socks5Session::async_udp_dns_reslove() {
     auto self = shared_from_this();
     this->udp_resolver.async_resolve(
-        convert::dst_to_string(this->dst_addr, ATyp::DoMainName), std::to_string(this->dst_port),
+        convert::dst_to_string(this->dst_addr, Socks5HostType::DoMainName), std::to_string(this->dst_port),
         [this, self](asio::error_code ec, const asio::ip::udp::resolver::results_type& result) {
             if (!ec) {
                 this->resolve_results = result;
@@ -532,12 +532,12 @@ void Socks5Session::async_udp_dns_reslove() {
                 this->udp_cli_endpoint = this->resolve_results.begin()->endpoint();
 
                 FDEBUG("Reslove Domain {} {} result sets in total",
-                       convert::dst_to_string(this->dst_addr, ATyp::DoMainName), this->resolve_results.size());
+                       convert::dst_to_string(this->dst_addr, Socks5HostType::DoMainName), this->resolve_results.size());
 
                 this->reply_udp_associate();
             } else {
                 FWARN("Failed to Reslove Domain {}, ERR_MSG = [{}]",
-                      convert::dst_to_string(this->dst_addr, ATyp::DoMainName), ec.message());
+                      convert::dst_to_string(this->dst_addr, Socks5HostType::DoMainName), ec.message());
 
                 this->reply_and_stop(SocksV5::ReplyREP::HostUnreachable);
             }
@@ -548,14 +548,14 @@ void Socks5Session::reply_udp_associate() {
     this->rep = SocksV5::ReplyREP::Succeeded;
     try {
         if (this->udp_cli_endpoint.address().is_v4()) {
-            this->reply_atyp = SocksV5::ReplyATYP::Ipv4;
+            this->reply_atyp = SocksV5::Socks5HostType::Ipv4;
             this->udp_socket.reset(
                 new asio::ip::udp::socket(this->ioc, asio::ip::udp::endpoint(asio::ip::udp::v4(), 0)));
             this->bnd_addr.resize(4);
             std::memcpy(this->bnd_addr.data(), this->udp_socket->local_endpoint().address().to_v4().to_bytes().data(),
                         4);
         } else {
-            this->reply_atyp = SocksV5::ReplyATYP::Ipv6;
+            this->reply_atyp = SocksV5::Socks5HostType::Ipv6;
             this->udp_socket.reset(
                 new asio::ip::udp::socket(this->ioc, asio::ip::udp::endpoint(asio::ip::udp::v6(), 0)));
             this->bnd_addr.resize(16);
@@ -628,7 +628,7 @@ bool Socks5Session::check_sender_endpoint() {
     }
 
     switch (this->request_atyp) {
-    case SocksV5::RequestATYP::Ipv4: {
+    case SocksV5::Socks5HostType::Ipv4: {
         if (this->check_dst_addr_all_zeros()) {
             // this->udp_cli_endpoint =
             //     asio::ip::udp::endpoint(asio::ip::address_v4::loopback(),
@@ -638,7 +638,7 @@ bool Socks5Session::check_sender_endpoint() {
         }
     } break;
 
-    case SocksV5::RequestATYP::Ipv6: {
+    case SocksV5::Socks5HostType::Ipv6: {
         if (this->check_dst_addr_all_zeros()) {
             // this->udp_cli_endpoint =
             //     asio::ip::udp::endpoint(asio::ip::address_v6::loopback(),
@@ -648,7 +648,7 @@ bool Socks5Session::check_sender_endpoint() {
         }
     } break;
 
-    case SocksV5::RequestATYP::DoMainName: {
+    case SocksV5::Socks5HostType::DoMainName: {
         for (auto iter : this->resolve_results) {
             if (iter.endpoint() == this->sender_endpoint) {
                 return true;
@@ -700,7 +700,7 @@ void Socks5Session::parse_udp_message() {
     std::memcpy(&this->reply_atyp, this->client_buffer.data() + 3, sizeof(this->reply_atyp));
 
     switch (this->reply_atyp) {
-    case SocksV5::ReplyATYP::Ipv4: {
+    case SocksV5::Socks5HostType::Ipv4: {
         if (this->udp_length <= 10) {
             FWARN("Udp Associate Ipv4 Length Error");
             this->stop();
@@ -713,7 +713,7 @@ void Socks5Session::parse_udp_message() {
         this->dst_port = ntohs(this->dst_port);
         try {
             this->udp_dst_endpoint = asio::ip::udp::endpoint(
-                asio::ip::make_address(convert::dst_to_string(this->dst_addr, ATyp::Ipv4)), this->dst_port);
+                asio::ip::make_address(convert::dst_to_string(this->dst_addr, Socks5HostType::Ipv4)), this->dst_port);
         } catch (const std::exception& e) {
             FWARN("Udp Associate Ipv4 format error {}", e.what());
             this->stop();
@@ -726,7 +726,7 @@ void Socks5Session::parse_udp_message() {
         this->send_udp_to_dst();
     } break;
 
-    case SocksV5::ReplyATYP::Ipv6: {
+    case SocksV5::Socks5HostType::Ipv6: {
         if (this->udp_length <= 18) {
             FWARN("Udp Associate Ipv6 Length Error");
             this->stop();
@@ -739,7 +739,7 @@ void Socks5Session::parse_udp_message() {
         this->dst_port = ntohs(this->dst_port);
         try {
             this->udp_dst_endpoint = asio::ip::udp::endpoint(
-                asio::ip::make_address(convert::dst_to_string(this->dst_addr, ATyp::Ipv6)), this->dst_port);
+                asio::ip::make_address(convert::dst_to_string(this->dst_addr, Socks5HostType::Ipv6)), this->dst_port);
         } catch (const std::exception& e) {
             FWARN("Udp Associate Ipv4 format error {}", e.what());
             this->stop();
@@ -752,7 +752,7 @@ void Socks5Session::parse_udp_message() {
         this->send_udp_to_dst();
     } break;
 
-    case SocksV5::ReplyATYP::DoMainName: {
+    case SocksV5::Socks5HostType::DoMainName: {
         this->dst_addr.resize(1 + UINT8_MAX);
         std::memcpy(this->dst_addr.data(), this->client_buffer.data() + 4, sizeof(this->dst_addr[0]));
         uint8_t domain_length = this->dst_addr[0];
@@ -949,17 +949,17 @@ void Socks5Session::connect_dst_host() {
 void Socks5Session::async_dns_reslove() {
     auto self = shared_from_this();
     this->udp_resolver.async_resolve(
-        convert::dst_to_string(this->dst_addr, ATyp::DoMainName), std::to_string(this->dst_port),
+        convert::dst_to_string(this->dst_addr, Socks5HostType::DoMainName), std::to_string(this->dst_port),
         [this, self](asio::error_code ec, const asio::ip::udp::resolver::results_type& result) {
             if (!ec) {
                 this->resolve_results = result;
                 FDEBUG("Reslove Domain {} {} result sets in total",
-                       convert::dst_to_string(this->dst_addr, ATyp::DoMainName), this->resolve_results.size());
+                       convert::dst_to_string(this->dst_addr, Socks5HostType::DoMainName), this->resolve_results.size());
 
                 this->try_to_connect_by_iterator(this->resolve_results.begin());
             } else {
                 FWARN("Failed to Reslove Domain {}, ERR_MSG = [{}]",
-                      convert::dst_to_string(this->dst_addr, ATyp::DoMainName), ec.message());
+                      convert::dst_to_string(this->dst_addr, Socks5HostType::DoMainName), ec.message());
 
                 this->reply_and_stop(SocksV5::ReplyREP::HostUnreachable);
             }
@@ -1004,7 +1004,7 @@ void Socks5Session::try_to_connect_by_iterator(asio::ip::udp::resolver::results_
 
 void Socks5Session::reply_and_stop(SocksV5::ReplyREP rep) {
     this->rep        = rep;
-    this->reply_atyp = SocksV5::ReplyATYP::Ipv4;
+    this->reply_atyp = SocksV5::Socks5HostType::Ipv4;
     this->bnd_addr   = { 0, 0, 0, 0 };
     this->bnd_port   = 0;
 
@@ -1021,7 +1021,7 @@ void Socks5Session::reply_and_stop(SocksV5::ReplyREP rep) {
                    "BND.ADDR = {}, BND.PORT = {}]",
                    convert::format_address(this->local_endpoint), convert::format_address(this->tcp_cli_endpoint),
                    static_cast<int16_t>(this->ver), static_cast<int16_t>(this->rep), static_cast<int16_t>(this->rsv),
-                   static_cast<int16_t>(this->reply_atyp), convert::dst_to_string(this->bnd_addr, ATyp::Ipv4),
+                   static_cast<int16_t>(this->reply_atyp), convert::dst_to_string(this->bnd_addr, Socks5HostType::Ipv4),
                    this->bnd_port);
 
             this->stop();
