@@ -130,12 +130,12 @@ private:
     template <typename InternetProtocol>
     void set_reply_address(const asio::ip::basic_endpoint<InternetProtocol>& endpoint) {
         if (endpoint.address().is_v4()) {
-            this->reply_atyp = SocksV5::ReplyATYP::Ipv4;
+            this->reply_atyp = SocksV5::Socks5HostType::Ipv4;
             this->bnd_addr.resize(4);
             auto&& ipv4_array = endpoint.address().to_v4().to_bytes();
             std::memcpy(this->bnd_addr.data(), ipv4_array.data(), 4);
         } else {
-            this->reply_atyp = SocksV5::ReplyATYP::Ipv6;
+            this->reply_atyp = SocksV5::Socks5HostType::Ipv6;
             this->bnd_addr.resize(16);
             auto&& ipv6_array = endpoint.address().to_v6().to_bytes();
             std::memcpy(this->bnd_addr.data(), ipv6_array.data(), 16);
@@ -280,12 +280,12 @@ protected:
     /* Request Step */
     SocksV5::Method method;
     SocksV5::RequestCMD cmd;
-    SocksV5::RequestATYP request_atyp;
+    SocksV5::Socks5HostType request_atyp;
     std::vector<uint8_t> dst_addr;
     uint16_t dst_port;
 
     /* Reply Step */
-    SocksV5::ReplyATYP reply_atyp;
+    SocksV5::Socks5HostType reply_atyp;
     SocksV5::ReplyREP rep;
     std::vector<uint8_t> bnd_addr;
     uint16_t bnd_port;

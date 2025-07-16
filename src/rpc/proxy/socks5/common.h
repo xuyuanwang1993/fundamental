@@ -19,19 +19,7 @@
 
 namespace SocksV5
 {
-/* SOCKS Protocol Version Field */
-enum SocksVersion : uint8_t
-{
-    V4 = 0x04,
-    V5 = 0x05,
-};
 
-enum class ATyp : uint8_t
-{
-    Ipv4       = 0x01,
-    DoMainName = 0x03,
-    Ipv6       = 0x04,
-};
 
 class noncopyable {
 protected:
@@ -54,7 +42,7 @@ std::string format_address(const asio::ip::basic_endpoint<InternetProtocol>& end
     return endpoint.address().to_string() + ":" + std::to_string(endpoint.port());
 }
 
-std::string dst_to_string(const std::vector<uint8_t>& dst_addr, ATyp addr_type);
+std::string dst_to_string(const std::vector<uint8_t>& dst_addr, Socks5HostType addr_type);
 
 } // namespace convert
 

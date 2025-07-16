@@ -24,9 +24,10 @@ struct network_proxy_interface : std::enable_shared_from_this<network_proxy_inte
     using write_cb = std::function<void(write_buffer_t write_buffers, const operation_cb& finish_cb)>;
     using read_cb  = std::function<void(read_buffer_t read_buffers, const operation_cb& finish_cb)>;
     using abort_cb = std::function<void()>;
-    virtual ~network_proxy_interface() = default;
-    virtual void abort_all_operation() = 0;
-    virtual void start()               = 0;
+    virtual ~network_proxy_interface()         = default;
+    virtual const char* interface_name() const = 0;
+    virtual void abort_all_operation()         = 0;
+    virtual void start()                       = 0;
     virtual void init(read_cb read_cb__, write_cb write_cb__, operation_cb finish_cb__, abort_cb abort_cb__) {
         abort_cb_  = abort_cb__;
         read_cb_   = read_cb__;

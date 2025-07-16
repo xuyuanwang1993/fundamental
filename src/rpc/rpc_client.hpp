@@ -686,11 +686,13 @@ private:
             asio::post(ios_, [this, ref = shared_from_this()] { close(true); });
         };
         auto finish_callback = [this, ptr = shared_from_this(), layer](std::error_code ec, const std::string& msg) {
+            
             do {
                 if (!reference_.is_valid()) {
                     if (!ec) ec = std::make_error_code(std::errc::bad_file_descriptor);
                     break;
                 }
+                FDEBUG("{} ec:{}({}) msg:{}", proxy_interfaces[layer]->interface_name(), ec.value(), ec.message(), msg);
                 if (ec) break;
                 auto next_layer = layer + 1;
                 if (next_layer == proxy_interfaces.size()) {

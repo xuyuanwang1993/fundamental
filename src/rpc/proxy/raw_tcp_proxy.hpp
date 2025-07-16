@@ -26,6 +26,9 @@ public:
 
         process_write();
     }
+    const char* interface_name() const override {
+        return "raw_tcp_proxy";
+    }
 
 protected:
     void process_write() {

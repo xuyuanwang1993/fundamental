@@ -17,6 +17,9 @@ public:
     CustomRpcProxy(const std::string& serviceName, const std::string& field, const std::string& token) :
     serviceName_(serviceName), field_(field), token_(token) {
     }
+    const char* interface_name() const override {
+        return "custom_rpc_proxy";
+    }
     void abort_all_operation() override {
         if (abort_cb_) abort_cb_();
     }

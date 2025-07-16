@@ -6,6 +6,7 @@
 #include "fundamental/delay_queue/delay_queue.h"
 #include "rpc/proxy/custom_rpc_proxy.hpp"
 #include "rpc/proxy/raw_tcp_proxy.hpp"
+#include "rpc/proxy/socks5/socks5_proxy_session.hpp"
 
 #include "fundamental/application/application.hpp"
 #include "fundamental/basic/random_generator.hpp"
@@ -1048,7 +1049,9 @@ TEST(rpc_test, test_void_stream) {
     EXPECT_TRUE(!stream->Finish(0));
 }
 TEST(rpc_test, test_proxy_list) {
-    auto client = network::make_guard<rpc_client>("127.0.0.1", "9000");
+    auto client       = network::make_guard<rpc_client>("127.0.0.1", "9000");
+    auto socks5_proxy = SocksV5::socks5_proxy_imp::make_shared("127.0.0.1", 9000, "", "");
+    client->append_proxy(socks5_proxy);
     client->append_proxy(network::rpc_service::RawTcpProxy::make_shared("127.0.0.1", "9000"));
     client->append_proxy(
         network::rpc_service::CustomRpcProxy::make_shared(kProxyServiceName, kProxyServiceField, kProxyServiceToken));
@@ -1062,13 +1065,14 @@ TEST(rpc_test, test_proxy_list) {
     str = std::string(10, 'a');
     std::string ret;
     try {
-         ret = client->call<100, std::string>("echo", str);
+        ret = client->call<100, std::string>("echo", str);
     } catch (const std::exception& e) {
         FERR("exception {}->{}", c, e.what());
     }
-    EXPECT_EQ(ret,str);
+    EXPECT_EQ(ret, str);
 }
 #endif
+
 int main(int argc, char** argv) {
     int mode = 0;
     if (argc > 1) mode = std::stoi(argv[1]);
