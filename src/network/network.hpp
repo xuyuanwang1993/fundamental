@@ -42,16 +42,24 @@ struct network_server_ssl_config {
     bool disable_ssl   = false;
     bool enable_no_ssl = true;
 };
-
+enum rpc_protocal_enable_mask : std::uint32_t
+{
+    rpc_protocal_filter_none          = 0,
+    rpc_protocal_filter_rpc           = (1 << 0),
+    rpc_protocal_filter_raw_tcp_proxy = (1 << 1),
+    rpc_protocal_filter_custom_proxy  = (1 << 2),
+    rpc_protocal_filter_socks5        = (1 << 3),
+    rpc_protocal_filter_http_ws       = (1 << 4),
+    rpc_protocal_filter_all           = std::numeric_limits<std::uint32_t>::max(),
+};
 struct rpc_server_external_config {
     // Whether to enable transparent proxy mode. When enabled,
     // traffic will be forwarded to the service at transparent_proxy_host:transparent_proxy_port
-    bool enable_transparent_proxy = false;
-    // In transparent proxy mode, if enabled, custom TCP proxy traffic will be distributed to the custom TCP proxy
-    bool filter_raw_tcp_proxy     = false;
-    // Transparent proxy target host    
+    bool enable_transparent_proxy   = false;
+    std::uint32_t rpc_protocal_mask = rpc_protocal_filter_all;
+    // Transparent proxy target host
     std::string transparent_proxy_host;
-     // Transparent proxy target port
+    // Transparent proxy target port
     std::string transparent_proxy_port;
 };
 
@@ -59,7 +67,7 @@ struct network_client_ssl_config {
     std::string certificate_path;
     std::string private_key_path;
     std::string ca_certificate_path;
-    bool verify_org  = true;
+    bool verify_org  = false;
     bool disable_ssl = false;
 
 #ifndef NETWORK_DISABLE_SSL

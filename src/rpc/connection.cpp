@@ -45,7 +45,7 @@ void connection::process_proxy_request() {
         auto self(this->shared_from_this());
         auto p_data = proxy_buffer->data() + kRpcHeadLen;
         async_buffer_read(
-            { asio::buffer(p_data, data_size - kRpcHeadLen) },
+            asio::buffer(p_data, data_size - kRpcHeadLen),
             [this, self, proxy_buffer = std::move(proxy_buffer)](asio::error_code ec, std::size_t length) {
                 if (!socket_.is_open()) {
                     on_net_err_(self, "socket already closed");
@@ -125,7 +125,7 @@ void connection::process_raw_tcp_proxy_request() {
         auto self(this->shared_from_this());
         auto p_data = proxy_buffer->data() + kRpcHeadLen;
         async_buffer_read(
-            { asio::buffer(p_data, data_size > kRpcHeadLen ? (data_size - kRpcHeadLen) : 0) },
+            asio::buffer(p_data, data_size > kRpcHeadLen ? (data_size - kRpcHeadLen) : 0),
             [this, self, proxy_buffer = std::move(proxy_buffer), data_size](asio::error_code ec, std::size_t length) {
                 if (!socket_.is_open()) {
                     on_net_err_(self, "socket already closed");
@@ -181,11 +181,6 @@ void connection::process_raw_tcp_proxy_request() {
 }
 
 void connection::process_transparent_proxy() {
-
-    if (external_config.filter_raw_tcp_proxy && head_[0] == network::proxy::ProxyRawTcpRequest::kMagicNum) {
-        process_raw_tcp_proxy_request();
-        return;
-    }
 
     auto self(this->shared_from_this());
 

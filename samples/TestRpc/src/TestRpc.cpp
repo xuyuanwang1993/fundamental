@@ -7,6 +7,7 @@
 #include "rpc/proxy/custom_rpc_proxy.hpp"
 #include "rpc/proxy/raw_tcp_proxy.hpp"
 #include "rpc/proxy/socks5/socks5_proxy_session.hpp"
+#include "rpc/proxy/websocket/ws_common.hpp"
 
 #include "fundamental/application/application.hpp"
 #include "fundamental/basic/random_generator.hpp"
@@ -22,6 +23,90 @@ using namespace network::rpc_service;
 static Fundamental::ThreadPool& s_test_pool = Fundamental::ThreadPool::Instance<101>();
 
 #if 1
+TEST(rpc_test, test_ws_forward) {
+    {
+        std::string ws_context =
+            "GET /api111 HTTP/1.1\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: "
+            "dGhlIHNhbXBsZSBub25jZQ==\r\nConnection: Upgrade\r\nUpgrade: websocket\r\nHost: example.com\r\n\r\n";
+
+        network::websocket::http_handler_context context;
+        context.head1 = context.kWebsocketMethod;
+        context.head2 = "/api111";
+        context.head3 = context.kHttpVersion;
+        context.headers.emplace(context.kHttpHost, "example.com");
+        context.headers.emplace(context.kHttpUpgradeStr, context.kHttpWebsocketStr);
+        context.headers.emplace(context.kHttpConnection, context.kHttpUpgradeStr);
+        context.headers.emplace(context.kWebsocketRequestKey, "dGhlIHNhbXBsZSBub25jZQ==");
+        context.headers.emplace(context.kWebsocketRequestVersion, context.kWebsocketVersion);
+        auto encode_str = context.encode();
+        EXPECT_EQ(encode_str, ws_context);
+        network::websocket::http_handler_context parse_context;
+        std::size_t i = 0;
+        encode_str.push_back('a');
+        for (; i < encode_str.size() - 3; i += 2) {
+            auto ret    = parse_context.parse(encode_str.data() + i, 2);
+            auto status = std::get<0>(ret);
+            auto len    = std::get<1>(ret);
+            EXPECT_EQ(status, network::websocket::http_handler_context::parse_need_more_data);
+            EXPECT_EQ(len, 2);
+        }
+        auto left_size = encode_str.size() - i;
+        auto ret       = parse_context.parse(encode_str.data() + i, left_size);
+        auto status    = std::get<0>(ret);
+        auto len       = std::get<1>(ret);
+        EXPECT_EQ(status, network::websocket::http_handler_context::parse_success);
+        EXPECT_EQ(len, left_size - 1);
+
+        EXPECT_EQ(parse_context.head1, context.head1);
+        EXPECT_EQ(parse_context.head2, context.head2);
+        EXPECT_EQ(parse_context.head3, context.head3);
+
+        for (auto& item : context.headers) {
+            auto iter = parse_context.headers.find(item.first);
+            EXPECT_TRUE(iter != parse_context.headers.end() && item.second == iter->second);
+        }
+    }
+    {
+        std::string ws_context =
+            "HTTP/1.1 101 Switching Protocols\r\nSec-WebSocket-Accept: dGhlIHNhbXBsZSBub25jZQ==\r\nConnection: "
+            "Upgrade\r\nUpgrade: websocket\r\n\r\n";
+
+        network::websocket::http_handler_context context;
+        context.head1 = context.kHttpVersion;
+        context.head2 = context.kWebsocketSuccessCode;
+        context.head3 = context.kWebsocketSuccessStr;
+        context.headers.emplace(context.kHttpUpgradeStr, context.kHttpWebsocketStr);
+        context.headers.emplace(context.kHttpConnection, context.kHttpUpgradeStr);
+        context.headers.emplace(context.kWebsocketResponseAccept, "dGhlIHNhbXBsZSBub25jZQ==");
+        auto encode_str = context.encode();
+        EXPECT_EQ(encode_str, ws_context);
+        network::websocket::http_handler_context parse_context;
+        std::size_t i = 0;
+        encode_str.push_back('a');
+        for (; i < encode_str.size() - 3; i += 2) {
+            auto ret    = parse_context.parse(encode_str.data() + i, 2);
+            auto status = std::get<0>(ret);
+            auto len    = std::get<1>(ret);
+            EXPECT_EQ(status, network::websocket::http_handler_context::parse_need_more_data);
+            EXPECT_EQ(len, 2);
+        }
+        auto left_size = encode_str.size() - i;
+        auto ret       = parse_context.parse(encode_str.data() + i, left_size);
+        auto status    = std::get<0>(ret);
+        auto len       = std::get<1>(ret);
+        EXPECT_EQ(status, network::websocket::http_handler_context::parse_success);
+        EXPECT_EQ(len, left_size - 1);
+
+        EXPECT_EQ(parse_context.head1, context.head1);
+        EXPECT_EQ(parse_context.head2, context.head2);
+        EXPECT_EQ(parse_context.head3, context.head3);
+
+        for (auto& item : context.headers) {
+            auto iter = parse_context.headers.find(item.first);
+            EXPECT_TRUE(iter != parse_context.headers.end() && item.second == iter->second);
+        }
+    }
+}
     #if 1
 TEST(rpc_test, test_connect) {
     Fundamental::Timer check_timer;

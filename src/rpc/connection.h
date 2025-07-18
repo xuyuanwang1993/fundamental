@@ -24,6 +24,10 @@ using asio::ip::tcp;
 
 namespace network
 {
+namespace proxy
+{
+class rpc_forward_connection;
+}
 namespace rpc_service
 {
 
@@ -115,6 +119,9 @@ private:
 class connection : public std::enable_shared_from_this<connection>, private asio::noncopyable {
     friend class rpc_server;
     friend class ServerStreamReadWriter;
+    friend class proxy::rpc_forward_connection;
+    static constexpr std::size_t kProbeReadSize    = 1;
+    static constexpr std::size_t kMaxProbeReadSize = kRpcHeadLen;
 
 public:
     Fundamental::Signal<void(std::string, std::weak_ptr<connection>)> on_new_subscriber_added;
@@ -258,7 +265,7 @@ private:
                                              return;
                                          }
 
-                                         read_head();
+                                         probe_protocal(0);
                                      });
 #endif
     }
@@ -289,6 +296,7 @@ private:
                                      }
                                      do_ssl_handshake(head_, kSslPreReadSize);
                                  } else {
+                                     // rpc request ssl check
                                      if (!enable_no_ssl_ && p_data[0] == RPC_MAGIC_NUM) {
                                          on_net_err_(self, "only tls connection is supported");
                                          break;
@@ -342,7 +350,7 @@ private:
             process_rpc_stream(header.func_id);
         } break;
         case request_type::rpc_heartbeat: {
-            read_head();
+            read_rpc_head();
             response_interal(req_id_, "", network::rpc_service::request_type::rpc_heartbeat);
             return;
         }
@@ -356,13 +364,18 @@ private:
     void process_raw_tcp_proxy_request();
     void process_transparent_proxy();
     void process_socks5_proxy(const void* preread_data, std::size_t len);
-    void probe_protocal(std::size_t offset = 0) {
-        static constexpr std::size_t kProbeReadSize = 1;
-        static_assert(kProbeReadSize < kRpcHeadLen, "probe size must < kRpcHeadLen");
+    void probe_protocal(std::size_t offset = 0, std::size_t target_probe_size = kProbeReadSize) {
+        FASSERT_ACTION(
+            target_probe_size <= kMaxProbeReadSize,
+            {
+                release_obj();
+                return;
+            },
+            "probe size must < kMaxProbeReadSize");
         auto self(this->shared_from_this());
-        if (offset < kProbeReadSize) {
-            async_buffer_read({ asio::buffer(head_ + offset, kProbeReadSize - offset) },
-                              [this, self](asio::error_code ec, std::size_t length) {
+        if (offset < target_probe_size) {
+            async_buffer_read(asio::buffer(head_ + offset, target_probe_size - offset),
+                              [this, self, target_probe_size](asio::error_code ec, std::size_t length) {
                                   if (!reference_.is_valid()) {
                                       return;
                                   }
@@ -378,13 +391,15 @@ private:
                                       release_obj();
                                       return;
                                   }
-                                  probe_protocal(kProbeReadSize);
+                                  probe_protocal(target_probe_size, target_probe_size);
                               });
         } else {
+
             switch (head_[0]) {
                 // Protocols with packet lengths that may be smaller than the RPC header length (18) should be processed
                 // separately.
             case SocksV5::SocksVersion::V5: {
+                if (!(external_config.rpc_protocal_mask & network::rpc_protocal_filter_socks5)) break;
                 if (socks5_handler) {
                     process_socks5_proxy(head_, offset);
                     return;
@@ -392,18 +407,45 @@ private:
                 // use default handler
                 break;
             }
-
             default: break;
             }
-            // default action
-            read_head(offset);
+            // ensure offset==rpc len
+            if (offset < kMaxProbeReadSize) {
+                probe_protocal(offset, kMaxProbeReadSize);
+                return;
+            }
+            switch (head_[0]) {
+            case RPC_MAGIC_NUM: {
+                if (!(external_config.rpc_protocal_mask & network::rpc_protocal_filter_rpc)) goto RPC_FALL_DOWN_ACTION;
+                read_rpc_head(offset);
+            } break;
+            case network::proxy::ProxyRequest::kMagicNum: {
+                if (!(external_config.rpc_protocal_mask & network::rpc_protocal_filter_custom_proxy)) goto RPC_FALL_DOWN_ACTION;
+                process_proxy_request();
+
+            } break;
+            case network::proxy::ProxyRawTcpRequest::kMagicNum: {
+                if (!(external_config.rpc_protocal_mask & network::rpc_protocal_filter_raw_tcp_proxy))goto RPC_FALL_DOWN_ACTION;
+                process_raw_tcp_proxy_request();
+            } break;
+            default: goto RPC_FALL_DOWN_ACTION;
+            }
+            return;
+        RPC_FALL_DOWN_ACTION:
+            // work as a transparent_proxy，proxy directly
+            if (external_config.enable_transparent_proxy) {
+                process_transparent_proxy();
+                return;
+            }
+            FERR("none supported protocal");
+            release_obj();
         }
     }
-    void read_head(std::size_t offset = 0) {
-        FASSERT(offset < kRpcHeadLen);
+    void read_rpc_head(std::size_t offset = 0) {
+        FASSERT(offset <= kRpcHeadLen);
         auto self(this->shared_from_this());
-        async_buffer_read({ asio::buffer(head_ + offset, kRpcHeadLen - offset) }, [this, self](asio::error_code ec,
-                                                                                               std::size_t length) {
+        async_buffer_read(asio::buffer(head_ + offset, kRpcHeadLen - offset), [this, self](asio::error_code ec,
+                                                                                           std::size_t length) {
             if (!reference_.is_valid()) {
                 return;
             }
@@ -423,17 +465,11 @@ private:
 #ifdef RPC_VERBOSE
             FDEBUG("server {:p} read head {}", (void*)this, Fundamental::Utils::BufferToHex(head_, kRpcHeadLen));
 #endif
-            // work as a transparent_proxy，proxy directly
-            if (external_config.enable_transparent_proxy) {
-                process_transparent_proxy();
-                return;
-            }
             switch (head_[0]) {
             case RPC_MAGIC_NUM: process_rpc_request(); break;
-            case network::proxy::ProxyRequest::kMagicNum: process_proxy_request(); break;
-            case network::proxy::ProxyRawTcpRequest::kMagicNum: process_raw_tcp_proxy_request(); break;
             default: {
-                FERR("{:p} protocol error magic  {:02x}", (void*)this, static_cast<std::uint8_t>(head_[0]));
+                // shoule never reach
+                FASSERT(false, "{:p} protocol error magic  {:02x}", (void*)this, static_cast<std::uint8_t>(head_[0]));
                 release_obj();
             } break;
             }
@@ -446,7 +482,7 @@ private:
         FDEBUG("server {:p} try read size: {}", (void*)this, size - start_offset);
 #endif
         async_buffer_read_some(
-            { asio::mutable_buffer(body_.data() + start_offset, size - start_offset) },
+            asio::mutable_buffer(body_.data() + start_offset, size - start_offset),
             [this, func_id, self, size, start_offset](asio::error_code ec, std::size_t length) {
                 if (!reference_.is_valid()) {
                     return;
@@ -474,7 +510,7 @@ private:
                 FDEBUG("server {:p} read {} body {}", (void*)this, size,
                        Fundamental::Utils::BufferToHex(body_.data(), size, 140));
 #endif
-                read_head();
+                read_rpc_head();
                 try {
                     switch (req_type_) {
                     case request_type::rpc_req: process_request(func_id, body_.data(), size); break;
@@ -521,7 +557,7 @@ private:
             });
     }
     void handle_none_param_request(uint32_t func_id) {
-        read_head();
+        read_rpc_head();
         process_request(func_id, nullptr, 0);
     }
     void process_request(uint32_t func_id, const char* data, std::size_t size) {
@@ -613,8 +649,8 @@ private:
                                  });
     }
 
-    template <typename Handler>
-    void async_buffer_read(std::vector<asio::mutable_buffer> buffers, Handler handler) {
+    template <typename Handler, typename BufferType>
+    void async_buffer_read(BufferType buffers, Handler handler) {
         if (is_ssl()) {
 #ifndef NETWORK_DISABLE_SSL
             asio::async_read(*ssl_stream_, std::move(buffers), std::move(handler));
@@ -624,8 +660,8 @@ private:
         }
     }
 
-    template <typename Handler>
-    void async_buffer_read_some(std::vector<asio::mutable_buffer> buffers, Handler handler) {
+    template <typename Handler, typename BufferType>
+    void async_buffer_read_some(BufferType buffers, Handler handler) {
         if (is_ssl()) {
 #ifndef NETWORK_DISABLE_SSL
             ssl_stream_->async_read_some(std::move(buffers), std::move(handler));

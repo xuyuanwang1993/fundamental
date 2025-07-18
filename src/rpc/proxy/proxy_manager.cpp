@@ -1,7 +1,9 @@
 #include "proxy_manager.hpp"
 #include "fundamental/basic/log.h"
-namespace network {
-namespace proxy {
+namespace network
+{
+namespace proxy
+{
 void ProxyManager::UpdateProxyHostInfo(const std::string& serviceName, ProxyHostInfo&& hostInfo) {
     std::scoped_lock<std::mutex> locker(dataMutex);
     storage[serviceName] = std::move(hostInfo);
@@ -12,7 +14,9 @@ void ProxyManager::RemoveProxyHostInfo(const std::string& serviceName) {
     storage.erase(serviceName);
 }
 
-bool ProxyManager::GetProxyHostInfo(const std::string& serviceName, const std::string& token, const std::string& field,
+bool ProxyManager::GetProxyHostInfo(const std::string& serviceName,
+                                    const std::string& token,
+                                    const std::string& field,
                                     ProxyHost& outHost) {
     std::scoped_lock<std::mutex> locker(dataMutex);
     do {
@@ -34,6 +38,25 @@ bool ProxyManager::GetProxyHostInfo(const std::string& serviceName, const std::s
         outHost = iter2->second;
         return true;
     } while (0);
+    return false;
+}
+void ProxyManager::AddWsProxyRoute(const std::string& api_route, ProxyHost host) {
+    std::scoped_lock<std::mutex> locker(dataMutex);
+    ws_proxy_routes[api_route] = host;
+}
+
+void ProxyManager::RemoveWsProxyRoute(const std::string& api_route) {
+    std::scoped_lock<std::mutex> locker(dataMutex);
+    ws_proxy_routes.erase(api_route);
+}
+
+bool ProxyManager::GetWsProxyRoute(const std::string& api_route, ProxyHost& host) {
+    std::scoped_lock<std::mutex> locker(dataMutex);
+    auto iter = ws_proxy_routes.find(api_route);
+    if (iter != ws_proxy_routes.end()) {
+        host = iter->second;
+        return true;
+    }
     return false;
 }
 } // namespace proxy

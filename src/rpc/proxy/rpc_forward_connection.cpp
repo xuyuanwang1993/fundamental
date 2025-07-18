@@ -1,64 +1,56 @@
-#include "proxy_handler.hpp"
-#include "proxy_codec.hpp"
-
-#include <iostream>
-
-#include "fundamental/basic/log.h"
-#include "fundamental/basic/utils.hpp"
+#include "rpc_forward_connection.hpp"
+#include "rpc/connection.h"
 namespace network
 {
 namespace proxy
 {
-proxy_handler::proxy_handler(const std::string& proxy_host,
-                             const std::string& proxy_service,
-                             asio::ip::tcp::socket&& socket,
-                             std::string input_handshake_data,
-                             std::string pending_data_to_server) :
-proxy_host(proxy_host), proxy_service(proxy_service), socket_(std::move(socket)), proxy_socket_(socket_.get_executor()),
-resolver(socket_.get_executor()), handshake_data(input_handshake_data), cachePool(Fundamental::MakePoolMemorySource()),
-client2server(cachePool), server2client(cachePool) {
-    enable_tcp_keep_alive(socket_);
+rpc_forward_connection::rpc_forward_connection(std::shared_ptr<rpc_service::connection> ref_connection,
+                                               std::string pre_read_data) :
+upstream(ref_connection), proxy_socket_(ref_connection->executor_), resolver(ref_connection->executor_),
+cachePool(Fundamental::MakePoolMemorySource()), client2server(cachePool), server2client(cachePool) {
 #ifdef RPC_VERBOSE
     client2server.tag_ = "client2server";
     server2client.tag_ = "server2client";
 #endif
+    client2server.PrepareReadCache();
     // handle pending data
-    std::size_t pending_size   = pending_data_to_server.size();
+    std::size_t pending_size   = pre_read_data.size();
     std::size_t pending_offset = 0;
     while (pending_size > 0) {
         client2server.PrepareReadCache();
         auto buffer     = client2server.GetReadBuffer();
         auto chunk_size = buffer.size() > pending_size ? pending_size : buffer.size();
-        std::memcpy(buffer.data(), pending_data_to_server.data() + pending_offset, chunk_size);
+        std::memcpy(buffer.data(), pre_read_data.data() + pending_offset, chunk_size);
         client2server.UpdateReadBuffer(chunk_size);
         pending_size -= chunk_size;
         pending_offset += chunk_size;
     }
 }
 
-void proxy_handler::SetUp() {
-    Process();
+void rpc_forward_connection::start() {
+    process_protocal();
 }
 
-proxy_handler::~proxy_handler() {
-    FDEBUG("~proxy_handler");
+rpc_forward_connection::~rpc_forward_connection() {
+    FDEBUG("~rpc_forward_connection");
 }
 
-void proxy_handler::Process() {
-    ProcessTrafficProxy();
-}
-void proxy_handler::ProcessTrafficProxy() {
-    HandShake();
-    StartDnsResolve(proxy_host, proxy_service);
+void rpc_forward_connection::release_obj() {
+    reference_.release();
+    asio::post(upstream->executor_, [this, ref = shared_from_this()] {
+        try {
+            HandleDisconnect({}, "release_obj");
+        } catch (const std::exception& e) {
+        }
+    });
 }
 
-void proxy_handler::HandleDisconnect(asio::error_code ec, const std::string& callTag, std::int32_t closeMask) {
+void rpc_forward_connection::HandleDisconnect(asio::error_code ec, const std::string& callTag, std::int32_t closeMask) {
     if (!callTag.empty()) FDEBUG("disconnect for {} -> ec:{}-{}", callTag, ec.category().name(), ec.message());
     if (closeMask & ClientProxying) {
         if (status & ClientProxying) {
             status &= (~ClientProxying);
-            asio::error_code code;
-            socket_.close(code);
+            upstream->release_obj();
 #ifdef RPC_VERBOSE
             if (!callTag.empty()) FDEBUG("{} close proxy remote endpoint", callTag);
 #endif
@@ -85,7 +77,7 @@ void proxy_handler::HandleDisconnect(asio::error_code ec, const std::string& cal
     }
 }
 
-void proxy_handler::StartDnsResolve(const std::string& host, const std::string& service) {
+void rpc_forward_connection::StartDnsResolve(const std::string& host, const std::string& service) {
     FDEBUG("start proxy dns resolve {}:{}", host, service);
     status |= ProxyDnsResolving;
     resolver.async_resolve(
@@ -102,7 +94,7 @@ void proxy_handler::StartDnsResolve(const std::string& host, const std::string& 
         });
 }
 
-void proxy_handler::StartConnect(asio::ip::tcp::resolver::results_type&& result) {
+void rpc_forward_connection::StartConnect(asio::ip::tcp::resolver::results_type&& result) {
     status |= ServerConnecting;
     asio::async_connect(proxy_socket_, result,
                         [this, self = shared_from_this()](std::error_code ec, asio::ip::tcp::endpoint endpoint) {
@@ -127,42 +119,23 @@ void proxy_handler::StartConnect(asio::ip::tcp::resolver::results_type&& result)
                         });
 }
 
-void proxy_handler::HandShake() {
-    if (!handshake_data.empty()) {
-        asio::async_write(socket_, asio::const_buffer(handshake_data.data(), handshake_data.size()),
-                          [this, self = shared_from_this()](std::error_code ec, std::size_t bytesWrite) {
-                              if (!reference_.is_valid()) {
-                                  return;
-                              }
-                              if (ec) {
-                                  HandleDisconnect(ec, "HandShake");
-                                  return;
-                              }
-#ifdef RPC_VERBOSE
-                              FDEBUG("proxy handshake sucess");
-#endif
-                          });
-    }
-
-    StartClientRead();
-}
-
-void proxy_handler::StartServer2ClientWrite() {
+void rpc_forward_connection::StartServer2ClientWrite() {
     if (!(status & ClientProxying)) return;
     auto needWrite = server2client.PrepareWriteCache();
     if (needWrite) {
-        socket_.async_write_some(server2client.GetWriteBuffer(), [this, self = shared_from_this()](
-                                                                     std::error_code ec, std::size_t bytesWrite) {
-            if (!reference_.is_valid()) {
-                return;
-            }
-            if (ec) {
-                HandleDisconnect(ec, "Server2ClientWrite", TrafficProxyCloseExceptServerProxying);
-                return;
-            }
-            server2client.UpdateWriteBuffer(bytesWrite);
-            StartServer2ClientWrite();
-        });
+        upstream->async_write_buffers_some(
+            server2client.GetWriteBuffer(),
+            [this, self = shared_from_this()](std::error_code ec, std::size_t bytesWrite) {
+                if (!reference_.is_valid()) {
+                    return;
+                }
+                if (ec) {
+                    HandleDisconnect(ec, "Server2ClientWrite", TrafficProxyCloseExceptServerProxying);
+                    return;
+                }
+                server2client.UpdateWriteBuffer(bytesWrite);
+                StartServer2ClientWrite();
+            });
     } else { // when server connection is aborted and remaining data to transfer to client
         if (!(status & ServerProxying)) {
             HandleDisconnect({}, "finish client transfer", ClientProxying);
@@ -170,25 +143,25 @@ void proxy_handler::StartServer2ClientWrite() {
     }
 }
 
-void proxy_handler::StartClientRead() {
+void rpc_forward_connection::StartClientRead() {
     client2server.PrepareReadCache();
-    socket_.async_read_some(client2server.GetReadBuffer(),
-                            [this, self = shared_from_this()](std::error_code ec, std::size_t bytesRead) {
-                                if (!reference_.is_valid()) {
-                                    return;
-                                }
-                                client2server.UpdateReadBuffer(bytesRead);
-                                Fundamental::ScopeGuard guard([this]() { StartClient2ServerWrite(); });
+    upstream->async_buffer_read_some(client2server.GetReadBuffer(),
+                                     [this, self = shared_from_this()](std::error_code ec, std::size_t bytesRead) {
+                                         if (!reference_.is_valid()) {
+                                             return;
+                                         }
+                                         client2server.UpdateReadBuffer(bytesRead);
+                                         Fundamental::ScopeGuard guard([this]() { StartClient2ServerWrite(); });
 
-                                if (ec) {
-                                    HandleDisconnect(ec, "ClientRead", TrafficProxyCloseExceptServerProxying);
-                                    return;
-                                }
-                                StartClientRead();
-                            });
+                                         if (ec) {
+                                             HandleDisconnect(ec, "ClientRead", TrafficProxyCloseExceptServerProxying);
+                                             return;
+                                         }
+                                         StartClientRead();
+                                     });
 }
 
-void proxy_handler::StartClient2ServerWrite() {
+void rpc_forward_connection::StartClient2ServerWrite() {
     if (!(status & ServerProxying)) return;
     auto needWrite = client2server.PrepareWriteCache();
     if (needWrite) {
@@ -211,7 +184,7 @@ void proxy_handler::StartClient2ServerWrite() {
     }
 }
 
-void proxy_handler::StartServerRead() {
+void rpc_forward_connection::StartServerRead() {
     server2client.PrepareReadCache();
     proxy_socket_.async_read_some(server2client.GetReadBuffer(),
                                   [this, self = shared_from_this()](std::error_code ec, std::size_t bytesRead) {
@@ -227,8 +200,6 @@ void proxy_handler::StartServerRead() {
                                       StartServerRead();
                                   });
 }
-
-
 
 } // namespace proxy
 } // namespace network
