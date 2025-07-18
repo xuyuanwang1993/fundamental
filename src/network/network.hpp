@@ -52,17 +52,6 @@ enum rpc_protocal_enable_mask : std::uint32_t
     rpc_protocal_filter_http_ws       = (1 << 4),
     rpc_protocal_filter_all           = std::numeric_limits<std::uint32_t>::max(),
 };
-struct rpc_server_external_config {
-    // Whether to enable transparent proxy mode. When enabled,
-    // traffic will be forwarded to the service at transparent_proxy_host:transparent_proxy_port
-    bool enable_transparent_proxy   = false;
-    std::uint32_t rpc_protocal_mask = rpc_protocal_filter_all;
-    // Transparent proxy target host
-    std::string transparent_proxy_host;
-    // Transparent proxy target port
-    std::string transparent_proxy_port;
-};
-
 struct network_client_ssl_config {
     std::string certificate_path;
     std::string private_key_path;
@@ -94,6 +83,25 @@ struct network_client_ssl_config {
 #endif
     }
 };
+
+struct rpc_client_forward_config {
+    //
+    network_client_ssl_config ssl_config;
+    std::string socks5_proxy_host;
+    std::string socks5_proxy_port;
+};
+struct rpc_server_external_config {
+    // Whether to enable transparent proxy mode. When enabled,
+    // traffic will be forwarded to the service at transparent_proxy_host:transparent_proxy_port
+    bool enable_transparent_proxy   = false;
+    std::uint32_t rpc_protocal_mask = rpc_protocal_filter_all;
+    // Transparent proxy target host
+    std::string transparent_proxy_host;
+    // Transparent proxy target port
+    std::string transparent_proxy_port;
+    rpc_client_forward_config forward_config;
+};
+
 
 template <typename T>
 struct auto_network_storage_instance : Fundamental::NonCopyable {

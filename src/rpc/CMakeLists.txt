@@ -17,6 +17,9 @@ file(GLOB lib_source
     proxy/websocket/*.h
     proxy/websocket/*.cpp
     proxy/websocket/*.hpp
+    proxy/ptotocal_pipe/*.h
+    proxy/ptotocal_pipe/*.cpp
+    proxy/ptotocal_pipe/*.hpp
 )
 
 # Add to source group, TREE will enable cmake to config the folder layout automatically

@@ -5,6 +5,7 @@
 #include "fundamental/basic/log.h"
 #include "fundamental/delay_queue/delay_queue.h"
 #include "rpc/proxy/custom_rpc_proxy.hpp"
+#include "rpc/proxy/ptotocal_pipe/forward_pipe_codec.hpp"
 #include "rpc/proxy/raw_tcp_proxy.hpp"
 #include "rpc/proxy/socks5/socks5_proxy_session.hpp"
 #include "rpc/proxy/websocket/ws_common.hpp"
@@ -21,8 +22,63 @@
 using namespace network;
 using namespace network::rpc_service;
 static Fundamental::ThreadPool& s_test_pool = Fundamental::ThreadPool::Instance<101>();
+TEST(rpc_test, test_forward_protocal_codec) {
+    {
+        using context_type = network::forward::forward_request_context;
+        context_type context;
+        context.dst_host              = "127.0.0.1";
+        context.dst_service           = "9000";
+        context.route_path            = "#/test_api#";
+        context.forward_protocal      = network::forward::forward_raw;
+        context.ssl_option            = network::forward::forward_required_option;
+        context.socks5_option         = network::forward::forward_required_option;
+        auto [encode_ret, encode_str] = context.encode();
+        EXPECT_TRUE(encode_ret);
+        context_type parse_context;
+        std::size_t i = 0;
+        encode_str.push_back('a');
+        for (; i < encode_str.size() - 3; i += 2) {
+            auto [status, len] = parse_context.decode(encode_str.data() + i, 2);
+            EXPECT_EQ(status, network::forward::forward_parse_need_more_data);
+            EXPECT_EQ(len, 2);
+        }
+        auto left_size     = encode_str.size() - i;
+        auto [status, len] = parse_context.decode(encode_str.data() + i, left_size);
+        EXPECT_EQ(status, network::forward::forward_parse_success);
+        EXPECT_EQ(len, left_size - 1);
 
-#if 1
+        EXPECT_EQ(parse_context.dst_host, context.dst_host);
+        EXPECT_EQ(parse_context.dst_service, context.dst_service);
+        EXPECT_EQ(parse_context.route_path, context.route_path);
+        EXPECT_EQ(parse_context.ssl_option, context.ssl_option);
+        EXPECT_EQ(parse_context.socks5_option, context.socks5_option);
+        EXPECT_EQ(parse_context.forward_protocal, context.forward_protocal);
+    }
+    {
+        using context_type = network::forward::forward_response_context;
+        context_type context;
+        context.code                  = 100;
+        context.msg                   = "okkk";
+        auto [encode_ret, encode_str] = context.encode();
+        EXPECT_TRUE(encode_ret);
+        context_type parse_context;
+        std::size_t i = 0;
+        encode_str.push_back('a');
+        for (; i < encode_str.size() - 3; i += 2) {
+            auto [status, len] = parse_context.decode(encode_str.data() + i, 2);
+            EXPECT_EQ(status, network::forward::forward_parse_need_more_data);
+            EXPECT_EQ(len, 2);
+        }
+        auto left_size     = encode_str.size() - i;
+        auto [status, len] = parse_context.decode(encode_str.data() + i, left_size);
+        EXPECT_EQ(status, network::forward::forward_parse_success);
+        EXPECT_EQ(len, left_size - 1);
+
+        EXPECT_EQ(parse_context.code, context.code);
+        EXPECT_EQ(parse_context.msg, context.msg);
+    }
+}
+#if 0
 TEST(rpc_test, test_ws_forward) {
     {
         std::string ws_context =

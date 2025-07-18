@@ -338,6 +338,18 @@ void server_task(std::promise<void>& sync_p) {
     ssl_config.verify_client       = ::getenv("verify_client") != nullptr;
     ssl_config.enable_no_ssl       = ::getenv("disable_no_ssl") == nullptr;
     server.enable_ssl(ssl_config);
+
+    network::rpc_server_external_config external_config;
+    external_config.forward_config.ssl_config.ca_certificate_path = ssl_config.ca_certificate_path;
+    external_config.forward_config.ssl_config.private_key_path    = ssl_config.private_key_path;
+    external_config.forward_config.ssl_config.certificate_path    = ssl_config.certificate_path;
+    external_config.forward_config.ssl_config.disable_ssl         = false;
+    external_config.forward_config.socks5_proxy_host              = "127.0.0.1";
+    external_config.forward_config.socks5_proxy_port              = "9000";
+    external_config.enable_transparent_proxy                      = true;
+    external_config.transparent_proxy_host                        = "127.0.0.1";
+    external_config.transparent_proxy_port                        = "9000";
+    server.set_external_config(external_config);
     dummy d;
     server.register_delay_handler("add", [&d](rpc_conn conn, int x, int y) -> int { return d.add(conn, x, y); });
 

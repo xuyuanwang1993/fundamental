@@ -7,12 +7,8 @@ namespace proxy
 {
 websocket_forward_connection::websocket_forward_connection(std::shared_ptr<rpc_service::connection> ref_connection,
                                                            route_query_function query_func,
-                                                           std::string default_host,
-                                                           std::string default_service,
                                                            std::string pre_read_data) :
 rpc_forward_connection(ref_connection, std::move(pre_read_data)), route_query_f(query_func) {
-    proxy_host    = default_host;
-    proxy_service = default_service;
 }
 void websocket_forward_connection::process_protocal() {
     auto read_buffer = client2server.GetWriteBuffer();
