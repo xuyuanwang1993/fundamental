@@ -44,13 +44,14 @@ struct network_server_ssl_config {
 };
 enum rpc_protocal_enable_mask : std::uint32_t
 {
-    rpc_protocal_filter_none          = 0,
-    rpc_protocal_filter_rpc           = (1 << 0),
-    rpc_protocal_filter_raw_tcp_proxy = (1 << 1),
-    rpc_protocal_filter_custom_proxy  = (1 << 2),
-    rpc_protocal_filter_socks5        = (1 << 3),
-    rpc_protocal_filter_http_ws       = (1 << 4),
-    rpc_protocal_filter_all           = std::numeric_limits<std::uint32_t>::max(),
+    rpc_protocal_filter_none            = 0,
+    rpc_protocal_filter_rpc             = (1 << 0),
+    rpc_protocal_filter_raw_tcp_proxy   = (1 << 1),
+    rpc_protocal_filter_custom_proxy    = (1 << 2),
+    rpc_protocal_filter_socks5          = (1 << 3),
+    rpc_protocal_filter_http_ws         = (1 << 4),
+    rpc_protocal_filter_pipe_connection = (1 << 5),
+    rpc_protocal_filter_all             = std::numeric_limits<std::uint32_t>::max(),
 };
 struct network_client_ssl_config {
     std::string certificate_path;
@@ -89,7 +90,10 @@ struct rpc_client_forward_config {
     network_client_ssl_config ssl_config;
     std::string socks5_proxy_host;
     std::string socks5_proxy_port;
+    std::string socks5_username;
+    std::string socks5_passwd;
 };
+
 struct rpc_server_external_config {
     // Whether to enable transparent proxy mode. When enabled,
     // traffic will be forwarded to the service at transparent_proxy_host:transparent_proxy_port
@@ -101,7 +105,6 @@ struct rpc_server_external_config {
     std::string transparent_proxy_port;
     rpc_client_forward_config forward_config;
 };
-
 
 template <typename T>
 struct auto_network_storage_instance : Fundamental::NonCopyable {

@@ -1,10 +1,15 @@
 #pragma once
+#include "forward_pipe_codec.hpp"
 #include "network/network.hpp"
 #include "rpc/proxy/rpc_forward_connection.hpp"
+
 namespace network
 {
 namespace proxy
 {
+/*
+connect -> socks5 handshake->tls handshake -> ws handshake->raw proxy
+*/
 class protocal_pipe_connection : public rpc_forward_connection {
 
 public:
@@ -18,9 +23,23 @@ public:
 
 protected:
     void process_protocal() override;
-
+    void HandleConnectSuccess() override;
+    void StartProtocal() override;
+    void StartForward() override;
+    void StartRawForward();
+    void read_more_data();
+    void start_pipe_proxy_handler();
+    void process_socks5_proxy();
+    void handle_tls();
+    void process_pipe_handshake();
+    void process_ws_proxy();
 protected:
+    void do_pipe_proxy();
+protected:
+    std::vector<std::uint8_t> read_cache;
     rpc_client_forward_config forward_config_;
+    forward::forward_request_context request_context;
+    bool need_socks5_proxy = false;
 };
 } // namespace proxy
 } // namespace network

@@ -1,4 +1,5 @@
 #include "connection.h"
+#include "proxy/protocal_pipe/protocal_pipe_connection.hpp"
 #include "proxy/proxy_handler.hpp"
 #include "proxy/socks5/socks5_session.h"
 #include "proxy/websocket/ws_forward_connection.hpp"
@@ -241,8 +242,8 @@ void connection::process_ws_request(std::size_t preread_len) {
             } while (0);
             return std::make_tuple(ret, dst_host, dst_service);
         };
-        auto ret = network::proxy::websocket_forward_connection::make_shared(
-            shared_from_this(), query_func, std::string(head_, head_ + preread_len));
+        auto ret = network::proxy::websocket_forward_connection::make_shared(shared_from_this(), query_func,
+                                                                             std::string(head_, head_ + preread_len));
         ret->start();
         // we don't release connection here,forward connection will manage the lifetime of the connection
         return;
@@ -264,6 +265,25 @@ void connection::process_socks5_proxy(const void* preread_data, std::size_t len)
         }
         auto ret = SocksV5::Socks5Session::make_shared(executor_, socks5_handler, std::move(socket_));
         ret->start(preread_data, len);
+    } while (0);
+    release_obj();
+}
+
+void connection::process_pipe_connection(std::size_t preread_len) {
+    // switch to proxy connection,don't need timer check any more
+    cancel_timer();
+    b_waiting_process_any_data.exchange(false);
+    do {
+        auto server = this->server_wref_.lock();
+        if (!server) {
+            FERR("server maybe post stop, cancel proxy");
+            break;
+        }
+        auto ret = network::proxy::protocal_pipe_connection::make_shared(
+            shared_from_this(), external_config.forward_config, std::string(head_, head_ + preread_len));
+        ret->start();
+        // we don't release connection here,forward connection will manage the lifetime of the connection
+        return;
     } while (0);
     release_obj();
 }
@@ -314,7 +334,13 @@ void connection::probe_protocal(std::size_t offset, std::size_t target_probe_siz
             // use default handler
             break;
         }
-
+        case forward::forward_request_context::kForwardMagicNum: {
+            if (!(external_config.rpc_protocal_mask & network::rpc_protocal_filter_pipe_connection))
+                goto RPC_FALL_DOWN_ACTION;
+            process_pipe_connection(offset);
+            // use default handler
+            break;
+        }
         case RPC_MAGIC_NUM: {
             if (!(external_config.rpc_protocal_mask & network::rpc_protocal_filter_rpc)) goto RPC_FALL_DOWN_ACTION;
             // ensure offset==rpc len

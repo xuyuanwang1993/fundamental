@@ -33,9 +33,11 @@ enum forward_protocal_t
 };
 //(total_len_str)(key)#(value_len_str)(value)(key)#(value_len_str)...
 struct forward_context_interface {
+    static constexpr std::int8_t kForwardMagicNum = '*';
+    static constexpr std::size_t kMagicNumSize    = 1;
     static constexpr std::size_t kMaxPayloadSize  = 9999;
     static constexpr std::size_t kFrameSizeStrLen = 4;
-    static constexpr std::size_t kMaxFrameSize    = kFrameSizeStrLen + kMaxPayloadSize;
+    static constexpr std::size_t kMaxFrameSize    = kFrameSizeStrLen + kMaxPayloadSize + kMagicNumSize;
     static constexpr std::int8_t kSplitChar       = '#';
     inline static constexpr std::array<const char*, forward_option_NUM> kForwardOptionArray = { "disabled", "optional",
                                                                                                 "required" };
@@ -58,16 +60,19 @@ struct forward_context_interface {
     std::tuple<bool, std::string> encode() {
         bool ret = false;
         std::string ret_str;
+        ret_str.push_back(kForwardMagicNum);
         do {
             auto [bEncodeSucess, encode_str] = encode_imp();
             if (!bEncodeSucess) break;
             auto [bSuccess, len_str] = format_len(encode_str.size());
             if (!bSuccess) break;
-            ret     = true;
-            ret_str = len_str + encode_str;
+            ret = true;
+            ret_str += len_str + encode_str;
         } while (0);
         return std::make_tuple(ret, ret_str);
     }
+    // On success, it returns the number of bytes parsed this time; when more data is needed, it returns the number of
+    // additional bytes required to be read.
     std::tuple<forward_parse_status, std::size_t> decode(const void* data, std::size_t len) {
         auto status  = forward_parse_status::forward_parse_failed;
         auto ret_len = len;
@@ -77,24 +82,29 @@ struct forward_context_interface {
             }
             auto ptr = static_cast<const std::uint8_t*>(data);
             if (len > 0) parse_cache.insert(parse_cache.end(), ptr, ptr + len);
-            if (parse_cache.size() < kFrameSizeStrLen) {
-                status = forward_parse_status::forward_parse_need_more_data;
+            if (parse_cache.size() < kFrameSizeStrLen + kMagicNumSize) {
+                status  = forward_parse_status::forward_parse_need_more_data;
+                ret_len = kFrameSizeStrLen + kMagicNumSize - parse_cache.size();
                 break;
             }
             if (payload_size == 0) {
-                auto [len_ret, parse_payload_size] = peek_len(parse_cache.data(), parse_cache.size());
+                if (parse_cache[0] != kForwardMagicNum) {
+                    break;
+                }
+                auto [len_ret, parse_payload_size] = peek_len(parse_cache.data() + kMagicNumSize, kFrameSizeStrLen);
                 // failed
                 if (!len_ret || parse_payload_size > kMaxPayloadSize || parse_payload_size == 0) break;
                 payload_size = parse_payload_size;
             }
-            if (kFrameSizeStrLen + payload_size > parse_cache.size()) {
-                status = forward_parse_status::forward_parse_need_more_data;
+            if (kMagicNumSize + kFrameSizeStrLen + payload_size > parse_cache.size()) {
+                ret_len = kMagicNumSize + kFrameSizeStrLen + payload_size - parse_cache.size();
+                status  = forward_parse_status::forward_parse_need_more_data;
                 break;
             }
-            ret_len = len - (parse_cache.size() - (kFrameSizeStrLen + payload_size));
-            parse_cache.resize(kFrameSizeStrLen + payload_size);
+            ret_len = len - (parse_cache.size() - (kMagicNumSize + kFrameSizeStrLen + payload_size));
+            parse_cache.resize(kMagicNumSize + kFrameSizeStrLen + payload_size);
 
-            std::size_t parse_pos = kFrameSizeStrLen;
+            std::size_t parse_pos = kFrameSizeStrLen + kMagicNumSize;
             // parse headers
             while (parse_pos < parse_cache.size()) {
                 auto key_pos = parse_cache.find(kSplitChar, parse_pos);
@@ -309,6 +319,7 @@ struct forward_request_context : forward_context_interface {
 
 struct forward_response_context : forward_context_interface {
     constexpr static std::int32_t kSuccessCode = 0;
+    constexpr static std::int32_t kFailedCode = 1;
     enum value_array_t : std::uint8_t
     {
         code_v,

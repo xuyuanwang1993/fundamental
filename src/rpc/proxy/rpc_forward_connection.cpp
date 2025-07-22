@@ -25,6 +25,9 @@ cachePool(Fundamental::MakePoolMemorySource()), client2server(cachePool), server
         pending_size -= chunk_size;
         pending_offset += chunk_size;
     }
+#ifndef NETWORK_DISABLE_SSL
+    ssl_config_.disable_ssl = true;
+#endif
 }
 
 void rpc_forward_connection::start() {
@@ -68,13 +71,41 @@ void rpc_forward_connection::HandleDisconnect(asio::error_code ec, const std::st
     if ((closeMask & ServerProxying) || (closeMask & ServerConnecting)) {
         if ((status & ServerProxying) || (status & ServerConnecting)) {
             status &= ~(ServerProxying | ServerConnecting);
-            asio::error_code code;
-            proxy_socket_.close(code);
+
+            {
+                auto final_clear_function = [this, ptr = shared_from_this()]() {
+                    asio::error_code ec;
+                    proxy_socket_.shutdown(asio::ip::tcp::socket::shutdown_both, ec);
+                    proxy_socket_.close(ec);
+                };
+
+#ifndef NETWORK_DISABLE_SSL
+                if (ssl_stream_) {
+                    ssl_stream_->async_shutdown([this, ptr = shared_from_this(), final_clear_function](
+                                                    const asio::error_code&) { final_clear_function(); });
+                    return;
+                }
+#endif
+                final_clear_function();
+            }
 #ifdef RPC_VERBOSE
             if (!callTag.empty()) FDEBUG("{} close proxy local endpoint", callTag);
 #endif
         }
     }
+}
+
+void rpc_forward_connection::HandleConnectSuccess() {
+    if (proxy_by_ssl()) {
+        ssl_handshake();
+    } else {
+        StartForward();
+    }
+}
+
+void rpc_forward_connection::StartProtocal() {
+    StartDnsResolve(proxy_host, proxy_service);
+    StartClientRead();
 }
 
 void rpc_forward_connection::StartDnsResolve(const std::string& host, const std::string& service) {
@@ -106,19 +137,28 @@ void rpc_forward_connection::StartConnect(asio::ip::tcp::resolver::results_type&
                                 HandleDisconnect(ec, "connect");
                                 return;
                             }
-                            status ^= ServerConnecting;
-                            status |= ServerProxying;
-                            if (!(status & ClientProxying)) return;
-                            asio::error_code error_code;
-                            asio::ip::tcp::no_delay option(true);
-                            proxy_socket_.set_option(option, error_code);
-                            enable_tcp_keep_alive(proxy_socket_);
-
-                            StartServerRead();
-                            StartClient2ServerWrite();
+                            HandleConnectSuccess();
                         });
 }
 
+void rpc_forward_connection::StartForward() {
+    status ^= ServerConnecting;
+    status |= ServerProxying;
+    if (!(status & ClientProxying)) return;
+    asio::error_code error_code;
+    asio::ip::tcp::no_delay option(true);
+    proxy_socket_.set_option(option, error_code);
+    enable_tcp_keep_alive(proxy_socket_);
+
+    StartServerRead();
+    StartClient2ServerWrite();
+}
+
+void rpc_forward_connection::enable_ssl(network_client_ssl_config client_ssl_config) {
+#ifndef NETWORK_DISABLE_SSL
+    ssl_config_ = client_ssl_config;
+#endif
+}
 void rpc_forward_connection::StartServer2ClientWrite() {
     if (!(status & ClientProxying)) return;
     auto needWrite = server2client.PrepareWriteCache();
@@ -165,18 +205,19 @@ void rpc_forward_connection::StartClient2ServerWrite() {
     if (!(status & ServerProxying)) return;
     auto needWrite = client2server.PrepareWriteCache();
     if (needWrite) {
-        proxy_socket_.async_write_some(client2server.GetWriteBuffer(), [this, self = shared_from_this()](
-                                                                           std::error_code ec, std::size_t bytesWrite) {
-            if (!reference_.is_valid()) {
-                return;
-            }
-            if (ec) {
-                HandleDisconnect(ec, "Client2ServerWrite", TrafficProxyCloseExceptClientProxying);
-                return;
-            }
-            client2server.UpdateWriteBuffer(bytesWrite);
-            StartClient2ServerWrite();
-        });
+        downstream_async_write_buffers_some(
+            client2server.GetWriteBuffer(),
+            [this, self = shared_from_this()](std::error_code ec, std::size_t bytesWrite) {
+                if (!reference_.is_valid()) {
+                    return;
+                }
+                if (ec) {
+                    HandleDisconnect(ec, "Client2ServerWrite", TrafficProxyCloseExceptClientProxying);
+                    return;
+                }
+                client2server.UpdateWriteBuffer(bytesWrite);
+                StartClient2ServerWrite();
+            });
     } else { // when client is aborted and remaining data to transfer to server
         if (!(status & ClientProxying)) {
             HandleDisconnect({}, "finish server transfer", ServerProxying);
@@ -186,20 +227,67 @@ void rpc_forward_connection::StartClient2ServerWrite() {
 
 void rpc_forward_connection::StartServerRead() {
     server2client.PrepareReadCache();
-    proxy_socket_.async_read_some(server2client.GetReadBuffer(),
-                                  [this, self = shared_from_this()](std::error_code ec, std::size_t bytesRead) {
-                                      if (!reference_.is_valid()) {
-                                          return;
-                                      }
-                                      server2client.UpdateReadBuffer(bytesRead);
-                                      Fundamental::ScopeGuard guard([this]() { StartServer2ClientWrite(); });
-                                      if (ec) {
-                                          HandleDisconnect(ec, "ServerRead", TrafficProxyCloseExceptClientProxying);
-                                          return;
-                                      }
-                                      StartServerRead();
-                                  });
+    downstream_async_buffer_read_some(server2client.GetReadBuffer(),
+                                      [this, self = shared_from_this()](std::error_code ec, std::size_t bytesRead) {
+                                          if (!reference_.is_valid()) {
+                                              return;
+                                          }
+                                          server2client.UpdateReadBuffer(bytesRead);
+                                          Fundamental::ScopeGuard guard([this]() { StartServer2ClientWrite(); });
+                                          if (ec) {
+                                              HandleDisconnect(ec, "ServerRead", TrafficProxyCloseExceptClientProxying);
+                                              return;
+                                          }
+                                          StartServerRead();
+                                      });
 }
 
+void rpc_forward_connection::ssl_handshake() {
+#ifndef NETWORK_DISABLE_SSL
+    asio::ssl::context ssl_context(asio::ssl::context::tlsv13);
+    auto* actual_context = &ssl_context;
+    try {
+        if (ssl_config_.load_exception) std::rethrow_exception(ssl_config_.load_exception);
+        if (!ssl_config_.ssl_context) {
+            if (!ssl_config_.ca_certificate_path.empty()) {
+                ssl_context.load_verify_file(ssl_config_.ca_certificate_path);
+            }
+            if (!ssl_config_.private_key_path.empty()) {
+                ssl_context.use_private_key_file(ssl_config_.private_key_path, asio::ssl::context::pem);
+            }
+            if (!ssl_config_.certificate_path.empty()) {
+                ssl_context.use_certificate_chain_file(ssl_config_.certificate_path);
+            }
+        } else {
+            actual_context = ssl_config_.ssl_context.get();
+        }
+        FDEBUG("load client ssl config success  ca:{} crt:{} key:{}", ssl_config_.ca_certificate_path,
+               ssl_config_.certificate_path, ssl_config_.private_key_path);
+    } catch (const std::exception& e) {
+        FERR("load ssl context failed {}", e.what());
+        return;
+    }
+
+    ssl_stream_ = std::make_unique<asio::ssl::stream<asio::ip::tcp::socket&>>(proxy_socket_, *actual_context);
+    ssl_stream_->set_verify_mode(asio::ssl::verify_peer);
+    SSL_set_tlsext_host_name(ssl_stream_->native_handle(), proxy_host.c_str());
+    ssl_stream_->async_handshake(asio::ssl::stream_base::client,
+                                 [this, ptr = shared_from_this()](const asio::error_code& ec) {
+                                     if (!reference_.is_valid()) {
+                                         return;
+                                     }
+                                     if (ec) return;
+                                     StartForward();
+                                 });
+#endif
+}
+
+bool rpc_forward_connection::proxy_by_ssl() {
+#ifndef NETWORK_DISABLE_SSL
+    return !ssl_config_.disable_ssl;
+#else
+    return false;
+#endif
+}
 } // namespace proxy
 } // namespace network

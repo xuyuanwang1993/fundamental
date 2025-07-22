@@ -7,24 +7,24 @@
 
 namespace network
 {
-struct network_proxy_write_buffer {
+struct network_upgrade_write_buffer {
     const void* data = nullptr;
     std::size_t len  = 0;
 };
-struct network_proxy_read_buffer {
+struct network_upgrade_read_buffer {
     void* data      = nullptr;
     std::size_t len = 0;
 };
-using write_buffer_t = std::vector<network_proxy_write_buffer>;
-using read_buffer_t  = std::vector<network_proxy_read_buffer>;
+using write_buffer_t = std::vector<network_upgrade_write_buffer>;
+using read_buffer_t  = std::vector<network_upgrade_read_buffer>;
 // code=0 means success
-struct network_proxy_interface : std::enable_shared_from_this<network_proxy_interface> {
+struct network_upgrade_interface : std::enable_shared_from_this<network_upgrade_interface> {
     static constexpr std::int32_t kSuccessOpCode = 0;
     using operation_cb                           = std::function<void(std::error_code ec, const std::string& msg)>;
     using write_cb = std::function<void(write_buffer_t write_buffers, const operation_cb& finish_cb)>;
     using read_cb  = std::function<void(read_buffer_t read_buffers, const operation_cb& finish_cb)>;
     using abort_cb = std::function<void()>;
-    virtual ~network_proxy_interface()         = default;
+    virtual ~network_upgrade_interface()         = default;
     virtual const char* interface_name() const = 0;
     virtual void abort_all_operation()         = 0;
     virtual void start()                       = 0;

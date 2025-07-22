@@ -32,6 +32,13 @@ protected:
     void HandleDisconnect(asio::error_code ec,
                           const std::string& callTag = "",
                           std::int32_t closeMask     = TrafficProxyCloseAll);
+    virtual void HandleConnectSuccess();
+    // This function is a protocol handling example, and its default implementation initiates a connection to the peer
+    // and enables read operations on the raw connection.
+    virtual void StartProtocal();
+    // This function will be called after a successful proxy connection or SSL handshake.
+    virtual void StartForward();
+    void enable_ssl(network_client_ssl_config client_ssl_config);
 
 protected:
     void StartDnsResolve(const std::string& host, const std::string& service);
@@ -40,6 +47,10 @@ protected:
     void StartClientRead();
     void StartClient2ServerWrite();
     void StartServerRead();
+
+protected:
+    void ssl_handshake();
+    bool proxy_by_ssl();
 
 protected:
     // forward imp
@@ -62,6 +73,48 @@ protected:
         upstream->async_write_buffers_some(std::move(buffers), handler);
     }
 
+    template <typename BufferType, typename Handler>
+    void downstream_async_buffer_read(BufferType buffers, Handler handler) {
+        if (proxy_by_ssl()) {
+#ifndef NETWORK_DISABLE_SSL
+            asio::async_read(*ssl_stream_, std::move(buffers), std::move(handler));
+#endif
+        } else {
+            asio::async_read(proxy_socket_, std::move(buffers), std::move(handler));
+        }
+    }
+    template <typename BufferType, typename Handler>
+    void downstream_async_buffer_read_some(BufferType buffers, Handler handler) {
+        if (proxy_by_ssl()) {
+#ifndef NETWORK_DISABLE_SSL
+            ssl_stream_->async_read_some(std::move(buffers), std::move(handler));
+#endif
+        } else {
+            proxy_socket_.async_read_some(std::move(buffers), std::move(handler));
+        }
+    }
+
+    template <typename BufferType, typename Handler>
+    void downstream_async_write_buffers(BufferType&& buffers, Handler handler) {
+        if (proxy_by_ssl()) {
+#ifndef NETWORK_DISABLE_SSL
+            asio::async_write(*ssl_stream_, std::move(buffers), std::move(handler));
+#endif
+        } else {
+            asio::async_write(proxy_socket_, std::move(buffers), std::move(handler));
+        }
+    }
+    template <typename BufferType, typename Handler>
+    void downstream_async_write_buffers_some(BufferType&& buffers, Handler handler) {
+        if (proxy_by_ssl()) {
+#ifndef NETWORK_DISABLE_SSL
+            ssl_stream_->async_write_some(std::move(buffers), std::move(handler));
+#endif
+        } else {
+            proxy_socket_.async_write_some(std::move(buffers), std::move(handler));
+        }
+    }
+
 protected:
     network::network_data_reference reference_;
     std::string proxy_host;
@@ -70,6 +123,10 @@ protected:
     std::shared_ptr<rpc_service::connection> upstream;
     //
     asio::ip::tcp::socket proxy_socket_;
+#ifndef NETWORK_DISABLE_SSL
+    std::unique_ptr<asio::ssl::stream<asio::ip::tcp::socket&>> ssl_stream_ = nullptr;
+    network_client_ssl_config ssl_config_;
+#endif
     asio::ip::tcp::resolver resolver;
     std::int32_t status = ClientProxying;
     //

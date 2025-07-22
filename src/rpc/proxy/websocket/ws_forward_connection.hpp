@@ -17,7 +17,7 @@ public:
     explicit websocket_forward_connection(std::shared_ptr<rpc_service::connection> ref_connection,
                                           route_query_function query_func,
                                           std::string pre_read_data = "");
-
+    
 protected:
     void process_protocal() override;
     void read_more_data();

@@ -283,6 +283,7 @@ private:
     void process_raw_tcp_proxy_request();
     void process_transparent_proxy(std::size_t preread_len = 0);
     void process_ws_request(std::size_t preread_len = 0);
+    void process_pipe_connection(std::size_t preread_len = 0);
     void process_socks5_proxy(const void* preread_data, std::size_t len);
     void probe_protocal(std::size_t offset = 0, std::size_t target_probe_size = kProbeReadSize);
     void read_rpc_head(std::size_t offset = 0);

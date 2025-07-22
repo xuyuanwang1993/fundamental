@@ -331,6 +331,7 @@ std::tuple<http_handler_context::parse_status, std::size_t> http_handler_context
             headers.emplace(std::move(key), std::move(value));
             parse_pos = next_line_pos + line_len;
         }
+        FDEBUG("\n{}", parse_cache);
         parse_cache.clear();
         parse_cache.shrink_to_fit();
         status = parse_status::parse_success;

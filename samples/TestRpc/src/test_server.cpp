@@ -341,11 +341,13 @@ void server_task(std::promise<void>& sync_p) {
 
     network::rpc_server_external_config external_config;
     external_config.forward_config.ssl_config.ca_certificate_path = ssl_config.ca_certificate_path;
-    external_config.forward_config.ssl_config.private_key_path    = ssl_config.private_key_path;
-    external_config.forward_config.ssl_config.certificate_path    = ssl_config.certificate_path;
+    external_config.forward_config.ssl_config.private_key_path    = "client.key";
+    external_config.forward_config.ssl_config.certificate_path    = "client.crt";
     external_config.forward_config.ssl_config.disable_ssl         = false;
     external_config.forward_config.socks5_proxy_host              = "127.0.0.1";
     external_config.forward_config.socks5_proxy_port              = "9000";
+    external_config.forward_config.socks5_username                = "fongwell";
+    external_config.forward_config.socks5_passwd                  = "fongwell123456";
     external_config.enable_transparent_proxy                      = true;
     external_config.transparent_proxy_host                        = "127.0.0.1";
     external_config.transparent_proxy_port                        = "9000";
@@ -412,6 +414,7 @@ void server_task(std::promise<void>& sync_p) {
             }
             manager.UpdateProxyHostInfo("test_http", std::move(host));
         }
+        manager.AddWsProxyRoute("/ws_proxy", proxy::ProxyHost { "127.0.0.1", "9000" });
     }
     server.enable_data_proxy(&s_manager);
     server.enable_socks5_proxy(SocksV5::Sock5Handler::make_default_handler());

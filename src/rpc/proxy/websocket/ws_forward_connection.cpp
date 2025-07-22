@@ -11,8 +11,8 @@ websocket_forward_connection::websocket_forward_connection(std::shared_ptr<rpc_s
 rpc_forward_connection(ref_connection, std::move(pre_read_data)), route_query_f(query_func) {
 }
 void websocket_forward_connection::process_protocal() {
-    auto read_buffer = client2server.GetWriteBuffer();
-    auto [status,peek_len]         = parse_context.parse(read_buffer.data(), read_buffer.size());
+    auto read_buffer        = client2server.GetWriteBuffer();
+    auto [status, peek_len] = parse_context.parse(read_buffer.data(), read_buffer.size());
     do {
         if (status == websocket::http_handler_context::parse_status::parse_failed) break;
         client2server.UpdateWriteBuffer(peek_len);
@@ -44,8 +44,20 @@ void websocket_forward_connection::read_more_data() {
 
 void websocket_forward_connection::start_ws_proxy() {
     websocket::http_handler_context response_context;
-    std::string response_data;
-    Fundamental::ScopeGuard response_guard([&]() {});
+    auto response_data    = std::make_shared<std::string>();
+    bool finished_success = false;
+    Fundamental::ScopeGuard response_guard([&]() {
+        //
+        forward_async_write_buffers(asio::const_buffer { response_data->data(), response_data->size() },
+                                    [this, self = shared_from_this(), response_data,
+                                     finished_success](std::error_code ec, std::size_t bytesRead) {
+                                        if (!reference_.is_valid()) {
+                                            return;
+                                        }
+                                        if (!finished_success) return;
+                                        StartProtocal();
+                                    });
+    });
 
     do {
         // check head
@@ -92,7 +104,7 @@ void websocket_forward_connection::start_ws_proxy() {
         if (proxy_host.empty() || proxy_service.empty()) {
             goto HAS_ANY_PROTOCAL_ERROR;
         }
-        FDEBUG("ws dst {} {}", proxy_host, proxy_service);
+        FDEBUG("ws  dst {} {}", proxy_host, proxy_service);
         response_context.head1 = response_context.kHttpVersion;
         response_context.head2 = response_context.kWebsocketSuccessCode;
         response_context.head3 = response_context.kWebsocketSuccessStr;
@@ -100,12 +112,13 @@ void websocket_forward_connection::start_ws_proxy() {
         response_context.headers.emplace(response_context.kHttpConnection, response_context.kHttpUpgradeStr);
         response_context.headers.emplace(response_context.kWebsocketResponseAccept,
                                          websocket::ws_utils::generateServerAcceptKey(ws_key));
-        response_data = response_context.encode();
+        *response_data   = response_context.encode();
+        finished_success = true;
         return;
 
     } while (0);
 HAS_ANY_PROTOCAL_ERROR:
-    response_data = response_context.default_error_response();
+    *response_data = response_context.default_error_response();
 }
 } // namespace proxy
 } // namespace network

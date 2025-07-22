@@ -3,7 +3,7 @@
 #include "basic/md5.hpp"
 #include "basic/meta_util.hpp"
 #include "network/network.hpp"
-#include "network/proxy_interface.hpp"
+#include "network/upgrade_interface.hpp"
 
 #include <deque>
 #include <functional>
@@ -294,16 +294,16 @@ public:
             deadline_.cancel();
         }
     }
-    void append_proxy(std::shared_ptr<network_proxy_interface> proxy) {
+    void append_proxy(std::shared_ptr<network_upgrade_interface> proxy) {
         if (!proxy) return;
         proxy_interfaces.emplace_back(proxy);
     }
-    void set_proxy(std::shared_ptr<network_proxy_interface> proxy) {
+    void set_proxy(std::shared_ptr<network_upgrade_interface> proxy) {
         proxy_interfaces.clear();
         if (!proxy) return;
         proxy_interfaces.emplace_back(proxy);
     }
-    void set_proxy(std::vector<std::shared_ptr<network_proxy_interface>> proxy_vec) {
+    void set_proxy(std::vector<std::shared_ptr<network_upgrade_interface>> proxy_vec) {
         proxy_interfaces = proxy_vec;
     }
     void config_addr(const std::string& host, const std::string& service) {
@@ -630,7 +630,7 @@ private:
                                     });
             });
     }
-    void proxy_write(write_buffer_t write_buffers, const network_proxy_interface::operation_cb& finish_cb) {
+    void proxy_write(write_buffer_t write_buffers, const network_upgrade_interface::operation_cb& finish_cb) {
         if (!reference_.is_valid()) {
             finish_cb(std::make_error_code(std::errc::operation_canceled), "aborted");
             return;
@@ -648,7 +648,7 @@ private:
                               finish_cb(ec, "");
                           });
     }
-    void proxy_read(read_buffer_t read_buffers, const network_proxy_interface::operation_cb& finish_cb) {
+    void proxy_read(read_buffer_t read_buffers, const network_upgrade_interface::operation_cb& finish_cb) {
         if (!reference_.is_valid()) {
             finish_cb(std::make_error_code(std::errc::operation_canceled), "aborted");
             return;
@@ -670,12 +670,12 @@ private:
         change_connection_status(rpc_connection_proxy_handshaking);
         auto write_callback =
             [this, ptr = shared_from_this()](write_buffer_t write_buffers,
-                                             const network_proxy_interface::operation_cb& finish_cb) mutable {
+                                             const network_upgrade_interface::operation_cb& finish_cb) mutable {
                 proxy_write(std::move(write_buffers), finish_cb);
             };
         auto read_callback =
             [this, ptr = shared_from_this()](read_buffer_t read_buffers,
-                                             const network_proxy_interface::operation_cb& finish_cb) mutable {
+                                             const network_upgrade_interface::operation_cb& finish_cb) mutable {
                 proxy_read(std::move(read_buffers), finish_cb);
             };
         ;
@@ -686,7 +686,6 @@ private:
             asio::post(ios_, [this, ref = shared_from_this()] { close(true); });
         };
         auto finish_callback = [this, ptr = shared_from_this(), layer](std::error_code ec, const std::string& msg) {
-            
             do {
                 if (!reference_.is_valid()) {
                     if (!ec) ec = std::make_error_code(std::errc::bad_file_descriptor);
@@ -864,7 +863,7 @@ private:
     }
 
     void do_read() {
-        async_buffer_read({ asio::buffer(head_.data(), kRpcHeadLen) },
+        async_buffer_read(asio::buffer(head_.data(), kRpcHeadLen),
                           [this, ptr = shared_from_this()](const asio::error_code& ec, const size_t length) {
                               if (!reference_.is_valid()) {
                                   return;
@@ -912,7 +911,7 @@ private:
 
     void read_body(std::uint64_t req_id, request_type req_type, size_t body_len, std::size_t read_offset = 0) {
         FASSERT(read_offset < body_len);
-        async_buffer_read_some({ asio::buffer(body_.data() + read_offset, body_len - read_offset) },
+        async_buffer_read_some(asio::buffer(body_.data() + read_offset, body_len - read_offset),
                                [this, req_id, req_type, body_len, read_offset,
                                 ptr = shared_from_this()](asio::error_code ec, std::size_t length) {
                                    if (!reference_.is_valid()) {
@@ -1202,8 +1201,8 @@ private:
 #endif
     }
 
-    template <typename Handler>
-    void async_buffer_read(std::vector<asio::mutable_buffer> buffers, Handler handler) {
+    template <typename BufferType, typename Handler>
+    void async_buffer_read(BufferType buffers, Handler handler) {
         if (is_ssl()) {
 #ifndef NETWORK_DISABLE_SSL
             asio::async_read(*ssl_stream_, std::move(buffers), std::move(handler));
@@ -1212,8 +1211,8 @@ private:
             asio::async_read(socket_, std::move(buffers), std::move(handler));
         }
     }
-    template <typename Handler>
-    void async_buffer_read_some(std::vector<asio::mutable_buffer> buffers, Handler handler) {
+    template <typename BufferType, typename Handler>
+    void async_buffer_read_some(BufferType buffers, Handler handler) {
         if (is_ssl()) {
 #ifndef NETWORK_DISABLE_SSL
             ssl_stream_->async_read_some(std::move(buffers), std::move(handler));
@@ -1302,7 +1301,7 @@ private:
     std::mutex sub_mtx_;
     std::unordered_map<std::string, std::function<void(string_view)>> sub_map_;
     //
-    std::vector<std::shared_ptr<network_proxy_interface>> proxy_interfaces;
+    std::vector<std::shared_ptr<network_upgrade_interface>> proxy_interfaces;
     rpc_client_ssl_level ssl_level = rpc_client_ssl_level::rpc_client_ssl_level_none;
 #ifndef NETWORK_DISABLE_SSL
     std::unique_ptr<asio::ssl::stream<asio::ip::tcp::socket&>> ssl_stream_ = nullptr;
