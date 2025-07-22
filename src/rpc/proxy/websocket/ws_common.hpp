@@ -58,6 +58,7 @@ struct http_handler_context {
     constexpr static const char* kWebsocketSuccessCode = "101";
     constexpr static const char* kWebsocketSuccessStr  = "Switching Protocols";
     constexpr static const char* kHttpUpgradeStr       = "Upgrade";
+    constexpr static const char* kHttpUpgradeValueStr  = "upgrade";
     constexpr static const char* kHttpWebsocketStr     = "websocket";
     // ip[:port]
     constexpr static const char* kHttpHost                = "Host";

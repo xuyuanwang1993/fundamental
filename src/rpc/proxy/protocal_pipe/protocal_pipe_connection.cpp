@@ -97,6 +97,7 @@ void protocal_pipe_connection::start_pipe_proxy_handler() {
         }
         proxy_host    = request_context.dst_host;
         proxy_service = request_context.dst_service;
+        FDEBUG("pipe proxy to {} {}", proxy_host, proxy_service);
         if (request_context.forward_protocal == forward::forward_raw) {
             FWARN("not supported now");
             break;
@@ -117,6 +118,7 @@ void protocal_pipe_connection::start_pipe_proxy_handler() {
             response_context.msg = "no ssl proxy enabled";
             break;
         }
+
         response_context.code = response_context.kSuccessCode;
         response_context.msg  = "success";
     } while (0);

@@ -34,6 +34,7 @@ public:
             finish_cb_(std::make_error_code(std::errc::invalid_argument), "user info overflow");
             return;
         }
+        FDEBUG("request socks5 proxy to {} {}",dst_host,dst_port);
         greeting();
     }
 

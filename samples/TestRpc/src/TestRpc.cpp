@@ -83,7 +83,7 @@ TEST(rpc_test, test_ws_forward) {
     {
         std::string ws_context =
             "GET /api111 HTTP/1.1\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: "
-            "dGhlIHNhbXBsZSBub25jZQ==\r\nConnection: Upgrade\r\nUpgrade: websocket\r\nHost: example.com\r\n\r\n";
+            "dGhlIHNhbXBsZSBub25jZQ==\r\nConnection: upgrade\r\nUpgrade: websocket\r\nHost: example.com\r\n\r\n";
 
         network::websocket::http_handler_context context;
         context.head1 = context.kWebsocketMethod;
@@ -91,7 +91,7 @@ TEST(rpc_test, test_ws_forward) {
         context.head3 = context.kHttpVersion;
         context.headers.emplace(context.kHttpHost, "example.com");
         context.headers.emplace(context.kHttpUpgradeStr, context.kHttpWebsocketStr);
-        context.headers.emplace(context.kHttpConnection, context.kHttpUpgradeStr);
+        context.headers.emplace(context.kHttpConnection, context.kHttpUpgradeValueStr);
         context.headers.emplace(context.kWebsocketRequestKey, "dGhlIHNhbXBsZSBub25jZQ==");
         context.headers.emplace(context.kWebsocketRequestVersion, context.kWebsocketVersion);
         auto encode_str = context.encode();
@@ -125,14 +125,14 @@ TEST(rpc_test, test_ws_forward) {
     {
         std::string ws_context =
             "HTTP/1.1 101 Switching Protocols\r\nSec-WebSocket-Accept: dGhlIHNhbXBsZSBub25jZQ==\r\nConnection: "
-            "Upgrade\r\nUpgrade: websocket\r\n\r\n";
+            "upgrade\r\nUpgrade: websocket\r\n\r\n";
 
         network::websocket::http_handler_context context;
         context.head1 = context.kHttpVersion;
         context.head2 = context.kWebsocketSuccessCode;
         context.head3 = context.kWebsocketSuccessStr;
         context.headers.emplace(context.kHttpUpgradeStr, context.kHttpWebsocketStr);
-        context.headers.emplace(context.kHttpConnection, context.kHttpUpgradeStr);
+        context.headers.emplace(context.kHttpConnection, context.kHttpUpgradeValueStr);
         context.headers.emplace(context.kWebsocketResponseAccept, "dGhlIHNhbXBsZSBub25jZQ==");
         auto encode_str = context.encode();
         EXPECT_EQ(encode_str, ws_context);
@@ -1216,14 +1216,14 @@ TEST(rpc_test, test_proxy_list) {
 TEST(rpc_test, test_proxy_list) {
     auto client = network::make_guard<rpc_client>("127.0.0.1", "9000");
     forward::forward_request_context forward_request;
-    forward_request.dst_host      = "127.0.0.1";
-    forward_request.dst_service   = "9000";
-    forward_request.route_path    = "/ws_proxy";
-    forward_request.socks5_option = forward::forward_disable_option;
-    forward_request.ssl_option    = forward::forward_required_option;
-    auto pipe_upgrade             = proxy::pip_connection_upgrade::make_shared(forward_request);
+    forward_request.dst_host    = "127.0.0.1";
+    auto ws_dst_port            = ::getenv("ws_dst_port");
+    forward_request.dst_service = ws_dst_port ? ws_dst_port : "9000";
+    forward_request.route_path  = "/ws_proxy";
+    forward_request.ssl_option  = forward::forward_required_option;
+    auto pipe_upgrade           = proxy::pip_connection_upgrade::make_shared(forward_request);
     client->append_proxy(pipe_upgrade);
-    auto ws_upgrade               = proxy::ws_upgrade_imp::make_shared("/ws_proxy", "127.0.0.1");
+    auto ws_upgrade = proxy::ws_upgrade_imp::make_shared("/ws_proxy", "127.0.0.1");
     client->append_proxy(ws_upgrade);
     auto socks5_proxy = SocksV5::socks5_proxy_imp::make_shared("127.0.0.1", 9000, "", "");
     client->append_proxy(socks5_proxy);

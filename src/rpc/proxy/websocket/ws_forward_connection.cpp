@@ -1,4 +1,5 @@
 #include "ws_forward_connection.hpp"
+#include "fundamental/basic/string_utils.hpp"
 #include "fundamental/basic/utils.hpp"
 #include "rpc/connection.h"
 namespace network
@@ -47,6 +48,7 @@ void websocket_forward_connection::start_ws_proxy() {
     auto response_data    = std::make_shared<std::string>();
     bool finished_success = false;
     Fundamental::ScopeGuard response_guard([&]() {
+        FDEBUG("ws forward:response \n{}", *response_data);
         //
         forward_async_write_buffers(asio::const_buffer { response_data->data(), response_data->size() },
                                     [this, self = shared_from_this(), response_data,
@@ -68,14 +70,16 @@ void websocket_forward_connection::start_ws_proxy() {
         // check upgrade
         {
             auto iter = parse_context.headers.find(parse_context.kHttpUpgradeStr);
-            if (iter == parse_context.headers.end() || iter->second != parse_context.kHttpWebsocketStr) {
+            if (iter == parse_context.headers.end() ||
+                (Fundamental::StringToLower(iter->second), iter->second != parse_context.kHttpWebsocketStr)) {
                 goto HAS_ANY_PROTOCAL_ERROR;
             }
         }
         // check connection
         {
             auto iter = parse_context.headers.find(parse_context.kHttpConnection);
-            if (iter == parse_context.headers.end() || iter->second != parse_context.kHttpUpgradeStr) {
+            if (iter == parse_context.headers.end() ||
+                (Fundamental::StringToLower(iter->second), iter->second != parse_context.kHttpUpgradeValueStr)) {
                 goto HAS_ANY_PROTOCAL_ERROR;
             }
         }
@@ -109,7 +113,7 @@ void websocket_forward_connection::start_ws_proxy() {
         response_context.head2 = response_context.kWebsocketSuccessCode;
         response_context.head3 = response_context.kWebsocketSuccessStr;
         response_context.headers.emplace(response_context.kHttpUpgradeStr, response_context.kHttpWebsocketStr);
-        response_context.headers.emplace(response_context.kHttpConnection, response_context.kHttpUpgradeStr);
+        response_context.headers.emplace(response_context.kHttpConnection, response_context.kHttpUpgradeValueStr);
         response_context.headers.emplace(response_context.kWebsocketResponseAccept,
                                          websocket::ws_utils::generateServerAcceptKey(ws_key));
         *response_data   = response_context.encode();

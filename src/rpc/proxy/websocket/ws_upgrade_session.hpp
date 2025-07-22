@@ -42,7 +42,7 @@ protected:
         context.head3 = context.kHttpVersion;
         context.headers.emplace(context.kHttpHost, remote_host);
         context.headers.emplace(context.kHttpUpgradeStr, context.kHttpWebsocketStr);
-        context.headers.emplace(context.kHttpConnection, context.kHttpUpgradeStr);
+        context.headers.emplace(context.kHttpConnection, context.kHttpUpgradeValueStr);
         context.headers.emplace(context.kWebsocketRequestKey, network::websocket::ws_utils::generateSessionKey(this));
         context.headers.emplace(context.kWebsocketRequestVersion, context.kWebsocketVersion);
         auto request_str = std::make_shared<std::string>(context.encode());
