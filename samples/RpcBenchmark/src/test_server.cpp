@@ -16,12 +16,13 @@
 using namespace network;
 using namespace rpc_service;
 static auto& rpc_stream_pool = Fundamental::ThreadPool::Instance<100>();
+
 std::string echo(rpc_conn conn, std::string src) {
     if (src.size() > 4096) {
         auto sp = conn.lock();
         sp->set_delay(true);
         auto req_id = sp->request_id(); // note: you need keep the request id at that
-        rpc_stream_pool.Enqueue([src = std::move(src), conn, req_id]() ->void {
+        rpc_stream_pool.Enqueue([src = std::move(src), conn, req_id]() -> void {
             auto sp = conn.lock();
             if (sp) sp->response(req_id, network::rpc_service::request_type::rpc_res, std::move(src));
         });
@@ -52,25 +53,29 @@ static network::proxy::ProxyManager s_manager;
 void server_task(std::promise<void>& sync_p) {
 
     auto s_server = rpc_server::make_shared(9000);
-    s_server->enable_ssl({ nullptr, "server.crt", "server.key", "dh2048.pem","ca_root.crt" });
+    s_server->enable_ssl({ nullptr, "server.crt", "server.key", "dh2048.pem", "ca_root.crt" });
     s_server->register_handler("echo", echo);
     s_server->register_handler("echos", echos);
     network::init_io_context_pool(10);
+    network::rpc_server_external_config external_config;
+    external_config.forward_config.ssl_config.ca_certificate_path = "ca_root.crt";
+    external_config.forward_config.ssl_config.private_key_path    = "client.key";
+    external_config.forward_config.ssl_config.certificate_path    = "client.crt";
+    external_config.forward_config.ssl_config.disable_ssl         = false;
+    external_config.forward_config.socks5_proxy_host              = "127.0.0.1";
+    external_config.forward_config.socks5_proxy_port              = "9000";
+    external_config.forward_config.socks5_username                = "fongwell";
+    external_config.forward_config.socks5_passwd                  = "fongwell123456";
+    external_config.enable_transparent_proxy                      = true;
+    external_config.transparent_proxy_host                        = "127.0.0.1";
+    external_config.transparent_proxy_port                        = "9000";
+    s_server->set_external_config(external_config);
     {
         using namespace network::proxy;
         auto& manager = s_manager;
-        { // add http proxy
-            ProxyHostInfo host;
-            host.token = kProxyServiceToken;
-            {
-                ProxyHost hostRecord;
-                hostRecord.host    = "0.0.0.0";
-                hostRecord.service = "9000";
-                host.hosts.emplace(kProxyServiceField, std::move(hostRecord));
-            }
-            manager.UpdateProxyHostInfo(kProxyServiceName, std::move(host));
-        }
+        manager.AddWsProxyRoute("/ws_proxy", proxy::ProxyHost { "127.0.0.1", "9000" });
     }
+
     s_server->enable_data_proxy(&s_manager);
     s_server->start();
     rpc_stream_pool.Spawn(5);

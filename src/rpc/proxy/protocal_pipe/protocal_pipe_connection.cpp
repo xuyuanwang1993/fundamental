@@ -98,10 +98,6 @@ void protocal_pipe_connection::start_pipe_proxy_handler() {
         proxy_host    = request_context.dst_host;
         proxy_service = request_context.dst_service;
         FDEBUG("pipe proxy to {} {}", proxy_host, proxy_service);
-        if (request_context.forward_protocal == forward::forward_raw) {
-            FWARN("not supported now");
-            break;
-        }
         if (request_context.socks5_option == forward::forward_option::forward_required_option &&
             (forward_config_.socks5_proxy_host.empty() || forward_config_.socks5_proxy_port.empty())) {
             response_context.msg = "no socks5 proxy set";
@@ -197,7 +193,9 @@ void protocal_pipe_connection::process_pipe_handshake() {
     case forward::forward_websocket: {
         process_ws_proxy();
     } break;
-
+    case forward::forward_raw: {
+        do_pipe_proxy();
+    } break;
     default: {
         FERR("pipe proxy protocal {} is coming soon",
              forward::forward_context_interface::kForwardProtocalArray[request_context.forward_protocal]);

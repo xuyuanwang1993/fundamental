@@ -1,5 +1,6 @@
 #include "rpc_forward_connection.hpp"
 #include "rpc/connection.h"
+#define RPC_VERBOSE 1
 namespace network
 {
 namespace proxy
@@ -48,8 +49,11 @@ void rpc_forward_connection::release_obj() {
     });
 }
 
-void rpc_forward_connection::HandleDisconnect(asio::error_code ec, const std::string& callTag, std::int32_t closeMask) {
-    if (!callTag.empty()) FDEBUG("disconnect for {} -> ec:{}-{}", callTag, ec.category().name(), ec.message());
+void rpc_forward_connection::HandleDisconnect(asio::error_code ec,
+                                              const std::string& callTag,
+                                              std::uint32_t closeMask) {
+    if (!callTag.empty())
+        FDEBUG("disconnect for {} {}-> ec:{}-{}", callTag, closeMask, ec.category().name(), ec.message());
     if (closeMask & ClientProxying) {
         if (status & ClientProxying) {
             status &= (~ClientProxying);
@@ -177,6 +181,9 @@ void rpc_forward_connection::StartServer2ClientWrite() {
                 StartServer2ClientWrite();
             });
     } else { // when server connection is aborted and remaining data to transfer to client
+        if (downstream_delay_close) {
+            HandleDisconnect({}, "ServerRead delay close", TrafficProxyCloseExceptClientProxying);
+        }
         if (!(status & ServerProxying)) {
             HandleDisconnect({}, "finish client transfer", ClientProxying);
         }
@@ -185,20 +192,26 @@ void rpc_forward_connection::StartServer2ClientWrite() {
 
 void rpc_forward_connection::StartClientRead() {
     client2server.PrepareReadCache();
-    upstream->async_buffer_read_some(client2server.GetReadBuffer(),
-                                     [this, self = shared_from_this()](std::error_code ec, std::size_t bytesRead) {
-                                         if (!reference_.is_valid()) {
-                                             return;
-                                         }
-                                         client2server.UpdateReadBuffer(bytesRead);
-                                         Fundamental::ScopeGuard guard([this]() { StartClient2ServerWrite(); });
+    upstream->async_buffer_read_some(
+        client2server.GetReadBuffer(), [this, self = shared_from_this()](std::error_code ec, std::size_t bytesRead) {
+            if (!reference_.is_valid()) {
+                return;
+            }
+            client2server.UpdateReadBuffer(bytesRead);
+            Fundamental::ScopeGuard guard([this]() { StartClient2ServerWrite(); });
 
-                                         if (ec) {
-                                             HandleDisconnect(ec, "ClientRead", TrafficProxyCloseExceptServerProxying);
-                                             return;
-                                         }
-                                         StartClientRead();
-                                     });
+            if (ec) {
+                auto needWrite = client2server.PrepareWriteCache();
+                if (needWrite) {
+                    upstream_delay_close = true;
+                    FDEBUG("ClientRead request delay close");
+                } else {
+                    HandleDisconnect(ec, "ClientRead", TrafficProxyCloseExceptServerProxying);
+                }
+                return;
+            }
+            StartClientRead();
+        });
 }
 
 void rpc_forward_connection::StartClient2ServerWrite() {
@@ -219,6 +232,9 @@ void rpc_forward_connection::StartClient2ServerWrite() {
                 StartClient2ServerWrite();
             });
     } else { // when client is aborted and remaining data to transfer to server
+        if (upstream_delay_close) {
+            HandleDisconnect({}, "ClientRead delay close", TrafficProxyCloseExceptServerProxying);
+        }
         if (!(status & ClientProxying)) {
             HandleDisconnect({}, "finish server transfer", ServerProxying);
         }
@@ -227,19 +243,27 @@ void rpc_forward_connection::StartClient2ServerWrite() {
 
 void rpc_forward_connection::StartServerRead() {
     server2client.PrepareReadCache();
-    downstream_async_buffer_read_some(server2client.GetReadBuffer(),
-                                      [this, self = shared_from_this()](std::error_code ec, std::size_t bytesRead) {
-                                          if (!reference_.is_valid()) {
-                                              return;
-                                          }
-                                          server2client.UpdateReadBuffer(bytesRead);
-                                          Fundamental::ScopeGuard guard([this]() { StartServer2ClientWrite(); });
-                                          if (ec) {
-                                              HandleDisconnect(ec, "ServerRead", TrafficProxyCloseExceptClientProxying);
-                                              return;
-                                          }
-                                          StartServerRead();
-                                      });
+    downstream_async_buffer_read_some(
+        server2client.GetReadBuffer(), [this, self = shared_from_this()](std::error_code ec, std::size_t bytesRead) {
+            if (!reference_.is_valid()) {
+                return;
+            }
+            server2client.UpdateReadBuffer(bytesRead);
+            Fundamental::ScopeGuard guard([this]() { StartServer2ClientWrite(); });
+            if (ec) {
+
+                auto needWrite = server2client.PrepareWriteCache();
+                if (needWrite) {
+                    downstream_delay_close = true;
+                    FDEBUG("ServerRead request delay close");
+                } else {
+                    HandleDisconnect(ec, "ServerRead", TrafficProxyCloseExceptClientProxying);
+                }
+
+                return;
+            }
+            StartServerRead();
+        });
 }
 
 void rpc_forward_connection::ssl_handshake() {

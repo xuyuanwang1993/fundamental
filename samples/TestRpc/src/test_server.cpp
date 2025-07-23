@@ -392,28 +392,7 @@ void server_task(std::promise<void>& sync_p) {
     {
         using namespace network::proxy;
         auto& manager = s_manager;
-        { // add http proxy
-            ProxyHostInfo host;
-            host.token = kProxyServiceToken;
-            {
-                ProxyHost hostRecord;
-                hostRecord.host    = "0.0.0.0";
-                hostRecord.service = "9000";
-                host.hosts.emplace(kProxyServiceField, std::move(hostRecord));
-            }
-            manager.UpdateProxyHostInfo(kProxyServiceName, std::move(host));
-        }
-        { // add http proxy
-            ProxyHostInfo host;
-            host.token = "test_http_token";
-            {
-                ProxyHost hostRecord;
-                hostRecord.host    = "www.baidu.com";
-                hostRecord.service = "http";
-                host.hosts.emplace(kProxyServiceField, std::move(hostRecord));
-            }
-            manager.UpdateProxyHostInfo("test_http", std::move(host));
-        }
+        manager.AddWsProxyRoute("/ws_proxy_baidu", proxy::ProxyHost { "www.baidu.com", "http" });
         manager.AddWsProxyRoute("/ws_proxy", proxy::ProxyHost { "127.0.0.1", "9000" });
     }
     server.enable_data_proxy(&s_manager);

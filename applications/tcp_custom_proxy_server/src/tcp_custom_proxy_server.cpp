@@ -16,7 +16,7 @@ using namespace rpc_service;
 
 int main(int argc, char* argv[]) {
     Fundamental::Logger::LoggerInitOptions options;
-    options.minimumLevel = Fundamental::LogLevel::info;
+    options.minimumLevel = Fundamental::LogLevel::debug;
     options.logFormat    = "%^[%L]%H:%M:%S.%e%$[%t] %v ";
     Fundamental::Logger::Initialize(std::move(options));
     Fundamental::arg_parser arg_parser { argc, argv, "1.0.1" };
@@ -24,7 +24,6 @@ int main(int argc, char* argv[]) {
     std::size_t port    = 32000;
     std::string proxy_host;
     std::string proxy_port;
-    bool disable_raw_tcp_proxy = false;
     arg_parser.AddOption("threads", Fundamental::StringFormat("handler's thread nums default:{}", threads), 't',
                          Fundamental::arg_parser::param_type::required_param, "number");
     arg_parser.AddOption("port", Fundamental::StringFormat("proxyserver's listening port default:{}", port), 'p',
@@ -33,8 +32,6 @@ int main(int argc, char* argv[]) {
                          Fundamental::arg_parser::param_type::required_param, "ip or domain name");
     arg_parser.AddOption("proxy_port", Fundamental::StringFormat("proxyserver's transparent proxy port", port), -1,
                          Fundamental::arg_parser::param_type::required_param, "port");
-    arg_parser.AddOption("disable_raw_tcp_proxy",
-                         Fundamental::StringFormat("disable raw tcp proxy", disable_raw_tcp_proxy));
     if (argc == 1) {
         arg_parser.ShowHelp();
         return 1;
@@ -55,7 +52,6 @@ int main(int argc, char* argv[]) {
     port                  = arg_parser.GetValue("port", port);
     proxy_host            = arg_parser.GetValue("proxy_host", proxy_host);
     proxy_port            = arg_parser.GetValue("proxy_port", proxy_port);
-    disable_raw_tcp_proxy = arg_parser.HasParam("disable_raw_tcp_proxy");
     auto s_server         = network::make_guard<rpc_server>(port);
     auto p                = s_server.get();
     auto& server          = *s_server.get();
@@ -65,9 +61,6 @@ int main(int argc, char* argv[]) {
     if (!proxy_host.empty() && !proxy_port.empty()) {
         FINFO("transparent proxy to {} {}", proxy_host, proxy_port);
         config.enable_transparent_proxy = true;
-        if (!disable_raw_tcp_proxy) {
-            config.rpc_protocal_mask = network::rpc_protocal_enable_mask::rpc_protocal_filter_raw_tcp_proxy;
-        }
         config.transparent_proxy_host = proxy_host;
         config.transparent_proxy_port = proxy_port;
         server.set_external_config(config);

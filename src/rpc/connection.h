@@ -4,8 +4,6 @@
 #include "basic/const_vars.h"
 #include "basic/router.hpp"
 
-#include "proxy/proxy_codec.hpp"
-#include "proxy/proxy_handler.hpp"
 #include "proxy/proxy_manager.hpp"
 #include "proxy/socks5/common.h"
 
@@ -279,8 +277,6 @@ private:
 #endif
     }
     void process_rpc_request();
-    void process_proxy_request();
-    void process_raw_tcp_proxy_request();
     void process_transparent_proxy(std::size_t preread_len = 0);
     void process_ws_request(std::size_t preread_len = 0);
     void process_pipe_connection(std::size_t preread_len = 0);
