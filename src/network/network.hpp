@@ -56,7 +56,7 @@ struct network_client_ssl_config {
     std::string private_key_path;
     std::string ca_certificate_path;
     bool verify_org  = false;
-    bool disable_ssl = false;
+    bool disable_ssl = true;
 
 #ifndef NETWORK_DISABLE_SSL
 
