@@ -24,7 +24,7 @@ using namespace network;
 using namespace network::rpc_service;
 static Fundamental::ThreadPool& s_test_pool = Fundamental::ThreadPool::Instance<101>();
 
-#if 0
+#if 1
 TEST(rpc_test, test_forward_protocal_codec) {
     {
         using context_type = network::forward::forward_request_context;
@@ -1190,30 +1190,6 @@ TEST(rpc_test, test_void_stream) {
     EXPECT_TRUE(!stream->Finish(0));
 }
 TEST(rpc_test, test_proxy_list) {
-    auto client       = network::make_guard<rpc_client>("127.0.0.1", "9000");
-    auto socks5_proxy = SocksV5::socks5_proxy_imp::make_shared("127.0.0.1", 9000, "", "");
-    client->append_proxy(socks5_proxy);
-    client->append_proxy(network::rpc_service::RawTcpProxy::make_shared("127.0.0.1", "9000"));
-    client->append_proxy(
-        network::rpc_service::CustomRpcProxy::make_shared(kProxyServiceName, kProxyServiceField, kProxyServiceToken));
-    bool r = client->connect();
-    if (!r) {
-        EXPECT_TRUE(false && "connect timeout");
-        return;
-    }
-    std::int32_t c = 0;
-    std::string str;
-    str = std::string(10, 'a');
-    std::string ret;
-    try {
-        ret = client->call<100, std::string>("echo", str);
-    } catch (const std::exception& e) {
-        FERR("exception {}->{}", c, e.what());
-    }
-    EXPECT_EQ(ret, str);
-}
-#endif
-TEST(rpc_test, test_proxy_list) {
     auto client = network::make_guard<rpc_client>("127.0.0.1", "9000");
     forward::forward_request_context forward_request;
     forward_request.dst_host    = "127.0.0.1";
@@ -1246,6 +1222,8 @@ TEST(rpc_test, test_proxy_list) {
     }
     EXPECT_EQ(ret, str);
 }
+#endif
+
 int main(int argc, char** argv) {
     int mode = 0;
     if (argc > 1) mode = std::stoi(argv[1]);
