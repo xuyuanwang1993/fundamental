@@ -27,7 +27,7 @@ decltype(auto) gen_pipe_proxy() {
     forward_request.route_path    = "/ws_proxy";
     forward_request.ssl_option    = forward::forward_optional_option;
     forward_request.socks5_option = forward::forward_disable_option;
-    return proxy::pip_connection_upgrade::make_shared(forward_request);
+    return proxy::pipe_connection_upgrade::make_shared(forward_request);
 }
 template <std::size_t blockSize>
 static void TestNormal(benchmark::State& state) {

@@ -9,16 +9,16 @@ namespace network
 {
 namespace proxy
 {
-class pip_connection_upgrade : public network::network_upgrade_interface {
+class pipe_connection_upgrade : public network::network_upgrade_interface {
 public:
     template <typename... Args>
     static decltype(auto) make_shared(Args&&... args) {
-        return std::make_shared<pip_connection_upgrade>(std::forward<Args>(args)...);
+        return std::make_shared<pipe_connection_upgrade>(std::forward<Args>(args)...);
     }
-    pip_connection_upgrade(forward::forward_request_context request) : request(request) {
+    pipe_connection_upgrade(forward::forward_request_context request) : request(request) {
     }
     const char* interface_name() const override {
-        return "pip_connection_upgrade";
+        return "pipe_connection_upgrade";
     }
     void abort_all_operation() override {
         if (abort_cb_) abort_cb_();
@@ -27,7 +27,7 @@ public:
         FASSERT(read_cb_ && write_cb_ && finish_cb_, "call proxy init first");
         // check user info
         if (request.dst_host.empty() || request.dst_service.empty() || request.route_path.empty()) {
-            finish_cb_(std::make_error_code(std::errc::invalid_argument), "invalid pip upgrade infomation");
+            finish_cb_(std::make_error_code(std::errc::invalid_argument), "invalid pipe upgrade infomation");
             return;
         }
         greeting();
@@ -37,7 +37,7 @@ protected:
     void greeting() {
         auto [b_success, encode_result] = request.encode();
         if (!b_success) {
-            finish_cb_(std::make_error_code(std::errc::invalid_argument), "invalid pip upgrade request");
+            finish_cb_(std::make_error_code(std::errc::invalid_argument), "invalid pipe upgrade request");
             return;
         }
         auto request_str = std::make_shared<std::string>(encode_result);

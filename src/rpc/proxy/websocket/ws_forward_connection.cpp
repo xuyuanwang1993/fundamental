@@ -108,7 +108,7 @@ void websocket_forward_connection::start_ws_proxy() {
         if (proxy_host.empty() || proxy_service.empty()) {
             goto HAS_ANY_PROTOCAL_ERROR;
         }
-        FDEBUG("ws  dst {} {}", proxy_host, proxy_service);
+        FINFO("ws_forward {} to {} {}", parse_context.head2, proxy_host, proxy_service);
         response_context.head1 = response_context.kHttpVersion;
         response_context.head2 = response_context.kWebsocketSuccessCode;
         response_context.head3 = response_context.kWebsocketSuccessStr;
