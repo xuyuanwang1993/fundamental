@@ -1,14 +1,14 @@
 #pragma once
 #include "fundamental/basic/log.h"
 #include "fundamental/basic/utils.hpp"
-#include "network/proxy_interface.hpp"
+#include "network/upgrade_interface.hpp"
 #include "proxy_codec.hpp"
 
 namespace network
 {
 namespace rpc_service
 {
-class RawTcpProxy : public network_proxy_interface {
+class RawTcpProxy : public network_upgrade_interface {
 public:
     template <typename... Args>
     static decltype(auto) make_shared(Args&&... args) {

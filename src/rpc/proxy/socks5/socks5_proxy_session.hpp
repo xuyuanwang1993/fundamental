@@ -1,13 +1,13 @@
 #pragma once
 #include "fundamental/basic/log.h"
-#include "network/proxy_interface.hpp"
+#include "network/upgrade_interface.hpp"
 #include "socks5_type.h"
 // linux only
 
 #include <arpa/inet.h>
 namespace SocksV5
 {
-class socks5_proxy_imp : public network::network_proxy_interface {
+class socks5_proxy_imp : public network::network_upgrade_interface {
 public:
     template <typename... Args>
     static decltype(auto) make_shared(Args&&... args) {
@@ -34,6 +34,7 @@ public:
             finish_cb_(std::make_error_code(std::errc::invalid_argument), "user info overflow");
             return;
         }
+        FDEBUG("request socks5 proxy to {} {}",dst_host,dst_port);
         greeting();
     }
 

@@ -1,12 +1,7 @@
 #pragma once
+#include "proxy_buffer.hpp"
 #include "rpc/basic/const_vars.h"
-
-#include <array>
-#include <asio.hpp>
-#include <deque>
 #include <memory>
-
-#include "fundamental/basic/allocator.hpp"
 
 namespace network
 {
@@ -18,29 +13,7 @@ namespace proxy
 {
 class proxy_handler : public std::enable_shared_from_this<proxy_handler> {
     friend class rpc_service::connection;
-    inline static constexpr std::size_t kCacheBufferSize = 32 * 1024; // 32k
-    inline static constexpr std::size_t kMinPerReadSize  = 1200;
-    using DataCacheType                                  = std::array<std::uint8_t, kCacheBufferSize>;
-    struct DataCahceItem {
-        DataCacheType data;
-        std::size_t readOffset  = 0;
-        std::size_t writeOffset = 0;
-    };
 
-    struct EndponitCacheStatus {
-        explicit EndponitCacheStatus(decltype(Fundamental::MakePoolMemorySource()) dataSource) :
-        cache_(dataSource.get()) {
-        }
-        bool is_writing = false;
-        std::deque<DataCahceItem, Fundamental::AllocatorType<DataCahceItem>> cache_;
-        std::string tag_;
-        bool PrepareWriteCache();
-        void PrepareReadCache();
-        asio::mutable_buffer GetReadBuffer();
-        asio::const_buffer GetWriteBuffer();
-        void UpdateReadBuffer(std::size_t readBytes);
-        void UpdateWriteBuffer(std::size_t writeBytes);
-    };
     enum TrafficProxyStatusMask : std::int32_t
     {
         ClientProxying                        = (1 << 0),
@@ -92,8 +65,8 @@ protected:
 
 protected:
     network::network_data_reference reference_;
-    const std::string proxy_host;
-    const std::string proxy_service;
+    std::string proxy_host;
+    std::string proxy_service;
     /// Socket for the connection.
     asio::ip::tcp::socket socket_;
     //

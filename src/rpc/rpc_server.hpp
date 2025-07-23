@@ -200,6 +200,7 @@ public:
 
 #endif
     }
+
     void enable_data_proxy(network::proxy::ProxyManager* manager) {
         proxy_manager = manager;
     }
