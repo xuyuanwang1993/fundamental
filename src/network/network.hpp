@@ -46,11 +46,9 @@ enum rpc_protocal_enable_mask : std::uint32_t
 {
     rpc_protocal_filter_none            = 0,
     rpc_protocal_filter_rpc             = (1 << 0),
-    rpc_protocal_filter_raw_tcp_proxy   = (1 << 1),
-    rpc_protocal_filter_custom_proxy    = (1 << 2),
-    rpc_protocal_filter_socks5          = (1 << 3),
-    rpc_protocal_filter_http_ws         = (1 << 4),
-    rpc_protocal_filter_pipe_connection = (1 << 5),
+    rpc_protocal_filter_socks5          = (1 << 1),
+    rpc_protocal_filter_http_ws         = (1 << 2),
+    rpc_protocal_filter_pipe_connection = (1 << 3),
     rpc_protocal_filter_all             = std::numeric_limits<std::uint32_t>::max(),
 };
 struct network_client_ssl_config {

@@ -18,8 +18,8 @@
 #include <string>
 
 #include "fundamental/basic/log.h"
-#include "rpc/proxy/proxy_codec.hpp"
-#include "rpc/proxy/proxy_encoder.h"
+#include "rpc/proxy/protocal_pipe/forward_pipe_codec.hpp"
+
 using asio::ip::tcp;
 static std::int32_t proxy_mode = 0;
 class client {
@@ -35,7 +35,12 @@ public:
         request_stream << "Host: " << server << "\r\n";
         request_stream << "Accept: */*\r\n";
         request_stream << "Connection: close\r\n\r\n";
-
+        request_context.dst_host         = "127.0.0.1";
+        request_context.dst_service      = "9000";
+        request_context.route_path       = "/ws_proxy_baidu";
+        request_context.socks5_option    = network::forward::forward_disable_option;
+        request_context.ssl_option       = network::forward::forward_disable_option;
+        request_context.forward_protocal = network::forward::forward_raw;
         // Start an asynchronous resolve to translate the server and service names
         // into a list of endpoints.
         if (proxy_mode > 0) {
@@ -47,11 +52,9 @@ public:
                 server, "http",
                 std::bind(&client::handle_resolve, this, asio::placeholders::error, asio::placeholders::results));
         }
-        std::memset(&proxy_frame, 0, sizeof(proxy_frame));
     }
     ~client() {
         if (proxy_mode > 0) {
-            proxy_free_output(&proxy_frame);
             FINFO("finish USE_TRAFFIC_PROXY");
         }
     }
@@ -60,24 +63,9 @@ private:
     void prepare_traffic(const std::string& host) {
         if (proxy_mode <= 0) return;
         if (proxy_mode == 1) {
-            proxy_encode_input input;
-            std::string proxyServiceName = "test_http";
-            input.service                = proxyServiceName.data();
-            input.serviceLen             = proxyServiceName.size();
-            std::string field            = host;
-            input.field                  = field.data();
-            input.fieldLen               = field.size();
-            std::string token            = "test_http_token";
-            input.token                  = token.data();
-            input.tokenLen               = token.size();
-            proxy_encode_request(input, proxy_frame);
-            buffers_.emplace_back(asio::const_buffer(proxy_frame.buf, proxy_frame.bufLen));
-        } else {
-            network::proxy::ProxyRawTcpRequest request;
-            request.host_    = host;
-            request.service_ = "80";
-            proxy_data       = request.Encode();
-            buffers_.emplace_back(asio::const_buffer(proxy_data.data(), proxy_data.size()));
+            auto [ret, buf] = request_context.encode();
+            proxy_buf       = buf;
+            buffers_.emplace_back(asio::const_buffer(proxy_buf.data(), proxy_buf.size()));
         }
     }
 
@@ -91,24 +79,30 @@ private:
             std::cout << "Error: " << err.message() << "\n";
         }
     }
-
+    void protocal_handle_shake() {
+        auto [status, len] = response_context.decode(proxy_read_buf.data(), proxy_read_buf.size());
+        if (status == network::forward::forward_parse_success) {
+            send_request();
+        } else if (status == network::forward::forward_parse_need_more_data) {
+            proxy_read_buf.resize(len);
+            asio::async_read(socket_, asio::mutable_buffer(proxy_read_buf.data(), proxy_read_buf.size()),
+                             [this](const std::error_code& err, std::size_t) {
+                                 if (err) return;
+                                 protocal_handle_shake();
+                             });
+        } else {
+            FERR("pipe connection handle failed");
+        }
+    }
     void handle_traffic_proxy() {
         if (buffers_.empty())
             send_request();
         else {
+
             FINFO("write proxy handshake");
             asio::async_write(socket_, std::move(buffers_), [this](const std::error_code& err, std::size_t) {
                 if (err) return;
-                if (proxy_mode == 1) {
-                    handshake.resize(2);
-                    asio::async_read(socket_, asio::mutable_buffer(handshake.data(), 2),
-                                     [this](const std::error_code& err, std::size_t) {
-                                         if (err || handshake != "ok") return;
-                                         send_request();
-                                     });
-                } else {
-                    send_request();
-                }
+                protocal_handle_shake();
             });
         }
     }
@@ -199,8 +193,10 @@ private:
         }
     }
     std::vector<asio::const_buffer> buffers_;
-    proxy_encode_output proxy_frame;
-    std::vector<std::uint8_t> proxy_data;
+    network::forward::forward_request_context request_context;
+    std::string proxy_buf;
+    std::vector<std::uint8_t> proxy_read_buf;
+    network::forward::forward_response_context response_context;
     tcp::resolver resolver_;
     tcp::socket socket_;
     asio::streambuf request_;

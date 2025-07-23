@@ -5,7 +5,6 @@
 #include "fundamental/basic/log.h"
 #include "fundamental/basic/utils.hpp"
 
-#include "rpc/proxy/custom_rpc_proxy.hpp"
 #include "rpc/rpc_client.hpp"
 
 #include <chrono>
@@ -14,14 +13,25 @@
 #include <memory>
 #include <string>
 
-#include "test_server.h"
-
 #include "benchmark/benchmark.h"
+#include "rpc/proxy/protocal_pipe/pipe_connection_upgrade_session.hpp"
+#include "test_server.h"
 using namespace network;
 using network::rpc_service::rpc_client;
+
+decltype(auto) gen_pipe_proxy() {
+    forward::forward_request_context forward_request;
+    forward_request.dst_host      = "127.0.0.1";
+    auto ws_dst_port              = ::getenv("ws_dst_port");
+    forward_request.dst_service   = ws_dst_port ? ws_dst_port : "9000";
+    forward_request.route_path    = "/ws_proxy";
+    forward_request.ssl_option    = forward::forward_optional_option;
+    forward_request.socks5_option = forward::forward_disable_option;
+    return proxy::pip_connection_upgrade::make_shared(forward_request);
+}
 template <std::size_t blockSize>
 static void TestNormal(benchmark::State& state) {
-    auto client=network::make_guard<rpc_client>("127.0.0.1", "9000");
+    auto client = network::make_guard<rpc_client>("127.0.0.1", "9000");
     client->connect();
     std::string msg(blockSize, 'a');
     if (blockSize < 1024 * 1024 * 32) {
@@ -35,9 +45,8 @@ static void TestNormal(benchmark::State& state) {
 
 template <std::size_t blockSize>
 static void TestProxy(benchmark::State& state) {
-    auto client=network::make_guard<rpc_client>("127.0.0.1", "9000");
-    client->set_proxy(network::rpc_service::CustomRpcProxy::make_shared(kProxyServiceName, kProxyServiceField,
-                                                                            kProxyServiceToken));
+    auto client = network::make_guard<rpc_client>("127.0.0.1", "9000");
+    client->set_proxy(gen_pipe_proxy());
     client->connect();
     std::string msg(blockSize, 'a');
     if (blockSize < 1024 * 1024 * 32) {
@@ -52,10 +61,9 @@ static void TestProxy(benchmark::State& state) {
 #ifndef NETWORK_DISABLE_SSL
 template <std::size_t blockSize>
 static void TestSslProxy(benchmark::State& state) {
-    auto client=network::make_guard<rpc_client>("127.0.0.1", "9000");
-    client->enable_ssl(network_client_ssl_config{"client.crt","client.key","ca_root.crt"});
-    client->set_proxy(network::rpc_service::CustomRpcProxy::make_shared(kProxyServiceName, kProxyServiceField,
-                                                                            kProxyServiceToken));
+    auto client = network::make_guard<rpc_client>("127.0.0.1", "9000");
+    client->enable_ssl(network_client_ssl_config { "client.crt", "client.key", "ca_root.crt" });
+    client->set_proxy(gen_pipe_proxy());
     client->connect();
     std::string msg(blockSize, 'a');
     if (blockSize < 1024 * 1024 * 32) {
@@ -69,10 +77,9 @@ static void TestSslProxy(benchmark::State& state) {
 }
 template <std::size_t blockSize>
 static void TestSslProxyStream(benchmark::State& state) {
-    auto client=network::make_guard<rpc_client>("127.0.0.1", "9000");
-    client->enable_ssl(network_client_ssl_config{"client.crt","client.key","ca_root.crt"});
-    client->set_proxy(network::rpc_service::CustomRpcProxy::make_shared(kProxyServiceName, kProxyServiceField,
-                                                                            kProxyServiceToken));
+    auto client = network::make_guard<rpc_client>("127.0.0.1", "9000");
+    client->enable_ssl(network_client_ssl_config { "client.crt", "client.key", "ca_root.crt" });
+    client->set_proxy(gen_pipe_proxy());
     client->connect();
     std::string msg(blockSize, 'a');
     std::string recv;
@@ -131,8 +138,8 @@ int main(int argc, char* argv[]) {
     int mode = 0;
     if (argc > 1) mode = std::stoi(argv[1]);
     Fundamental::fs::SwitchToProgramDir(argv[0]);
-    argc=0;
-    argv=nullptr;
+    argc = 0;
+    argv = nullptr;
     Fundamental::Logger::LoggerInitOptions options;
     options.minimumLevel = Fundamental::LogLevel::info;
 
@@ -162,7 +169,7 @@ int main(int argc, char* argv[]) {
             argc = 1;
             argv = &args_default;
         }
-                network::io_context_pool::s_excutorNums = 10;
+        network::io_context_pool::s_excutorNums = 10;
         network::io_context_pool::Instance().start();
         ::benchmark::Initialize(&argc, argv);
         if (::benchmark::ReportUnrecognizedArguments(argc, argv)) return 1;

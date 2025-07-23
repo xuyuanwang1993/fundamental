@@ -4,10 +4,8 @@
 #include "fundamental/basic/filesystem_utils.hpp"
 #include "fundamental/basic/log.h"
 #include "fundamental/delay_queue/delay_queue.h"
-#include "rpc/proxy/custom_rpc_proxy.hpp"
 #include "rpc/proxy/protocal_pipe/forward_pipe_codec.hpp"
 #include "rpc/proxy/protocal_pipe/pipe_connection_upgrade_session.hpp"
-#include "rpc/proxy/raw_tcp_proxy.hpp"
 #include "rpc/proxy/socks5/socks5_proxy_session.hpp"
 #include "rpc/proxy/websocket/ws_upgrade_session.hpp"
 
@@ -24,6 +22,15 @@ using namespace network;
 using namespace network::rpc_service;
 static Fundamental::ThreadPool& s_test_pool = Fundamental::ThreadPool::Instance<101>();
 
+decltype(auto) gen_pipe_proxy() {
+    forward::forward_request_context forward_request;
+    forward_request.dst_host    = "127.0.0.1";
+    auto ws_dst_port            = ::getenv("ws_dst_port");
+    forward_request.dst_service = ws_dst_port ? ws_dst_port : "9000";
+    forward_request.route_path  = "/ws_proxy";
+    forward_request.ssl_option  = forward::forward_required_option;
+    return proxy::pip_connection_upgrade::make_shared(forward_request);
+}
 #if 1
 TEST(rpc_test, test_forward_protocal_codec) {
     {
@@ -488,8 +495,7 @@ TEST(rpc_test, test_proxy) {
         [&]() { EXPECT_LE(check_timer.GetDuration<Fundamental::Timer::TimeScale::Millisecond>(), 100); });
 
     auto client = network::make_guard<rpc_client>("127.0.0.1", "9000");
-    client->set_proxy(
-        network::rpc_service::CustomRpcProxy::make_shared(kProxyServiceName, kProxyServiceField, kProxyServiceToken));
+    client->set_proxy(gen_pipe_proxy());
     bool r = client->connect();
     if (!r) {
         EXPECT_TRUE(false && "connect timeout");
@@ -761,8 +767,7 @@ TEST(rpc_test, test_echo_stream) {
 
 TEST(rpc_test, test_obj_echo) {
     auto client = network::make_guard<rpc_client>("127.0.0.1", "9000");
-    client->set_proxy(
-        network::rpc_service::CustomRpcProxy::make_shared(kProxyServiceName, kProxyServiceField, kProxyServiceToken));
+    client->set_proxy(gen_pipe_proxy());
     bool r = client->connect();
     if (!r) {
         EXPECT_TRUE(false && "connect timeout");
@@ -848,8 +853,7 @@ TEST(rpc_test, test_echo_stream_proxy_mutithread) {
     auto nums      = 40;
     auto task_func = []() {
         auto client = network::make_guard<rpc_client>();
-        client->set_proxy(network::rpc_service::CustomRpcProxy::make_shared(kProxyServiceName, kProxyServiceField,
-                                                                            kProxyServiceToken));
+        client->set_proxy(gen_pipe_proxy());
         [[maybe_unused]] bool r = client->connect("127.0.0.1", "9000");
         EXPECT_TRUE(r && client->has_connected());
         auto stream = client->upgrade_to_stream("test_echo_stream");
@@ -1018,8 +1022,7 @@ TEST(rpc_test, test_ssl) {
             client->enable_ssl(config);
         }
         if (proxy_iter != test_tokens.end()) {
-            client->set_proxy(network::rpc_service::CustomRpcProxy::make_shared(kProxyServiceName, kProxyServiceField,
-                                                                                kProxyServiceToken));
+            client->set_proxy(gen_pipe_proxy());
         }
 
         try {
@@ -1067,8 +1070,7 @@ TEST(rpc_test, test_ssl) {
 TEST(rpc_test, test_ssl_proxy_echo_stream) {
     auto client = network::make_guard<rpc_client>();
     client->enable_ssl(network_client_ssl_config { "client.crt", "client.key", "ca_root.crt" });
-    client->set_proxy(
-        network::rpc_service::CustomRpcProxy::make_shared(kProxyServiceName, kProxyServiceField, kProxyServiceToken));
+    client->set_proxy(gen_pipe_proxy());
     [[maybe_unused]] bool r = client->connect("127.0.0.1", "9000");
     EXPECT_TRUE(r && client->has_connected());
     auto stream = client->upgrade_to_stream("test_echo_stream");
@@ -1143,8 +1145,7 @@ TEST(rpc_test, test_ssl_proxy_echo_stream_mutithread) {
     auto task_func = []() {
         auto client = network::make_guard<rpc_client>();
         client->enable_ssl(network_client_ssl_config { "client.crt", "client.key", "ca_root.crt" });
-        client->set_proxy(network::rpc_service::CustomRpcProxy::make_shared(kProxyServiceName, kProxyServiceField,
-                                                                            kProxyServiceToken));
+        client->set_proxy(gen_pipe_proxy());
         [[maybe_unused]] bool r = client->connect("127.0.0.1", "9000");
         EXPECT_TRUE(r && client->has_connected());
         auto stream = client->upgrade_to_stream("test_echo_stream");
@@ -1191,21 +1192,11 @@ TEST(rpc_test, test_void_stream) {
 }
 TEST(rpc_test, test_proxy_list) {
     auto client = network::make_guard<rpc_client>("127.0.0.1", "9000");
-    forward::forward_request_context forward_request;
-    forward_request.dst_host    = "127.0.0.1";
-    auto ws_dst_port            = ::getenv("ws_dst_port");
-    forward_request.dst_service = ws_dst_port ? ws_dst_port : "9000";
-    forward_request.route_path  = "/ws_proxy";
-    forward_request.ssl_option  = forward::forward_required_option;
-    auto pipe_upgrade           = proxy::pip_connection_upgrade::make_shared(forward_request);
-    client->append_proxy(pipe_upgrade);
+    client->append_proxy(gen_pipe_proxy());
     auto ws_upgrade = proxy::ws_upgrade_imp::make_shared("/ws_proxy", "127.0.0.1");
     client->append_proxy(ws_upgrade);
     auto socks5_proxy = SocksV5::socks5_proxy_imp::make_shared("127.0.0.1", 9000, "", "");
     client->append_proxy(socks5_proxy);
-    client->append_proxy(network::rpc_service::RawTcpProxy::make_shared("127.0.0.1", "9000"));
-    client->append_proxy(
-        network::rpc_service::CustomRpcProxy::make_shared(kProxyServiceName, kProxyServiceField, kProxyServiceToken));
     bool r = client->connect();
     if (!r) {
         EXPECT_TRUE(false && "connect timeout");

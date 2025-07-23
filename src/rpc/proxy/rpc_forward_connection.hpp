@@ -6,18 +6,24 @@
 #include "rpc/connection.h"
 namespace network
 {
+namespace rpc_service
+{
+class connection;
+}
 namespace proxy
 {
+using rpc_service::connection;
 class rpc_forward_connection : public std::enable_shared_from_this<rpc_forward_connection> {
-    enum TrafficProxyStatusMask : std::int32_t
+    friend class connection;
+    enum TrafficProxyStatusMask : std::uint32_t
     {
         ClientProxying                        = (1 << 0),
         ProxyDnsResolving                     = (1 << 2),
         ServerProxying                        = (1 << 3),
         ServerConnecting                      = (1 << 4),
-        TrafficProxyCloseExceptClientProxying = static_cast<std::int32_t>(~ClientProxying),
-        TrafficProxyCloseExceptServerProxying = static_cast<std::int32_t>(~ServerProxying),
-        TrafficProxyCloseAll                  = static_cast<std::int32_t>(~0),
+        TrafficProxyCloseExceptClientProxying = static_cast<std::uint32_t>(~ClientProxying),
+        TrafficProxyCloseExceptServerProxying = static_cast<std::uint32_t>(~ServerProxying),
+        TrafficProxyCloseAll                  = static_cast<std::uint32_t>(~0),
     };
 
 public:
@@ -31,7 +37,7 @@ protected:
     virtual void process_protocal() = 0;
     void HandleDisconnect(asio::error_code ec,
                           const std::string& callTag = "",
-                          std::int32_t closeMask     = TrafficProxyCloseAll);
+                          std::uint32_t closeMask    = TrafficProxyCloseAll);
     virtual void HandleConnectSuccess();
     // This function is a protocol handling example, and its default implementation initiates a connection to the peer
     // and enables read operations on the raw connection.
@@ -133,6 +139,8 @@ protected:
     decltype(Fundamental::MakePoolMemorySource()) cachePool;
     EndponitCacheStatus client2server;
     EndponitCacheStatus server2client;
+    bool upstream_delay_close   = false;
+    bool downstream_delay_close = false;
 };
 
 } // namespace proxy
