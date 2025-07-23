@@ -29,7 +29,7 @@ decltype(auto) gen_pipe_proxy() {
     forward_request.dst_service = ws_dst_port ? ws_dst_port : "9000";
     forward_request.route_path  = "/ws_proxy";
     forward_request.ssl_option  = forward::forward_required_option;
-    return proxy::pip_connection_upgrade::make_shared(forward_request);
+    return proxy::pipe_connection_upgrade::make_shared(forward_request);
 }
 #if 1
 TEST(rpc_test, test_forward_protocal_codec) {
