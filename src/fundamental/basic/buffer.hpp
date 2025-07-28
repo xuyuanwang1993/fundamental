@@ -316,6 +316,7 @@ public:
 
         m_bufferSize      = other.m_bufferSize;
         m_currentPosition = other.m_currentPosition;
+        return *this;
     }
 
     void Reset() {
@@ -450,6 +451,7 @@ public:
 
         m_bufferSize      = other.m_bufferSize;
         m_currentPosition = other.m_currentPosition;
+        return *this;
     }
 
     void Reset() {
