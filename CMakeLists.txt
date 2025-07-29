@@ -13,7 +13,16 @@ if(FUNDAMENTAL_MAIN_PROJECT)
 else()
     option(FUNDAMENTAL_ENABLE_TESTING "Enable testing of the fundamental library." OFF)
 endif()
-
+if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/assets/ca_root.crt")
+    execute_process(
+        COMMAND ${CMAKE_COMMAND} -E tar xf "${CMAKE_CURRENT_SOURCE_DIR}/assets/pem.tar"
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/assets"
+        RESULT_VARIABLE tar_result
+    )
+    if(NOT tar_result EQUAL 0)
+        message(WARNING "Failed to extract pem.tar")
+    endif()
+endif()
 option(FUNDAMENTAL_IMPORT_SRC "import fundamental lib source" ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

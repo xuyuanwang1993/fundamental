@@ -7,3 +7,6 @@
 *.txt.user
 CMakeLists.txt.user*
 *.pyc
+assets/*.crt
+assets/*.key
+assets/*.pem
