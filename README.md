@@ -1,6 +1,17 @@
 # fh-fundamental
 
 fundamental kits for developer
+# 功能简介
+- 基于spdlog的日志封装
+- 基于eventpp的事件封装，类qt的事件实现
+- 线程池
+- 定时器
+- 基于rttr的反射封装，提供json序列化/反序列化，二进制序列化/反序列化
+- rocksdb/sqlite3封装 使用示例
+- 基于asio的rpc实现，ws协议代理管道，socks5代理，http,支持tls
+- 命令行解析
+- hash/base64
+- 基于rttr实现的chaiscript绑定，可用于基于chai脚本动态测试
 
 # 目录结构
 ```
