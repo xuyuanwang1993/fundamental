@@ -1,6 +1,6 @@
 # fh-fundamental
 
-fundamental kits for develper
+fundamental kits for developer
 
 # 目录结构
 ```
