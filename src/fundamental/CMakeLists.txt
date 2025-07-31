@@ -81,7 +81,6 @@ if(F_BUILD_STATIC)
     add_library(${lib_name}${STATIC_LIB_SUFFIX} STATIC ${lib_source})
     config_enable_jemalloc_memory_profiling(${lib_name}${STATIC_LIB_SUFFIX})
     config_disable_rtti(${lib_name}${STATIC_LIB_SUFFIX})
-
     # Config link dependencies
     target_link_libraries(${lib_name}${STATIC_LIB_SUFFIX}
         PUBLIC

@@ -47,7 +47,7 @@ static std::shared_ptr<TestInstance> t1 = std::make_shared<TestInstance>();
 struct TestS : public Fundamental::Singleton<TestS> {
     // we should not declare any other signature for contruct Singleton instance
     // except the default signature version if you want to init some member values
-    ~TestS();
+    [[maybe_unused]] ~TestS();
     int i = 0;
 };
 struct TestNormal {

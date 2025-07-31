@@ -529,8 +529,8 @@ private:
 
 #ifndef NETWORK_DISABLE_SSL
         if (ssl_stream_) {
-            ssl_stream_->async_shutdown([this, ptr = shared_from_this(),
-                                         final_clear_function](const asio::error_code&) { final_clear_function(); });
+            ssl_stream_->async_shutdown(
+                [ptr = shared_from_this(), final_clear_function](const asio::error_code&) { final_clear_function(); });
             return;
         }
 #endif

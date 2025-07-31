@@ -326,8 +326,8 @@ inline constexpr std::array<char, N> __get_short_file_name__(const char (&file_n
 
     #define FASSERT(_check, ...) FASSERT_THROWN(_check, ##__VA_ARGS__)
 #else
-    #define FASSERT(_check, ...)        (void)0
-    #define FASSERT_THROWN(_check, ...) (void)0
+    #define FASSERT(_check, ...)        ((void)(0 && _check && Fundamental::StringFormat(__VA_ARGS__).empty()))
+    #define FASSERT_THROWN(_check, ...) ((void)(0 && _check && Fundamental::StringFormat(__VA_ARGS__).empty()))
 #endif
 
 #define FASSERT_ACTION(_check, _action, ...)                                                                           \

@@ -13,7 +13,7 @@ void EnableMemoryProfiling() {
 #endif
 }
 
-void DumpMemorySnapShot(const std::string& out_path) {
+void DumpMemorySnapShot([[maybe_unused]] const std::string& out_path) {
 #if ENABLE_JEMALLOC_MEMORY_PROFILING
     auto p = out_path.c_str();
     mallctl("prof.dump", NULL, NULL, &p, sizeof(p));
