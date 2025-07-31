@@ -35,8 +35,8 @@ else()
     message(FATAL_ERROR "Unknown platform.")
 endif()
 
-target_precompile_headers(BuildSettings INTERFACE "${CMAKE_CURRENT_LIST_DIR}/platform.h.in")
-
+#target_precompile_headers(BuildSettings INTERFACE "${CMAKE_CURRENT_LIST_DIR}/platform.h.in")
+target_compile_options(BuildSettings INTERFACE -include "${CMAKE_CURRENT_LIST_DIR}/platform.h.in")
 include(CheckCXXSourceCompiles)
 
 ## 
@@ -67,9 +67,9 @@ endmacro(ADD_COMPILE_DEFINITION)
 ADD_COMPILE_DEFINITION(Debug DEBUG)
 ADD_COMPILE_DEFINITION(Release NDEBUG)
 target_compile_options(BuildSettings INTERFACE
-    "$<$<CONFIG:Debug>:-O0;-Wall;-g2;-ggdb;-fno-omit-frame-pointer>"
-    "$<$<CONFIG:RelWithDebInfo>:-O2;-Wall;-g>"
-    "$<$<CONFIG:Release>:-O3;-Wall>"
+    "$<$<CONFIG:Debug>:-O0;-Wall;-Wextra;-g2;-ggdb;-fno-omit-frame-pointer>"
+    "$<$<CONFIG:RelWithDebInfo>:-O2;-Wall;-Wextra;-g>"
+    "$<$<CONFIG:Release>:-O3;-Wall;-Wextra>"
     "-fPIC"
 )
 
@@ -157,7 +157,11 @@ target_compile_options(BuildSettings INTERFACE
     -fdata-sections
     >
     >
+    -Wno-missing-field-initializers
+    -Wno-unused-parameter
+    -Wno-unused-but-set-parameter
 )
+
 
 target_link_options(BuildSettings INTERFACE
     # LTO 链接选项（-flto 或 /LTCG）

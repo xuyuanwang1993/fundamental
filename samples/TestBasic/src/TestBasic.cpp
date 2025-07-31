@@ -3,7 +3,6 @@
 #include "fundamental/basic/log.h"
 #include "fundamental/basic/utils.hpp"
 #include "fundamental/tracker/memory_tracker.hpp"
-
 #include <chrono>
 #include <future>
 #include <iostream>
@@ -48,7 +47,7 @@ static std::shared_ptr<TestInstance> t1 = std::make_shared<TestInstance>();
 struct TestS : public Fundamental::Singleton<TestS> {
     // we should not declare any other signature for contruct Singleton instance
     // except the default signature version if you want to init some member values
-    ~TestS();
+    [[maybe_unused]] ~TestS();
     int i = 0;
 };
 struct TestNormal {
@@ -98,6 +97,7 @@ void test_errorcode() {
     Fundamental::error_code default_ec;
     FINFO("default ec:{} {} {} {} {}", default_ec.value(), default_ec.message(), default_ec.details(),
           default_ec.details_c_str(), default_ec.details_view());
+    FINFO("{}",Fundamental::kTargetPlatform==Fundamental::TargetPlatformType::Linux);
 }
 int main(int argc, char** argv) {
     Fundamental::EnableMemoryProfiling();

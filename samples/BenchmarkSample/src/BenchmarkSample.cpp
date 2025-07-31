@@ -98,7 +98,7 @@ BENCHMARK(BM_empty_stop_start);
 BENCHMARK(BM_empty_stop_start)->ThreadPerCpu();
 
 void BM_KeepRunning(benchmark::State& state) {
-  benchmark::IterationCount iter_count = 0;
+  [[maybe_unused]] benchmark::IterationCount iter_count = 0;
   assert(iter_count == state.iterations());
   while (state.KeepRunning()) {
     ++iter_count;
@@ -114,7 +114,7 @@ void BM_KeepRunningBatch(benchmark::State& state) {
   // count.  Below we assert that this does not happen.
   const benchmark::IterationCount batch_size = 1009;
 
-  static benchmark::IterationCount prior_iter_count = 0;
+  [[maybe_unused]] static benchmark::IterationCount prior_iter_count = 0;
   benchmark::IterationCount iter_count = 0;
   while (state.KeepRunningBatch(batch_size)) {
     iter_count += batch_size;

@@ -53,7 +53,7 @@ void ProcessStatus::Dump() const {
 void ProcessStatus::Dump(std::string& out) const {
     std::stringstream f;
     f << "MemInfo[KB]-> VmPeak:" << vmPeak << ",VmSize:" << vmSize << ",VmHWM:" << vmHWM << ",VmRSS:" << vmRss;
-    out = std::move(f.str());
+    out = f.str();
 }
 
 ProcessStatus ProcessStatus::Diff(const ProcessStatus& other) {

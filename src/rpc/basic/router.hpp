@@ -144,7 +144,7 @@ public:
     }
     template <typename F, typename... Args>
     static typename std::enable_if<
-        std::is_void<typename std::result_of<F(std::weak_ptr<connection>, Args...)>::type>::value>::type
+        std::is_void<typename std::invoke_result<F, std::weak_ptr<connection>, Args...>::type>::value>::type
     call(const F& f, std::weak_ptr<connection> ptr, std::string& result, std::tuple<Args...> tp) {
         call_helper(f, std::make_index_sequence<sizeof...(Args)> {}, std::move(tp), ptr);
         result = msgpack_codec::pack_args_str(result_code::OK);
@@ -152,7 +152,7 @@ public:
 
     template <typename F, typename... Args>
     static typename std::enable_if<
-        !std::is_void<typename std::result_of<F(std::weak_ptr<connection>, Args...)>::type>::value>::type
+        !std::is_void<typename std::invoke_result<F, std::weak_ptr<connection>, Args...>::type>::value>::type
     call(const F& f, std::weak_ptr<connection> ptr, std::string& result, std::tuple<Args...> tp) {
         auto r = call_helper(f, std::make_index_sequence<sizeof...(Args)> {}, std::move(tp), ptr);
         result = msgpack_codec::pack_args_str(result_code::OK, r);
@@ -165,7 +165,7 @@ private:
     router(router&&)      = delete;
 
     template <typename F, size_t... I, typename... Args>
-    static typename std::result_of<F(std::weak_ptr<connection>, Args...)>::type call_helper(
+    static typename std::invoke_result<F, std::weak_ptr<connection>, Args...>::type call_helper(
         const F& f,
         const std::index_sequence<I...>&,
         std::tuple<Args...> tup,
@@ -174,7 +174,7 @@ private:
     }
 
     template <typename F, typename Self, size_t... Indexes, typename... Args>
-    static typename std::result_of<F(Self, std::weak_ptr<connection>, Args...)>::type call_member_helper(
+    static typename std::invoke_result<F, Self, std::weak_ptr<connection>, Args...>::type call_member_helper(
         const F& f,
         Self* self,
         const std::index_sequence<Indexes...>&,
@@ -185,7 +185,7 @@ private:
 
     template <typename F, typename Self, typename... Args>
     static typename std::enable_if<
-        std::is_void<typename std::result_of<F(Self, std::weak_ptr<connection>, Args...)>::type>::value>::type
+        std::is_void<typename std::invoke_result<F, Self, std::weak_ptr<connection>, Args...>::type>::value>::type
     call_member(const F& f, Self* self, std::weak_ptr<connection> ptr, std::string& result, std::tuple<Args...> tp) {
         call_member_helper(f, self, typename std::make_index_sequence<sizeof...(Args)> {}, std::move(tp), ptr);
         result = msgpack_codec::pack_args_str(result_code::OK);
@@ -193,7 +193,7 @@ private:
 
     template <typename F, typename Self, typename... Args>
     static typename std::enable_if<
-        !std::is_void<typename std::result_of<F(Self, std::weak_ptr<connection>, Args...)>::type>::value>::type
+        !std::is_void<typename std::invoke_result<F, Self, std::weak_ptr<connection>, Args...>::type>::value>::type
     call_member(const F& f, Self* self, std::weak_ptr<connection> ptr, std::string& result, std::tuple<Args...> tp) {
         auto r = call_member_helper(f, self, typename std::make_index_sequence<sizeof...(Args)> {}, std::move(tp), ptr);
         result = msgpack_codec::pack_args_str(result_code::OK, r);

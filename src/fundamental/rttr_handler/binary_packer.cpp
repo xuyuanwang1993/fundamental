@@ -321,6 +321,7 @@ bool do_binary_unpack(const std::uint8_t*& data,
     case float_pack_data:
     case uint64_pack_data:
         if (!var.get_type().is_arithmetic() && !var.get_type().get_wrapped_type().is_arithmetic()) return false;
+         [[fallthrough]];
     case string_pack_data:
     case enum_pack_data: return binary_unpack_basic_value(data, len, var, type);
     case array_pack_data: return binary_unpack_array(data, len, var, ignore_invalid_properties);

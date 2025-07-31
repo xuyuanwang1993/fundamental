@@ -735,7 +735,7 @@ void test_normal_packer() {
         obj.mm.emplace("1234","1233");
         auto data = Fundamental::io::to_json(obj);
         TestExtraObject tmp;
-        auto ret = Fundamental::io::from_json(data, tmp);
+        [[maybe_unused]] auto ret = Fundamental::io::from_json(data, tmp);
         FASSERT(ret);
         FINFO("raw:{}", data);
         FINFO("gen:{}", Fundamental::io::to_json(tmp));
@@ -775,7 +775,7 @@ void test_normal_packer() {
             v2.convert(v1.get_type());
             type.set_property_value("x", tmp.obj, v2);
             FASSERT(tmp.obj.x == 123, "{}", tmp.obj.x);
-            auto ret = Fundamental::io::from_json(data, tmp);
+            [[maybe_unused]] auto ret = Fundamental::io::from_json(data, tmp);
             FASSERT(ret);
             FINFO("raw:{}", data);
             FINFO("gen:{}", Fundamental::io::to_json(tmp));
