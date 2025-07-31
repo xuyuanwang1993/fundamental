@@ -3,7 +3,6 @@
 #include "fundamental/basic/log.h"
 #include "fundamental/basic/utils.hpp"
 #include "fundamental/tracker/memory_tracker.hpp"
-
 #include <chrono>
 #include <future>
 #include <iostream>
@@ -98,6 +97,7 @@ void test_errorcode() {
     Fundamental::error_code default_ec;
     FINFO("default ec:{} {} {} {} {}", default_ec.value(), default_ec.message(), default_ec.details(),
           default_ec.details_c_str(), default_ec.details_view());
+    FINFO("{}",Fundamental::kTargetPlatform==Fundamental::TargetPlatformType::Linux);
 }
 int main(int argc, char** argv) {
     Fundamental::EnableMemoryProfiling();

@@ -35,8 +35,8 @@ else()
     message(FATAL_ERROR "Unknown platform.")
 endif()
 
-target_precompile_headers(BuildSettings INTERFACE "${CMAKE_CURRENT_LIST_DIR}/platform.h.in")
-
+#target_precompile_headers(BuildSettings INTERFACE "${CMAKE_CURRENT_LIST_DIR}/platform.h.in")
+target_compile_options(BuildSettings INTERFACE -include "${CMAKE_CURRENT_LIST_DIR}/platform.h.in") 
 include(CheckCXXSourceCompiles)
 
 ## 
