@@ -15,7 +15,7 @@ if(IMPORT_BENCHMARK)
     include(FetchContent)
     FetchContent_Declare(
       benchmark
-      GIT_REPOSITORY git@github.com:xuyuanwang1993/benchmark.git
+      GIT_REPOSITORY https://github.com/xuyuanwang1993/benchmark.git
       GIT_TAG f4f93b5553ced834b2120048f65690cddb4b7a2f
     )
     option(BENCHMARK_ENABLE_TESTING "Enable testing of the benchmark library." OFF)
